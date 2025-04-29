@@ -40,3 +40,15 @@ body {
     color: white;
   }
   
+  h3 {
+    color: #2d3436;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+  
+  .stat-card span {
+    display: block;
+    font-size: 18px;
+    color: #0984e3;
+  }
+  

@@ -1,58 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>AI Trading Dashboard</title>
-  <link rel="stylesheet" href="/static/styles.css" />
-  <script src="/static/chart.js"></script>
+  <meta charset="UTF-8">
+  <title>ByBit AI Bot - Dashboard</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script defer src="/static/chart.js"></script>
 </head>
 <body>
   <div class="container">
-    <h2>📊 ByBit AI Bot - Dashboard</h2>
+    <h2>📊 ByBit AI Bot – Dashboard</h2>
 
     <div class="stats-container">
-      <div class="stat-card">Total Trades: <b>{{ stats.total_trades }}</b></div>
-      <div class="stat-card">Wins: <b>{{ stats.wins }}</b></div>
-      <div class="stat-card">Losses: <b>{{ stats.losses }}</b></div>
-      <div class="stat-card">Win Rate: <b>{{ stats.win_rate }}%</b></div>
-      <div class="stat-card">Profit: <b>{{ stats.total_profit }}€</b></div>
+      <div class="stat-card">🧠 Status:<br><span id="ai_status">Learning...</span></div>
+      <div class="stat-card">📈 Symbol:<br><span id="symbol">-</span></div>
+      <div class="stat-card">🎯 Confidence:<br><span id="confidence">-</span></div>
+      <div class="stat-card">🕒 Last Update:<br><span id="last_update">-</span></div>
     </div>
 
-    {% if last_trade %}
     <div class="card">
-      <h3>Last Trade</h3>
-      <p><strong>Symbol:</strong> {{ last_trade.symbol }}</p>
-      <p><strong>Side:</strong> {{ last_trade.side }}</p>
-      <p><strong>Sentiment:</strong> {{ last_trade.sentiment }}</p>
-      <p><strong>Confidence:</strong> {{ last_trade.confidence }}%</p>
-      <p><strong>Time:</strong> {{ last_trade.time }}</p>
-    </div>
-    {% endif %}
-
-    <div class="card">
-      <h3>Trade History</h3>
-      <table>
+      <h3>📉 Trade History</h3>
+      <table id="trades">
         <thead>
-          <tr><th>Time</th><th>Symbol</th><th>Side</th><th>Sentiment</th><th>Confidence</th><th>PNL (€)</th></tr>
+          <tr>
+            <th>Time</th>
+            <th>Symbol</th>
+            <th>Side</th>
+            <th>Sentiment</th>
+            <th>Confidence</th>
+            <th>PNL (€)</th>
+          </tr>
         </thead>
-        <tbody>
-          {% for trade in trades[::-1] %}
-            <tr>
-              <td>{{ trade.time }}</td>
-              <td>{{ trade.symbol }}</td>
-              <td>{{ trade.side }}</td>
-              <td>{{ trade.sentiment }}</td>
-              <td>{{ trade.confidence }}%</td>
-              <td>{{ trade.pnl }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
+        <tbody></tbody>
       </table>
     </div>
 
     <div class="card">
-      <h3>Prediction Chart</h3>
-      <canvas id="trendChart" width="400" height="200"></canvas>
+      <h3>📊 Prediction Chart</h3>
+      <canvas id="trendChart" width="600" height="300"></canvas>
     </div>
   </div>
 </body>
