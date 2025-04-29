@@ -1,0 +1,30 @@
+# =====================
+# ByBit AI Bot Settings
+# =====================
+
+bot:
+  risk_per_trade_percent: 2.0
+  take_profit_percent: 3.0
+  stop_loss_percent: 2.0
+  max_concurrent_trades: 5
+  ai_confidence_threshold: 80
+  max_daily_loss_percent: 10
+
+dashboard:
+  username: "admin"
+  password: "changeme123"
+  port: 8000
+
+telegram:
+  enabled: true
+  bot_token: "7940503973:AAEXQs9El89WBEDYAAm-ezF5OkOJbWTKjNo"
+  chat_id: "-1002636297645"
+
+api_keys:
+  bybit_api_key: "4D4kLS9q0IXWXxlG6q"
+  bybit_api_secret: "sTOXzUJZUDFz50m4oFDHMWeHSnBVPZIdm0tx"
+  cryptopanic_api_key: "defb6fad0b3f58d8369f3cbcafea0c0e8727025f"
+
+system:
+  currency: "EUR"
+  use_autostart: true
