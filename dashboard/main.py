@@ -9,6 +9,7 @@ from ai.trend_predictor import TrendPredictor
 from utils.trade_logger import TradeLogger
 
 app = FastAPI()
+
 app.mount("/static", StaticFiles(directory="dashboard/static"), name="static")
 templates = Jinja2Templates(directory="dashboard/templates")
 
@@ -17,25 +18,32 @@ PASSWORD = "changeme123"
 
 @app.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse("login.html", {"request": request, "error": ""})
 
 @app.post("/login", response_class=HTMLResponse)
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    if username == USERNAME and password == PASSWORD:
-        response = RedirectResponse(url="/dashboard", status_code=302)
-        response.set_cookie("authenticated", "yes")
-        return response
-    return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials"})
+    try:
+        if username == USERNAME and password == PASSWORD:
+            response = RedirectResponse(url="/dashboard", status_code=302)
+            response.set_cookie("authenticated", "yes")
+            return response
+        else:
+            return templates.TemplateResponse("login.html", {
+                "request": request,
+                "error": "Invalid credentials"
+            })
+    except Exception as e:
+        print("❌ Login error:", e)
+        return HTMLResponse(f"Login error: {e}", status_code=500)
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
-    authenticated = request.cookies.get("authenticated")
-    if authenticated != "yes":
+    if request.cookies.get("authenticated") != "yes":
         return RedirectResponse("/")
 
-    last_trade = {}
     trades = []
     stats = {}
+    last_trade = {}
 
     if os.path.exists("trades.json"):
         with open("trades.json", "r") as f:

@@ -2,76 +2,29 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Login to ByBit AI Bot</title>
-  <link rel="stylesheet" href="/static/styles.css">
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #000000);
-      background-size: 400% 400%;
-      animation: gradientBG 15s ease infinite;
-      font-family: 'Segoe UI', sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      color: #fff;
-    }
-
-    @keyframes gradientBG {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-
-    .login-box {
-      background: rgba(255, 255, 255, 0.1);
-      padding: 40px;
-      border-radius: 12px;
-      box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
-      width: 320px;
-      backdrop-filter: blur(12px);
-    }
-
-    .login-box h2 {
-      text-align: center;
-      margin-bottom: 30px;
-      color: #fff;
-    }
-
-    input {
-      width: 100%;
-      padding: 12px;
-      margin: 10px 0;
-      border: none;
-      border-radius: 6px;
-      font-size: 16px;
-    }
-
-    button {
-      width: 100%;
-      padding: 12px;
-      border: none;
-      border-radius: 6px;
-      background: #00b894;
-      font-size: 16px;
-      font-weight: bold;
-      color: white;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #019874;
-    }
-  </style>
+  <title>Login | ByBit AI Bot</title>
+  <link rel="stylesheet" href="/static/styles.css" />
 </head>
-<body>
-  <form method="post" action="/login" class="login-box">
-    <h2>🔐 Login to AI Bot</h2>
-    <input type="text" name="username" placeholder="Username" required />
-    <input type="password" name="password" placeholder="Password" required />
-    <button type="submit">Login</button>
-  </form>
+<body class="login-body">
+  <div class="login-container">
+    <form method="post" action="/login" class="login-card">
+      <div class="login-avatar">
+        <img src="https://cdn-icons-png.flaticon.com/512/747/747376.png" alt="avatar" />
+      </div>
+      <h2>Login to AI Bot</h2>
+      <div class="form-group">
+        <input type="text" name="username" placeholder="Email ID" required>
+      </div>
+      <div class="form-group">
+        <input type="password" name="password" placeholder="Password" required>
+      </div>
+      <div class="form-options">
+        <label><input type="checkbox"> Remember me</label>
+        <a href="#">Forgot Password?</a>
+      </div>
+      <button type="submit" class="login-button">LOGIN</button>
+    </form>
+    <footer class="footer">Developed by <strong>X Project</strong> © 2025</footer>
+  </div>
 </body>
 </html>
