@@ -3,41 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automated Trading Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.0/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/styles.css">
-</head>
-<body class="bg-gray-900 text-white">
-    <div class="container mx-auto">
-        <header class="flex justify-between items-center py-4">
-            <h1 class="text-3xl font-bold">Automated Trading Dashboard</h1>
-            <button class="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
-        </header>
-        
-        <main class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Balance Card -->
-            <div class="bg-gray-800 p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-semibold">Current Balance</h2>
-                <p class="text-3xl" id="balance">Loading...</p>
-            </div>
-
-            <!-- Trade History -->
-            <div class="bg-gray-800 p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-semibold">Recent Trades</h2>
-                <div id="trade-history">
-                    <!-- List of trades will be dynamically populated here -->
-                </div>
-            </div>
-
-            <!-- Chart -->
-            <div class="bg-gray-800 p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-semibold">Live Price Chart</h2>
-                <canvas id="priceChart"></canvas>
-            </div>
-        </main>
-    </div>
-
+    <title>Trading Bot Dashboard</title>
+    <link rel="stylesheet" href="/static/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="/static/js/app.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Trading Bot Dashboard</h1>
+        <div id="balance">Balance: $0</div>
+        <div>
+            <button id="startBotBtn" onclick="startBot()">Start Bot</button>
+            <button id="stopBotBtn" onclick="stopBot()">Stop Bot</button>
+        </div>
+    </header>
+
+    <section id="market_data">
+        <h2>Market Data (Price History)</h2>
+        <canvas id="priceChart"></canvas>
+    </section>
+
+    <section id="trade_stats">
+        <h2>Last Trade Info</h2>
+        <p id="last_trade">No trade yet</p>
+    </section>
+
+    <footer>
+        <p>Made with ❤️ by X Project</p>
+    </footer>
+
+    <script>
+        // Fetch balance and market data
+        fetch('/api/balance')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('balance').innerHTML = `Balance: $${data.balance}`;
+            });
+
+        fetch('/api/market_data')
+            .then(response => response.json())
+            .then(data => {
+                const ctx = document.getElementById('priceChart').getContext('2d');
+                const priceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.time,
+                        datasets: [{
+                            label: 'Price History',
+                            data: data.prices,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        }]
+                    }
+                });
+            });
+
+        fetch('/api/trades')
+            .then(response => response.json())
+            .then(data => {
+                if (data.length > 0) {
+                    const lastTrade = data[data.length - 1];
+                    document.getElementById('last_trade').innerHTML = `Last trade: ${lastTrade.symbol} | ${lastTrade.side} | ${lastTrade.timestamp}`;
+                }
+            });
+
+        // Function to start bot
+        function startBot() {
+            fetch('/start-bot')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Bot started', data);
+                });
+        }
+
+        // Function to stop bot
+        function stopBot() {
+            fetch('/stop-bot')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Bot stopped', data);
+                });
+        }
+    </script>
 </body>
 </html>
