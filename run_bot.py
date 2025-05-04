@@ -6,6 +6,11 @@ from ai.trend_predictor import TrendPredictor
 from utils.news_scraper import NewsScraper
 from utils.trade_logger import TradeLogger
 import time
+import argparse
+from ai.backtest import Backtester
+from ai.trader import Trader
+import pandas as pd
+
 
 class Trader:
     def __init__(self, settings, telegram):

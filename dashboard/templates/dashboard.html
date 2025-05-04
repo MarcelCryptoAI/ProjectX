@@ -1,44 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>ByBit AI Bot - Dashboard</title>
-  <link rel="stylesheet" href="/static/styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script defer src="/static/chart.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automated Trading Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.0/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
 </head>
-<body class="dashboard-body">
-  <div class="container">
-    <h2>📊 ByBit AI Bot – Dashboard</h2>
-    <div class="stats-container">
-      <div class="stat-card">🧠 Status:<br><span id="ai_status">Learning...</span></div>
-      <div class="stat-card">📈 Symbol:<br><span id="symbol">-</span></div>
-      <div class="stat-card">🎯 Confidence:<br><span id="confidence">-</span></div>
-      <div class="stat-card">🕒 Last Update:<br><span id="last_update">-</span></div>
+<body class="bg-gray-900 text-white">
+    <div class="container mx-auto">
+        <header class="flex justify-between items-center py-4">
+            <h1 class="text-3xl font-bold">Automated Trading Dashboard</h1>
+            <button class="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
+        </header>
+        
+        <main class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Balance Card -->
+            <div class="bg-gray-800 p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-semibold">Current Balance</h2>
+                <p class="text-3xl" id="balance">Loading...</p>
+            </div>
+
+            <!-- Trade History -->
+            <div class="bg-gray-800 p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-semibold">Recent Trades</h2>
+                <div id="trade-history">
+                    <!-- List of trades will be dynamically populated here -->
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <div class="bg-gray-800 p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-semibold">Live Price Chart</h2>
+                <canvas id="priceChart"></canvas>
+            </div>
+        </main>
     </div>
 
-    <div class="card">
-      <h3>📉 Trade History</h3>
-      <table id="trades">
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Symbol</th>
-            <th>Side</th>
-            <th>Sentiment</th>
-            <th>Confidence</th>
-            <th>PNL (€)</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-
-    <div class="card">
-      <h3>📊 Prediction Chart</h3>
-      <canvas id="trendChart" width="600" height="300"></canvas>
-    </div>
-  </div>
-  <footer class="footer">🛠️ Developed by X Project 2025</footer>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/js/app.js"></script>
 </body>
 </html>

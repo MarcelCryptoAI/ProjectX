@@ -1,41 +1,54 @@
+# ai/backtest.py
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from ai.trader import Trader
+from ai.sentiment_analyzer import SentimentAnalyzer
+from ai.trend_predictor import TrendPredictor
 
-# Load historical data
-def load_data(file_path):
-    return pd.read_csv(file_path)  # Assuming CSV file with 'Date', 'Close' columns
+class Backtester:
+    def __init__(self, historical_data, settings):
+        self.historical_data = historical_data
+        self.settings = settings
+        self.trader = Trader(settings, None)
+        self.sentiment_analyzer = SentimentAnalyzer()
+        self.trend_predictor = TrendPredictor()
 
-# Backtest the strategy (SMA crossover)
-def backtest_strategy(data, short_window=20, long_window=50):
-    data['Short_MA'] = data['Close'].rolling(window=short_window, min_periods=1).mean()
-    data['Long_MA'] = data['Close'].rolling(window=long_window, min_periods=1).mean()
+    def run_backtest(self):
+        balance = 1000  # Starting with $1000
+        initial_balance = balance
+        positions = []
+        returns = []
+        for i in range(len(self.historical_data)):
+            # Step 1: Get market data
+            current_data = self.historical_data.iloc[i]
+            symbol = current_data['symbol']
+            price = current_data['close']
+            
+            # Step 2: Get sentiment and trend predictions
+            sentiment_score = self.sentiment_analyzer.analyze_sentiment(current_data['news'])
+            trend = self.trend_predictor.predict_trend(symbol)
 
-    # Buy when short MA crosses above long MA, Sell when short MA crosses below long MA
-    data['Signal'] = 0
-    data['Signal'][short_window:] = np.where(data['Short_MA'][short_window:] > data['Long_MA'][short_window:], 1, 0)
-    data['Position'] = data['Signal'].diff()
+            # Step 3: Evaluate if we should trade
+            if self.trader.should_trade(sentiment_score, trend):
+                # Example: Buy or sell logic (simplified for backtest)
+                if trend["direction"] == "buy":
+                    balance -= price  # Simulate a buy
+                    positions.append("buy")
+                elif trend["direction"] == "sell":
+                    balance += price  # Simulate a sell
+                    positions.append("sell")
 
-    return data
+            # Step 4: Log returns
+            returns.append(balance - initial_balance)
 
-# Simulate trading
-def simulate_trading(data):
-    data['Daily_Return'] = data['Close'].pct_change() * data['Position']
-    data['Strategy_Return'] = data['Daily_Return'].cumsum()
-    return data
+        self.plot_results(returns)
 
-# Plot results
-def plot_results(data):
-    plt.figure(figsize=(10,5))
-    plt.plot(data['Date'], data['Strategy_Return'], label='Strategy Return')
-    plt.plot(data['Date'], data['Close'], label='Market Price')
-    plt.legend()
-    plt.show()
+    def plot_results(self, returns):
+        plt.plot(returns)
+        plt.title('Backtest Results')
+        plt.xlabel('Time')
+        plt.ylabel('Balance Change')
+        plt.show()
 
-# Main function to run backtest
-def run_backtest(file_path):
-    data = load_data(file_path)
-    data = backtest_strategy(data)
-    data = simulate_trading(data)
-    plot_results(data)
-    print("Backtest completed successfully!")
