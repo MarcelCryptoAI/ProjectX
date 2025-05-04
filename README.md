@@ -103,3 +103,71 @@ nano config/settings.yaml
 
 # 5. Start bot
 sudo systemctl start bybit-ai-bot
+
+
+# ByBit AI Trading Bot
+
+This bot uses machine learning and sentiment analysis to trade on ByBit using various strategies, including Q-Learning, sentiment analysis, and technical indicators like RSI, MACD, and SMA.
+
+## Setup Instructions
+
+### Prerequisites
+
+- Python 3.8+
+- Install required libraries:
+  ```bash
+  pip install -r requirements.txt
+Configuration
+Environment Variables:
+
+Create a .env file with the following variables:
+
+text
+Copy
+BYBIT_API_KEY=your_api_key
+BYBIT_API_SECRET=your_api_secret
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
+Run the Bot:
+
+Start the bot:
+
+bash
+Copy
+python3 run_bot.py
+Advanced Features
+Q-learning:
+
+The bot uses Q-learning to optimize trading strategies based on past trades.
+
+Sentiment Analysis:
+
+The bot fetches sentiment from social media and news using NLP models.
+
+Multiple Indicators:
+
+RSI and MACD indicators are used for technical analysis to predict market trends.
+
+Performance Metrics
+The bot tracks the following metrics:
+
+Sharpe ratio
+
+Win rate
+
+Maximum drawdown
+
+Portfolio performance
+
+yaml
+Copy
+
+---
+
+### **Final Steps**:
+
+1. **Apply all changes**:
+   - Replace the existing code with the updates provided for `trader.py`, `reinforcement_learning.py`, `trend_predictor.py`, and `README.md`.
+
+2. **Run the bot**:
+   - After implementing the changes, run the bot again to see the improvements. The bot will now use dynamic state inputs (e.g., sentiment, RSI, MACD) and enhance the trading strategy with the Q-learning algorithm.
