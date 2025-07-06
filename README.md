@@ -1,173 +1,242 @@
-# ByBit AI Bot by X Project
+# ByBit AI Trading Bot 🤖
 
-✅ Real-time crypto trading bot  
-✅ Full AI predictions (FinBERT + Trend)  
-✅ News Sentiment Analyzer (CryptoPanic API)  
-✅ Auto-trading on Bybit in EUR €  
-✅ Telegram alerts for trades
-✅ FastAPI dashboard
+Een AI-aangedreven cryptocurrency trading bot voor ByBit exchange met real-time web dashboard.
 
----
+## ✨ Features
 
-## Installation (Ubuntu 22 LTS)
+- 🤖 **AI-driven trading** - Machine learning voor market analyse
+- 📊 **Real-time dashboard** - Live monitoring via web interface  
+- 🔄 **WebSocket support** - Live updates zonder refresh
+- 📈 **Technical indicators** - RSI, MACD, Bollinger Bands, etc.
+- 🎯 **Risk management** - Position sizing en stop-loss automation
+- 💼 **Portfolio tracking** - Real-time P&L en performance metrics
+- 🔐 **Secure API integration** - ByBit API met rate limiting
+- 🗄️ **Database storage** - Training data en trade history
+- 📱 **Responsive design** - Werkt op desktop en mobile
+
+## 🚀 Quick Start (Lokaal)
 
 ```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
+# Clone repository
+git clone <repository-url>
+cd bybit-ai-bot
 
 # Install dependencies
-sudo apt install -y python3 python3-pip python3-venv git
+pip install -r requirements.txt
 
-# Clone or upload project
-mkdir -p /opt/bybit-ai-bot
-cd /opt/bybit-ai-bot
+# Setup environment variables
+cp .env.example .env
+# Edit .env met jouw ByBit API keys
 
-# (Upload files here)
+# Start de applicatie
+python web_app.py
+```
 
-# Setup Python environment
-python3 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt  # or manually install as in install.sh
+Dashboard beschikbaar op: http://localhost:5000
 
-# Copy systemd service
-sudo cp systemd/bybit-ai-bot.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable bybit-ai-bot
+## 🌐 Heroku Deployment
 
-# Edit your settings
-nano config/settings.yaml
+Zie [DEPLOYMENT.md](DEPLOYMENT.md) voor volledige deployment instructies.
 
-# Start the bot
-sudo systemctl start bybit-ai-bot
-Dashboard Access
-Go to: http://YOUR-VPS-IP:8000
+### One-Click Deploy
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
 
-Login: admin / changeme123
-
-Important
-Update your API keys inside config/settings.yaml first!
-
-Bot auto-restores after VPS reboot.
-
-🚀
-Built for fully autonomous 24/7 crypto trading with AI learning.
-
-yaml
-Copy
-Edit
-
-✅ Save this file as: `/ByBitAI-Bot-XProject/README.md`
-
----
-
-# 📋 Summary
-
-✅ Your full real bot project is now built:  
-✅ `run_bot.py`, `install.sh`, `/bot/`, `/ai/`, `/utils/`, `/dashboard/`, `/config/`, `/systemd/`
-
-✅ No missing files  
-✅ No dummy code  
-✅ Fully real AI bot, ready to install
-
----
-
-# 🛠 Final Folder Structure (You Should Have Now)
-
-ByBitAI-Bot-XProject/ ├── ai/ │ ├── sentiment_analyzer.py │ ├── trend_predictor.py ├── bot/ │ ├── trader.py │ ├── session_manager.py │ ├── risk_manager.py ├── utils/ │ ├── news_scraper.py │ ├── telegram_alerts.py ├── dashboard/ │ ├── main.py │ ├── templates/ │ ├── login.html │ ├── dashboard.html │ ├── static/ │ ├── styles.css ├── config/ │ ├── settings.yaml ├── systemd/ │ ├── bybit-ai-bot.service ├── install.sh ├── run_bot.py ├── README.md
-
-yaml
-Copy
-Edit
-
----
-
-# 🛠 Installation Steps Again (Final)
-
+### Manual Deploy
 ```bash
-# 1. Go to your project folder
-cd /opt/bybit-ai-bot
+heroku create jouw-app-naam
+heroku config:set BYBIT_API_KEY="jouw_key"
+heroku config:set BYBIT_API_SECRET="jouw_secret"
+heroku config:set BYBIT_TESTNET="true"
+git push heroku main
+```
 
-# 2. Setup environment
-python3 -m venv venv
-source venv/bin/activate
-pip install fastapi uvicorn python-binance pandas scikit-learn tensorflow transformers pyyaml requests aiohttp websockets
+## 🔧 Configuratie
 
-# 3. Install systemd service
-sudo cp systemd/bybit-ai-bot.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable bybit-ai-bot
+### Environment Variables
+| Variable | Beschrijving | Default |
+|----------|--------------|---------|
+| `BYBIT_API_KEY` | ByBit API key | Required |
+| `BYBIT_API_SECRET` | ByBit API secret | Required |
+| `BYBIT_TESTNET` | Testnet mode | `true` |
+| `TRADING_ENABLED` | Live trading | `false` |
+| `AI_CONFIDENCE_THRESHOLD` | Min confidence | `75` |
+| `RISK_PER_TRADE_PERCENT` | Max risk per trade | `2` |
 
-# 4. Edit config
-nano config/settings.yaml
+### Trading Safety
+⚠️ **BELANGRIJK**: Start altijd met:
+- `BYBIT_TESTNET=true` (testnet)
+- `TRADING_ENABLED=false` (geen live trades)
+- Lage risk percentages (1-2%)
 
-# 5. Start bot
-sudo systemctl start bybit-ai-bot
+## 📊 Dashboard Features
 
+### Main Dashboard
+- **System Status** - Trading/training status
+- **Live Console** - Real-time logging
+- **Control Panel** - START ALL / STOP ALL buttons
+- **Performance Metrics** - P&L, win rate, positions
 
-# ByBit AI Trading Bot
+### Coin Status Page
+- **AI Analysis** per coin - Bullish/Bearish/Neutral
+- **Take Profit/Stop Loss** recommendations
+- **Confidence Scores** - AI prediction confidence
+- **Direct Trading** - Execute trades direct vanuit interface
 
-This bot uses machine learning and sentiment analysis to trade on ByBit using various strategies, including Q-Learning, sentiment analysis, and technical indicators like RSI, MACD, and SMA.
+### Settings Page
+- **API Configuration** - ByBit connection settings
+- **Risk Management** - Position sizing, leverage
+- **AI Parameters** - Confidence thresholds, training intervals
 
-## Setup Instructions
+### Analytics Page
+- **Performance Charts** - P&L over time
+- **Trade Statistics** - Win/loss ratios, best performing pairs
+- **Risk Metrics** - Drawdown, Sharpe ratio
 
-### Prerequisites
+## 🏗️ Architecture
 
-- Python 3.8+
-- Install required libraries:
-  ```bash
-  pip install -r requirements.txt
-Configuration
-Environment Variables:
+```
+├── web_app.py              # Main Flask application
+├── ai_worker.py            # AI training en signal generation
+├── database.py             # PostgreSQL/SQLite database layer
+├── trading/
+│   └── executor.py         # Trade execution engine
+├── ai/
+│   └── trader.py           # AI model en predictions
+├── utils/
+│   ├── settings_loader.py  # Configuration management
+│   └── trade_logger.py     # Trade logging
+├── bot/
+│   └── risk_manager.py     # Risk management
+└── templates/              # HTML templates
+```
 
-Create a .env file with the following variables:
+## 🗄️ Database Schema
 
-text
-Copy
-BYBIT_API_KEY=your_api_key
-BYBIT_API_SECRET=your_api_secret
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-TELEGRAM_CHAT_ID=your_chat_id
-Run the Bot:
+- **market_data** - OHLCV price data
+- **technical_indicators** - RSI, MACD, BB values
+- **sentiment_data** - Market sentiment scores
+- **training_sessions** - AI training logs
+- **training_results** - Model performance data
 
-Start the bot:
+## 🔌 API Endpoints
 
-bash
-Copy
-python3 run_bot.py
-Advanced Features
-Q-learning:
+### System Control
+- `POST /api/start_all` - Start training, signals & trading
+- `POST /api/stop_all` - Stop all operations
 
-The bot uses Q-learning to optimize trading strategies based on past trades.
+### Data Endpoints
+- `GET /api/coin_analysis` - AI analysis per coin
+- `GET /api/worker_stats` - System status
+- `GET /api/database_stats` - Database statistics
+- `GET /api/console_logs` - Live console logs
 
-Sentiment Analysis:
+### Trading
+- `POST /api/execute_ai_trade` - Execute recommended trade
+- `GET /api/positions` - Current positions
+- `GET /api/trading_history` - Trade history
 
-The bot fetches sentiment from social media and news using NLP models.
+## 🛡️ Security Features
 
-Multiple Indicators:
+- **API Key Encryption** - Secure storage via environment variables
+- **Rate Limiting** - Respect ByBit API limits
+- **Risk Controls** - Max position sizes, stop losses
+- **Testnet Support** - Safe testing environment
+- **Manual Overrides** - Emergency stop functionality
 
-RSI and MACD indicators are used for technical analysis to predict market trends.
+## 📈 Trading Strategy
 
-Performance Metrics
-The bot tracks the following metrics:
+1. **Data Collection** - Market data, technical indicators, sentiment
+2. **AI Analysis** - Machine learning model predictions
+3. **Signal Generation** - Confidence-based trade signals
+4. **Risk Assessment** - Position sizing, stop loss calculation
+5. **Trade Execution** - Automated order placement
+6. **Monitoring** - Real-time position tracking
+7. **Learning** - Continuous model improvement
 
-Sharpe ratio
+## 🔧 Development
 
-Win rate
+### Local Setup
+```bash
+# Virtual environment
+python -m venv venv
+source venv/bin/activate  # Unix
+venv\\Scripts\\activate   # Windows
 
-Maximum drawdown
+# Install dependencies
+pip install -r requirements.txt
 
-Portfolio performance
+# Run in development mode
+export FLASK_ENV=development
+python web_app.py
+```
 
-yaml
-Copy
+### Testing
+- Start met testnet (`BYBIT_TESTNET=true`)
+- Disable live trading (`TRADING_ENABLED=false`)
+- Monitor logs voor errors
+- Test met kleine amounts
+
+## 🆘 Troubleshooting
+
+### Common Issues
+1. **API Connection Failed**
+   - Check API keys in environment variables
+   - Verify ByBit API status
+   - Check network connectivity
+
+2. **Database Errors**
+   - PostgreSQL connection issues (production)
+   - Check DATABASE_URL environment variable
+   - Verify database permissions
+
+3. **Trading Disabled**
+   - Check `TRADING_ENABLED` setting
+   - Verify `ENABLE_LIVE_TRADING` flag
+   - Check confidence thresholds
+
+4. **WebSocket Issues**
+   - Browser compatibility
+   - Network firewall blocking
+   - Check real-time console logs
+
+### Emergency Stops
+```bash
+# Stop all trading immediately
+heroku config:set TRADING_ENABLED="false"
+
+# Restart application  
+heroku ps:restart
+
+# Check status
+heroku logs --tail
+```
+
+## 📚 Resources
+
+- [ByBit API Documentation](https://bybit-exchange.github.io/docs/)
+- [Heroku Deployment Guide](DEPLOYMENT.md)
+- [Trading Strategy Guide](docs/strategy.md)
+
+## ⚖️ Disclaimer
+
+Dit is experimentele software voor educational purposes. 
+- **Trade op eigen risiko**
+- **Start altijd met testnet**
+- **Monitor altijd je positions**
+- **Gebruik alleen geld dat je kunt missen**
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
+
+## 📄 License
+
+MIT License - zie [LICENSE](LICENSE) file.
 
 ---
 
-### **Final Steps**:
-
-1. **Apply all changes**:
-   - Replace the existing code with the updates provided for `trader.py`, `reinforcement_learning.py`, `trend_predictor.py`, and `README.md`.
-
-2. **Run the bot**:
-   - After implementing the changes, run the bot again to see the improvements. The bot will now use dynamic state inputs (e.g., sentiment, RSI, MACD) and enhance the trading strategy with the Q-learning algorithm.
+**Happy Trading! 🚀📈**

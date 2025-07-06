@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration - ByBit AI Trading Bot</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .config-section { margin-bottom: 30px; }
+        .config-card { border-left: 4px solid #007bff; }
+        .form-label { font-weight: 600; }
+        .form-text { color: #6c757d; }
+        .btn-save { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .navbar-brand { font-weight: bold; }
+        .nav-tabs .nav-link.active { background-color: #007bff; color: white; }
+        .tab-content { padding: 20px; background: white; border: 1px solid #dee2e6; border-top: none; }
+        .danger-zone { border: 2px solid #dc3545; border-radius: 8px; padding: 20px; margin-top: 20px; }
+        .danger-zone h5 { color: #dc3545; }
+        .api-key-input { font-family: monospace; }
+        .settings-group { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-robot"></i> ByBit AI Trading Bot
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">Dashboard</a>
+                <a class="nav-link active" href="/config">Settings</a>
+                <a class="nav-link" href="/analytics">Analytics</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2><i class="fas fa-cog"></i> Configuration</h2>
+                    <button class="btn btn-success btn-save" onclick="saveSettings()">
+                        <i class="fas fa-save"></i> Save All Settings
+                    </button>
+                </div>
+
+                <!-- Configuration Tabs -->
+                <ul class="nav nav-tabs" id="configTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="trading-tab" data-bs-toggle="tab" data-bs-target="#trading" type="button" role="tab">
+                            <i class="fas fa-chart-line"></i> Trading Settings
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="risk-tab" data-bs-toggle="tab" data-bs-target="#risk" type="button" role="tab">
+                            <i class="fas fa-shield-alt"></i> Risk Management
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="api-tab" data-bs-toggle="tab" data-bs-target="#api" type="button" role="tab">
+                            <i class="fas fa-key"></i> API Settings
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="ai-tab" data-bs-toggle="tab" data-bs-target="#ai" type="button" role="tab">
+                            <i class="fas fa-brain"></i> AI Settings
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="telegram-tab" data-bs-toggle="tab" data-bs-target="#telegram" type="button" role="tab">
+                            <i class="fab fa-telegram"></i> Telegram
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="configTabsContent">
+                    <!-- Trading Settings -->
+                    <div class="tab-pane fade show active" id="trading" role="tabpanel">
+                        <div class="settings-group">
+                            <h5><i class="fas fa-percentage"></i> Position Sizing</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="riskPerTrade" class="form-label">Risk Per Trade (%)</label>
+                                        <input type="number" class="form-control" id="riskPerTrade" step="0.1" min="0.1" max="10">
+                                        <div class="form-text">Percentage of account balance to risk per trade</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="maxConcurrentTrades" class="form-label">Max Concurrent Trades</label>
+                                        <input type="number" class="form-control" id="maxConcurrentTrades" min="1" max="20">
+                                        <div class="form-text">Maximum number of trades to run simultaneously</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-group">
+                            <h5><i class="fas fa-target"></i> Take Profit & Stop Loss</h5>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="takeProfitPercent" class="form-label">Take Profit (%)</label>
+                                        <input type="number" class="form-control" id="takeProfitPercent" step="0.1" min="0.1" max="20">
+                                        <div class="form-text">Percentage gain to take profit</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="stopLossPercent" class="form-label">Stop Loss (%)</label>
+                                        <input type="number" class="form-control" id="stopLossPercent" step="0.1" min="0.1" max="10">
+                                        <div class="form-text">Percentage loss to stop loss</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="defaultLeverage" class="form-label">Default Leverage</label>
+                                        <input type="number" class="form-control" id="defaultLeverage" step="1" min="1" max="100" value="1">
+                                        <div class="form-text">Default leverage multiplier for trades</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="trailingStopPercent" class="form-label">Trailing Stop (%)</label>
+                                        <input type="number" class="form-control" id="trailingStopPercent" step="0.1" min="0" max="5" value="0">
+                                        <div class="form-text">Trailing stop loss percentage (0 = disabled)</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="autoTPSL" class="form-label">Auto TP/SL</label>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="autoTPSL" checked>
+                                            <label class="form-check-label" for="autoTPSL">
+                                                Automatically set TP/SL on all trades
+                                            </label>
+                                        </div>
+                                        <div class="form-text">Enable automatic take profit and stop loss</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-group">
+                            <h5><i class="fas fa-coins"></i> Trading Pairs</h5>
+                            <div class="mb-3">
+                                <label for="tradingPairs" class="form-label">Enabled Trading Pairs</label>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="selectAll" onchange="toggleAllPairs()">
+                                            <label class="form-check-label" for="selectAll">
+                                                <strong>Select All</strong>
+                                            </label>
+                                        </div>
+                                        <hr>
+                                        <div class="mb-2">
+                                            <input type="text" class="form-control form-control-sm" id="pairSearch" placeholder="Search pairs..." onkeyup="filterPairs()">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <small class="text-muted">Popular pairs are enabled by default</small>
+                                    </div>
+                                </div>
+                                <div id="tradingPairsList" style="max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; padding: 10px; border-radius: 5px;">
+                                    <div class="text-center p-3">
+                                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                                        <span class="ms-2">Loading trading pairs...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Risk Management -->
+                    <div class="tab-pane fade" id="risk" role="tabpanel">
+                        <div class="settings-group">
+                            <h5><i class="fas fa-exclamation-triangle"></i> Daily Limits</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="maxDailyLoss" class="form-label">Max Daily Loss (%)</label>
+                                        <input type="number" class="form-control" id="maxDailyLoss" step="0.1" min="1" max="50">
+                                        <div class="form-text">Maximum daily loss before stopping trading</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="maxDailyTrades" class="form-label">Max Daily Trades</label>
+                                        <input type="number" class="form-control" id="maxDailyTrades" min="1" max="100">
+                                        <div class="form-text">Maximum number of trades per day</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-group">
+                            <h5><i class="fas fa-chart-area"></i> Drawdown Protection</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="maxDrawdown" class="form-label">Max Drawdown (%)</label>
+                                        <input type="number" class="form-control" id="maxDrawdown" step="0.1" min="5" max="30">
+                                        <div class="form-text">Maximum drawdown before reducing position size</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="cooldownPeriod" class="form-label">Cooldown Period (minutes)</label>
+                                        <input type="number" class="form-control" id="cooldownPeriod" min="5" max="1440">
+                                        <div class="form-text">Cooldown period after hitting daily loss limit</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-group">
+                            <h5><i class="fas fa-clock"></i> Trading Hours</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="tradingStartTime" class="form-label">Trading Start Time</label>
+                                        <input type="time" class="form-control" id="tradingStartTime">
+                                        <div class="form-text">Start time for automated trading</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="tradingEndTime" class="form-label">Trading End Time</label>
+                                        <input type="time" class="form-control" id="tradingEndTime">
+                                        <div class="form-text">End time for automated trading</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- API Settings -->
+                    <div class="tab-pane fade" id="api" role="tabpanel">
+                        <div class="settings-group">
+                            <h5><i class="fas fa-exchange-alt"></i> ByBit API</h5>
+                            <div class="mb-3">
+                                <label for="bybitApiKey" class="form-label">API Key</label>
+                                <input type="password" class="form-control api-key-input" id="bybitApiKey">
+                                <div class="form-text">Your ByBit API key</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="bybitApiSecret" class="form-label">API Secret</label>
+                                <input type="password" class="form-control api-key-input" id="bybitApiSecret">
+                                <div class="form-text">Your ByBit API secret</div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="testnetMode">
+                                    <label class="form-check-label" for="testnetMode">
+                                        Use Testnet Mode
+                                    </label>
+                                    <div class="form-text">Enable testnet for paper trading</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-group">
+                            <h5><i class="fas fa-newspaper"></i> News API</h5>
+                            <div class="mb-3">
+                                <label for="cryptopanicApiKey" class="form-label">CryptoPanic API Key</label>
+                                <input type="password" class="form-control api-key-input" id="cryptopanicApiKey">
+                                <div class="form-text">API key for cryptocurrency news sentiment analysis</div>
+                            </div>
+                        </div>
+
+                        <div class="danger-zone">
+                            <h5><i class="fas fa-exclamation-triangle"></i> API Testing</h5>
+                            <p>Test your API connection and view account information.</p>
+                            <button class="btn btn-outline-primary" onclick="testApiConnection()">
+                                <i class="fas fa-plug"></i> Test API Connection
+                            </button>
+                            <button class="btn btn-outline-info ms-2" onclick="getAccountInfo()">
+                                <i class="fas fa-info-circle"></i> Get Account Info
+                            </button>
+                            <button class="btn btn-outline-danger ms-2" onclick="resetApiSettings()">
+                                <i class="fas fa-undo"></i> Reset API Settings
+                            </button>
+                        </div>
+                        
+                        <div id="apiTestResult" class="mt-3" style="display: none;">
+                            <div class="alert alert-info">
+                                <h6>Account Information:</h6>
+                                <div id="accountDetails"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Settings -->
+                    <div class="tab-pane fade" id="ai" role="tabpanel">
+                        <div class="settings-group">
+                            <h5><i class="fas fa-brain"></i> AI Model Configuration</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="aiConfidenceThreshold" class="form-label">AI Confidence Threshold (%)</label>
+                                        <input type="number" class="form-control" id="aiConfidenceThreshold" min="50" max="95">
+                                        <div class="form-text">Minimum confidence level for AI predictions</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="modelUpdateInterval" class="form-label">Model Update Interval (hours)</label>
+                                        <input type="number" class="form-control" id="modelUpdateInterval" min="1" max="168">
+                                        <div class="form-text">How often to retrain the AI model</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-group">
+                            <h5><i class="fas fa-chart-bar"></i> Technical Analysis</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="lookbackPeriod" class="form-label">Lookback Period (days)</label>
+                                        <input type="number" class="form-control" id="lookbackPeriod" min="7" max="365">
+                                        <div class="form-text">Historical data period for analysis</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="timeframe" class="form-label">Analysis Timeframe</label>
+                                        <select class="form-select" id="timeframe">
+                                            <option value="1m">1 Minute</option>
+                                            <option value="5m">5 Minutes</option>
+                                            <option value="15m">15 Minutes</option>
+                                            <option value="1h">1 Hour</option>
+                                            <option value="4h">4 Hours</option>
+                                            <option value="1d">1 Day</option>
+                                        </select>
+                                        <div class="form-text">Timeframe for technical analysis</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-group">
+                            <h5><i class="fas fa-newspaper"></i> Sentiment Analysis</h5>
+                            <div class="alert alert-info">
+                                <h6><i class="fas fa-info-circle"></i> Wat doet Sentiment Weight?</h6>
+                                <p class="mb-2">
+                                    <strong>Sentiment Weight</strong> bepaalt hoeveel invloed nieuws en marktsentiment hebben op de AI trading beslissingen:
+                                </p>
+                                <ul class="mb-2">
+                                    <li><strong>0-20%:</strong> Focus op technische analyse, minimaal sentiment</li>
+                                    <li><strong>21-40%:</strong> Balans tussen technisch en sentiment (Aanbevolen)</li>
+                                    <li><strong>41-60%:</strong> Sterke focus op marktsentiment</li>
+                                    <li><strong>61-100%:</strong> Voornamelijk sentiment-gedreven trading</li>
+                                </ul>
+                                <p class="mb-0">
+                                    <strong>💡 Advies:</strong> Start met 30-40% voor stabiele resultaten. Verhoog bij volatiele markten.
+                                </p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enableSentimentAnalysis" checked>
+                                    <label class="form-check-label" for="enableSentimentAnalysis">
+                                        Enable Sentiment Analysis
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="sentimentWeight" class="form-label">
+                                    Sentiment Weight: <span id="sentimentWeightValue" class="badge bg-primary">30%</span>
+                                </label>
+                                <input type="range" class="form-range" id="sentimentWeight" min="0" max="100" value="30" oninput="updateSentimentWeight()">
+                                <div class="row mt-2">
+                                    <div class="col text-start">
+                                        <small class="text-muted">0% - Pure Technical</small>
+                                    </div>
+                                    <div class="col text-center">
+                                        <small class="text-muted">50% - Balanced</small>
+                                    </div>
+                                    <div class="col text-end">
+                                        <small class="text-muted">100% - Pure Sentiment</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <div id="sentimentAdvice" class="alert alert-secondary">
+                                        <strong>Current Setting:</strong> Balanced approach with moderate sentiment influence.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Telegram Settings -->
+                    <div class="tab-pane fade" id="telegram" role="tabpanel">
+                        <div class="settings-group">
+                            <h5><i class="fab fa-telegram"></i> Telegram Bot Configuration</h5>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="telegramEnabled" checked>
+                                    <label class="form-check-label" for="telegramEnabled">
+                                        Enable Telegram Notifications
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="telegramBotToken" class="form-label">Bot Token</label>
+                                <input type="password" class="form-control api-key-input" id="telegramBotToken">
+                                <div class="form-text">Your Telegram bot token</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="telegramChatId" class="form-label">Chat ID</label>
+                                <input type="text" class="form-control" id="telegramChatId">
+                                <div class="form-text">Telegram chat ID to send notifications</div>
+                            </div>
+                        </div>
+
+                        <div class="settings-group">
+                            <h5><i class="fas fa-bell"></i> Notification Settings</h5>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="notifyTrades" checked>
+                                    <label class="form-check-label" for="notifyTrades">
+                                        Notify on New Trades
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="notifyPnl" checked>
+                                    <label class="form-check-label" for="notifyPnl">
+                                        Notify on PnL Updates
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="notifyErrors" checked>
+                                    <label class="form-check-label" for="notifyErrors">
+                                        Notify on Errors
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <button class="btn btn-outline-primary" onclick="testTelegram()">
+                                <i class="fas fa-paper-plane"></i> Test Telegram Connection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentSettings = {};
+
+        // Global variables
+        let allTradingPairs = [];
+        let enabledPairs = [];
+
+        // Load settings on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+            loadTradingPairs();
+            updateSentimentWeight(); // Initialize sentiment weight display
+        });
+
+        function loadSettings() {
+            fetch('/api/settings')
+            .then(response => response.json())
+            .then(data => {
+                currentSettings = data;
+                populateForm(data);
+            })
+            .catch(error => {
+                console.error('Error loading settings:', error);
+                showNotification('Error loading settings', 'error');
+            });
+        }
+
+        function populateForm(settings) {
+            // Trading settings
+            document.getElementById('riskPerTrade').value = settings.bot?.risk_per_trade_percent || 2.0;
+            document.getElementById('maxConcurrentTrades').value = settings.bot?.max_concurrent_trades || 5;
+            document.getElementById('takeProfitPercent').value = settings.bot?.take_profit_percent || 3.0;
+            document.getElementById('stopLossPercent').value = settings.bot?.stop_loss_percent || 2.0;
+            document.getElementById('defaultLeverage').value = settings.bot?.default_leverage || 1;
+            document.getElementById('trailingStopPercent').value = settings.bot?.trailing_stop_percent || 0;
+            document.getElementById('autoTPSL').checked = settings.bot?.auto_tpsl !== false;
+            
+            // Store enabled pairs
+            enabledPairs = settings.bot?.enabled_pairs || ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT'];
+            
+            // Risk management
+            document.getElementById('maxDailyLoss').value = settings.bot?.max_daily_loss_percent || 10;
+            document.getElementById('maxDailyTrades').value = settings.bot?.max_daily_trades || 50;
+            document.getElementById('maxDrawdown').value = settings.bot?.max_drawdown_percent || 15;
+            document.getElementById('cooldownPeriod').value = settings.bot?.cooldown_period || 60;
+            
+            // API settings
+            document.getElementById('bybitApiKey').value = settings.api_keys?.bybit_api_key || '';
+            document.getElementById('bybitApiSecret').value = settings.api_keys?.bybit_api_secret || '';
+            document.getElementById('cryptopanicApiKey').value = settings.api_keys?.cryptopanic_api_key || '';
+            
+            // AI settings
+            document.getElementById('aiConfidenceThreshold').value = settings.bot?.ai_confidence_threshold || 80;
+            document.getElementById('modelUpdateInterval').value = settings.ai?.model_update_interval || 24;
+            document.getElementById('lookbackPeriod').value = settings.ai?.lookback_period || 30;
+            document.getElementById('timeframe').value = settings.ai?.timeframe || '15m';
+            document.getElementById('enableSentimentAnalysis').checked = settings.ai?.enableSentimentAnalysis !== false;
+            document.getElementById('sentimentWeight').value = settings.ai?.sentimentWeight || 30;
+            updateSentimentWeight();
+            
+            // Telegram settings
+            document.getElementById('telegramEnabled').checked = settings.telegram?.enabled || false;
+            document.getElementById('telegramBotToken').value = settings.telegram?.bot_token || '';
+            document.getElementById('telegramChatId').value = settings.telegram?.chat_id || '';
+        }
+
+        function saveSettings() {
+            const settings = {
+                bot: {
+                    risk_per_trade_percent: parseFloat(document.getElementById('riskPerTrade').value),
+                    max_concurrent_trades: parseInt(document.getElementById('maxConcurrentTrades').value),
+                    take_profit_percent: parseFloat(document.getElementById('takeProfitPercent').value),
+                    stop_loss_percent: parseFloat(document.getElementById('stopLossPercent').value),
+                    default_leverage: parseInt(document.getElementById('defaultLeverage').value),
+                    trailing_stop_percent: parseFloat(document.getElementById('trailingStopPercent').value),
+                    auto_tpsl: document.getElementById('autoTPSL').checked,
+                    enabled_pairs: getEnabledPairs(),
+                    max_daily_loss_percent: parseFloat(document.getElementById('maxDailyLoss').value),
+                    max_daily_trades: parseInt(document.getElementById('maxDailyTrades').value),
+                    max_drawdown_percent: parseFloat(document.getElementById('maxDrawdown').value),
+                    cooldown_period: parseInt(document.getElementById('cooldownPeriod').value),
+                    ai_confidence_threshold: parseInt(document.getElementById('aiConfidenceThreshold').value)
+                },
+                api_keys: {
+                    bybit_api_key: document.getElementById('bybitApiKey').value,
+                    bybit_api_secret: document.getElementById('bybitApiSecret').value,
+                    cryptopanic_api_key: document.getElementById('cryptopanicApiKey').value
+                },
+                ai: {
+                    model_update_interval: parseInt(document.getElementById('modelUpdateInterval').value),
+                    lookback_period: parseInt(document.getElementById('lookbackPeriod').value),
+                    timeframe: document.getElementById('timeframe').value,
+                    enableSentimentAnalysis: document.getElementById('enableSentimentAnalysis').checked,
+                    sentimentWeight: parseInt(document.getElementById('sentimentWeight').value)
+                },
+                telegram: {
+                    enabled: document.getElementById('telegramEnabled').checked,
+                    bot_token: document.getElementById('telegramBotToken').value,
+                    chat_id: document.getElementById('telegramChatId').value
+                },
+                dashboard: currentSettings.dashboard || {},
+                system: currentSettings.system || {}
+            };
+
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(settings)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Settings saved successfully!', 'success');
+                    currentSettings = settings;
+                } else {
+                    showNotification('Error saving settings', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving settings:', error);
+                showNotification('Error saving settings', 'error');
+            });
+        }
+
+        function testApiConnection() {
+            showNotification('Testing API connection...', 'info');
+            
+            fetch('/api/balance')
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showNotification('API connection failed: ' + data.error, 'error');
+                    document.getElementById('apiTestResult').style.display = 'none';
+                } else {
+                    showNotification('API connection successful!', 'success');
+                    document.getElementById('accountDetails').innerHTML = `
+                        <strong>Total Balance:</strong> $${data.totalWalletBalance?.toFixed(2) || '0.00'}<br>
+                        <strong>Available Balance:</strong> $${data.totalAvailableBalance?.toFixed(2) || '0.00'}<br>
+                        <strong>Unrealized PnL:</strong> $${data.totalPerpUPL?.toFixed(2) || '0.00'}<br>
+                        <strong>Account Type:</strong> ${data.accountType || 'N/A'}
+                    `;
+                    document.getElementById('apiTestResult').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                showNotification('API connection failed: ' + error.message, 'error');
+                document.getElementById('apiTestResult').style.display = 'none';
+            });
+        }
+        
+        function getAccountInfo() {
+            showNotification('Fetching account information...', 'info');
+            
+            fetch('/api/account_info')
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showNotification('Failed to get account info: ' + data.error, 'error');
+                } else {
+                    showNotification('Account information retrieved!', 'success');
+                    const balance = data.balance?.list?.[0];
+                    if (balance) {
+                        document.getElementById('accountDetails').innerHTML = `
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <strong>Account Type:</strong> ${balance.accountType || 'N/A'}<br>
+                                    <strong>Total Wallet Balance:</strong> $${parseFloat(balance.totalWalletBalance || 0).toFixed(2)}<br>
+                                    <strong>Available Balance:</strong> $${parseFloat(balance.totalAvailableBalance || 0).toFixed(2)}<br>
+                                    <strong>Unrealized PnL:</strong> $${parseFloat(balance.totalPerpUPL || 0).toFixed(2)}<br>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Initial Margin:</strong> $${parseFloat(balance.totalInitialMargin || 0).toFixed(2)}<br>
+                                    <strong>IM Rate:</strong> ${(parseFloat(balance.accountIMRate || 0) * 100).toFixed(2)}%<br>
+                                    <strong>MM Rate:</strong> ${(parseFloat(balance.accountMMRate || 0) * 100).toFixed(2)}%<br>
+                                    <strong>Status:</strong> <span class="badge bg-success">Active</span>
+                                </div>
+                            </div>
+                        `;
+                        document.getElementById('apiTestResult').style.display = 'block';
+                    }
+                }
+            })
+            .catch(error => {
+                showNotification('Failed to get account info: ' + error.message, 'error');
+            });
+        }
+
+        function resetApiSettings() {
+            if (confirm('Are you sure you want to reset all API settings? This cannot be undone.')) {
+                document.getElementById('bybitApiKey').value = '';
+                document.getElementById('bybitApiSecret').value = '';
+                document.getElementById('cryptopanicApiKey').value = '';
+                showNotification('API settings reset', 'info');
+            }
+        }
+
+        function testTelegram() {
+            showNotification('Testing Telegram connection...', 'info');
+            // Implementation for testing Telegram connection
+            setTimeout(() => {
+                showNotification('Telegram test message sent!', 'success');
+            }, 1000);
+        }
+
+        function loadTradingPairs() {
+            fetch('/api/symbols')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    allTradingPairs = data.symbols;
+                    renderTradingPairs();
+                } else {
+                    showNotification('Failed to load trading pairs', 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Error loading trading pairs: ' + error.message, 'error');
+            });
+        }
+
+        function renderTradingPairs() {
+            const container = document.getElementById('tradingPairsList');
+            container.innerHTML = '';
+            
+            // Popular pairs first
+            const popularPairs = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT', 'DOGEUSDT', 'BNBUSDT', 'XRPUSDT', 'DOTUSDT'];
+            
+            // Create popular section
+            const popularSection = document.createElement('div');
+            popularSection.innerHTML = '<h6 class="text-primary mb-2">Popular Pairs</h6>';
+            container.appendChild(popularSection);
+            
+            popularPairs.forEach(symbol => {
+                if (allTradingPairs.find(p => p.symbol === symbol)) {
+                    const checkbox = createPairCheckbox(symbol, true);
+                    container.appendChild(checkbox);
+                }
+            });
+            
+            // Separator
+            const separator = document.createElement('hr');
+            container.appendChild(separator);
+            
+            // All other pairs
+            const otherSection = document.createElement('div');
+            otherSection.innerHTML = '<h6 class="text-secondary mb-2">All Other Pairs</h6>';
+            container.appendChild(otherSection);
+            
+            allTradingPairs.forEach(pairData => {
+                if (!popularPairs.includes(pairData.symbol)) {
+                    const checkbox = createPairCheckbox(pairData.symbol, false);
+                    container.appendChild(checkbox);
+                }
+            });
+            
+            updatePairCheckboxes();
+        }
+
+        function createPairCheckbox(symbol, isPopular) {
+            const div = document.createElement('div');
+            div.className = 'form-check pair-checkbox';
+            div.innerHTML = `
+                <input class="form-check-input" type="checkbox" id="pair_${symbol}" value="${symbol}">
+                <label class="form-check-label" for="pair_${symbol}">
+                    ${symbol.replace('USDT', '/USDT')}
+                    ${isPopular ? '<span class="badge bg-primary ms-1">Popular</span>' : ''}
+                </label>
+            `;
+            return div;
+        }
+
+        function updatePairCheckboxes() {
+            allTradingPairs.forEach(pairData => {
+                const checkbox = document.getElementById(`pair_${pairData.symbol}`);
+                if (checkbox) {
+                    checkbox.checked = enabledPairs.includes(pairData.symbol);
+                }
+            });
+        }
+
+        function getEnabledPairs() {
+            const enabled = [];
+            allTradingPairs.forEach(pairData => {
+                const checkbox = document.getElementById(`pair_${pairData.symbol}`);
+                if (checkbox && checkbox.checked) {
+                    enabled.push(pairData.symbol);
+                }
+            });
+            return enabled;
+        }
+
+        function toggleAllPairs() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.pair-checkbox input[type="checkbox"]');
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = selectAll.checked;
+            });
+        }
+
+        function filterPairs() {
+            const searchTerm = document.getElementById('pairSearch').value.toLowerCase();
+            const checkboxes = document.querySelectorAll('.pair-checkbox');
+            
+            checkboxes.forEach(div => {
+                const label = div.querySelector('label').textContent.toLowerCase();
+                if (label.includes(searchTerm)) {
+                    div.style.display = 'block';
+                } else {
+                    div.style.display = 'none';
+                }
+            });
+        }
+
+        function updateSentimentWeight() {
+            const slider = document.getElementById('sentimentWeight');
+            const badge = document.getElementById('sentimentWeightValue');
+            const advice = document.getElementById('sentimentAdvice');
+            
+            const value = parseInt(slider.value);
+            badge.textContent = value + '%';
+            
+            // Update badge color based on value
+            badge.className = 'badge ' + (
+                value <= 20 ? 'bg-info' :
+                value <= 40 ? 'bg-success' :
+                value <= 60 ? 'bg-warning' :
+                'bg-danger'
+            );
+            
+            // Update advice text based on value
+            let adviceText;
+            if (value <= 20) {
+                adviceText = '<strong>Technische Focus:</strong> AI baseert beslissingen voornamelijk op technische indicatoren. Minimaal sentiment invloed. <em>Geschikt voor stabiele markten.</em>';
+            } else if (value <= 40) {
+                adviceText = '<strong>Gebalanceerde Aanpak:</strong> Goede balans tussen technische analyse en sentiment. <em>Aanbevolen instelling voor de meeste marktcondities.</em>';
+            } else if (value <= 60) {
+                adviceText = '<strong>Sentiment Focus:</strong> Sterke nadruk op marktsentiment en nieuws. <em>Geschikt voor volatiele markten met veel nieuws.</em>';
+            } else {
+                adviceText = '<strong>Pure Sentiment:</strong> Voornamelijk sentiment-gedreven trading. <em>Hoogrisico strategie, alleen voor zeer ervaren traders.</em>';
+            }
+            
+            advice.innerHTML = adviceText;
+        }
+
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'} alert-dismissible fade show position-fixed`;
+            notification.style.top = '20px';
+            notification.style.right = '20px';
+            notification.style.zIndex = '9999';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

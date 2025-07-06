@@ -1,0 +1,109 @@
+{
+  "name": "ByBit AI Trading Bot",
+  "description": "AI-powered trading bot voor ByBit cryptocurrency exchange met real-time dashboard",
+  "keywords": [
+    "trading", 
+    "cryptocurrency", 
+    "ai", 
+    "bybit", 
+    "bot", 
+    "websocket"
+  ],
+  "website": "https://github.com/jouw-username/bybit-ai-bot",
+  "repository": "https://github.com/jouw-username/bybit-ai-bot",
+  "logo": "https://via.placeholder.com/128x128.png?text=AI+Bot",
+  "success_url": "/",
+  "stack": "heroku-22",
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-postgresql:essential-0"
+    }
+  ],
+  "env": {
+    "FLASK_ENV": {
+      "description": "Flask environment (production)",
+      "value": "production",
+      "required": true
+    },
+    "SECRET_KEY": {
+      "description": "Secret key voor Flask sessions - gebruik een sterke random string",
+      "generator": "secret",
+      "required": true
+    },
+    "BYBIT_API_KEY": {
+      "description": "Jouw ByBit API Key (krijg je van ByBit account)",
+      "required": true
+    },
+    "BYBIT_API_SECRET": {
+      "description": "Jouw ByBit API Secret (krijg je van ByBit account)",
+      "required": true
+    },
+    "BYBIT_TESTNET": {
+      "description": "Gebruik testnet voor veilig testen (true/false)",
+      "value": "true",
+      "required": true
+    },
+    "BOT_ENABLED": {
+      "description": "Bot ingeschakeld (true/false)",
+      "value": "true",
+      "required": true
+    },
+    "TRADING_ENABLED": {
+      "description": "Live trading ingeschakeld - START MET FALSE!",
+      "value": "false",
+      "required": true
+    },
+    "AI_CONFIDENCE_THRESHOLD": {
+      "description": "Minimum confidence percentage voor trades (50-95)",
+      "value": "75",
+      "required": true
+    },
+    "RISK_PER_TRADE_PERCENT": {
+      "description": "Maximum risk percentage per trade (1-5)",
+      "value": "2",
+      "required": true
+    },
+    "DEFAULT_LEVERAGE": {
+      "description": "Default leverage voor trades (1-10)",
+      "value": "1",
+      "required": true
+    },
+    "ENABLE_LIVE_TRADING": {
+      "description": "Feature flag voor live trading - START MET FALSE!",
+      "value": "false",
+      "required": true
+    },
+    "ENABLE_AI_TRAINING": {
+      "description": "Feature flag voor AI training",
+      "value": "true",
+      "required": true
+    },
+    "ENABLE_TELEGRAM_SIGNALS": {
+      "description": "Feature flag voor Telegram signals",
+      "value": "false",
+      "required": false
+    },
+    "TELEGRAM_BOT_TOKEN": {
+      "description": "Telegram bot token (optioneel voor notifications)",
+      "required": false
+    },
+    "TELEGRAM_CHAT_ID": {
+      "description": "Telegram chat ID voor notifications (optioneel)",
+      "required": false
+    }
+  },
+  "scripts": {
+    "postdeploy": "echo 'Deployment voltooid! Dashboard beschikbaar op: https://$HEROKU_APP_NAME.herokuapp.com'"
+  }
+}
