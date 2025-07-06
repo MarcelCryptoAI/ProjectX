@@ -117,72 +117,137 @@ class TradingDatabase:
             ''')
         
         # Sentiment data table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS sentiment_data (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                symbol TEXT NOT NULL,
-                timestamp INTEGER NOT NULL,
-                sentiment_score REAL,
-                news_count INTEGER,
-                social_sentiment REAL,
-                fear_greed_index REAL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(symbol, timestamp)
-            )
-        ''')
+        if self.use_postgres:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS sentiment_data (
+                    id SERIAL PRIMARY KEY,
+                    symbol VARCHAR(20) NOT NULL,
+                    timestamp BIGINT NOT NULL,
+                    sentiment_score DECIMAL(10,4),
+                    news_count INTEGER,
+                    social_sentiment DECIMAL(10,4),
+                    fear_greed_index DECIMAL(10,4),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(symbol, timestamp)
+                )
+            ''')
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS sentiment_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT NOT NULL,
+                    timestamp INTEGER NOT NULL,
+                    sentiment_score REAL,
+                    news_count INTEGER,
+                    social_sentiment REAL,
+                    fear_greed_index REAL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(symbol, timestamp)
+                )
+            ''')
         
         # AI training results table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS ai_training_results (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                training_session_id TEXT NOT NULL,
-                symbol TEXT NOT NULL,
-                features_json TEXT,
-                prediction_accuracy REAL,
-                confidence_score REAL,
-                model_params_json TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+        if self.use_postgres:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS training_results (
+                    id SERIAL PRIMARY KEY,
+                    session_id VARCHAR(100) NOT NULL,
+                    symbol VARCHAR(20) NOT NULL,
+                    features TEXT,
+                    accuracy DECIMAL(10,4),
+                    confidence DECIMAL(10,4),
+                    model_params TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS training_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    features TEXT,
+                    accuracy REAL,
+                    confidence REAL,
+                    model_params TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
         
         # Training sessions table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS training_sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT UNIQUE NOT NULL,
-                start_time TIMESTAMP,
-                end_time TIMESTAMP,
-                total_symbols INTEGER,
-                completed_symbols INTEGER,
-                overall_accuracy REAL,
-                status TEXT DEFAULT 'running',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+        if self.use_postgres:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS training_sessions (
+                    id SERIAL PRIMARY KEY,
+                    session_id VARCHAR(100) UNIQUE NOT NULL,
+                    start_time TIMESTAMP,
+                    end_time TIMESTAMP,
+                    total_symbols INTEGER,
+                    completed_symbols INTEGER,
+                    overall_accuracy DECIMAL(10,4),
+                    status VARCHAR(20) DEFAULT 'running',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS training_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT UNIQUE NOT NULL,
+                    start_time TIMESTAMP,
+                    end_time TIMESTAMP,
+                    total_symbols INTEGER,
+                    completed_symbols INTEGER,
+                    overall_accuracy REAL,
+                    status TEXT DEFAULT 'running',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
         
         conn.commit()
         conn.close()
     
     def store_market_data(self, symbol, kline_data):
         """Store market data for a symbol"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection()
         cursor = conn.cursor()
         
         for kline in kline_data:
             try:
-                cursor.execute('''
-                    INSERT OR REPLACE INTO market_data 
-                    (symbol, timestamp, open_price, high_price, low_price, close_price, volume)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    symbol,
-                    int(kline[0]),  # timestamp
-                    float(kline[1]),  # open
-                    float(kline[2]),  # high
-                    float(kline[3]),  # low
-                    float(kline[4]),  # close
-                    float(kline[5])   # volume
-                ))
+                if self.use_postgres:
+                    cursor.execute('''
+                        INSERT INTO market_data 
+                        (symbol, timestamp, open_price, high_price, low_price, close_price, volume)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (symbol, timestamp) DO UPDATE SET
+                        open_price = EXCLUDED.open_price,
+                        high_price = EXCLUDED.high_price,
+                        low_price = EXCLUDED.low_price,
+                        close_price = EXCLUDED.close_price,
+                        volume = EXCLUDED.volume
+                    ''', (
+                        symbol,
+                        int(kline[0]),  # timestamp
+                        float(kline[1]),  # open
+                        float(kline[2]),  # high
+                        float(kline[3]),  # low
+                        float(kline[4]),  # close
+                        float(kline[5])   # volume
+                    ))
+                else:
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO market_data 
+                        (symbol, timestamp, open_price, high_price, low_price, close_price, volume)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        symbol,
+                        int(kline[0]),  # timestamp
+                        float(kline[1]),  # open
+                        float(kline[2]),  # high
+                        float(kline[3]),  # low
+                        float(kline[4]),  # close
+                        float(kline[5])   # volume
+                    ))
             except Exception as e:
                 print(f"Error storing market data for {symbol}: {e}")
         
