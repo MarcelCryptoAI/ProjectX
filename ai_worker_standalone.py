@@ -53,19 +53,27 @@ class StandaloneAIWorker:
                 # Fallback to environment variables if config file doesn't exist
                 settings = type('Settings', (), {})()
             
-            # Override with environment variables
-            settings.bybit_api_key = os.getenv('BYBIT_API_KEY', getattr(settings, 'bybit_api_key', ''))
-            settings.bybit_api_secret = os.getenv('BYBIT_API_SECRET', getattr(settings, 'bybit_api_secret', ''))
+            # Get API keys from environment or settings
+            api_key = os.getenv('BYBIT_API_KEY', getattr(settings, 'bybit_api_key', ''))
+            api_secret = os.getenv('BYBIT_API_SECRET', getattr(settings, 'bybit_api_secret', ''))
             
-            if not settings.bybit_api_key or not settings.bybit_api_secret:
+            # Set attributes directly to avoid setter issues
+            if hasattr(settings, '__dict__'):
+                settings.__dict__['bybit_api_key'] = api_key
+                settings.__dict__['bybit_api_secret'] = api_secret
+            else:
+                setattr(settings, 'bybit_api_key', api_key)
+                setattr(settings, 'bybit_api_secret', api_secret)
+            
+            if not api_key or not api_secret:
                 logger.error("BYBIT_API_KEY and BYBIT_API_SECRET environment variables are required!")
                 return None, None
             
             # Initialize ByBit session
             bybit_session = HTTP(
                 testnet=os.getenv('BYBIT_TESTNET', 'false').lower() == 'true',
-                api_key=settings.bybit_api_key,
-                api_secret=settings.bybit_api_secret,
+                api_key=api_key,
+                api_secret=api_secret,
             )
             
             logger.info("✅ ByBit session initialized successfully")
