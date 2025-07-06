@@ -15,7 +15,7 @@ from utils.settings_loader import Settings
 from utils.trade_logger import TradeLogger
 from bot.risk_manager import RiskManager
 from ai.trader import AITrader
-from ai_worker import get_ai_worker
+from ai_worker import get_ai_worker, AIWorker
 from dotenv import load_dotenv
 import logging
 import sys
