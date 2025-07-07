@@ -93,6 +93,16 @@ def init_components():
     # Initialize AI worker instance (will be properly configured when start_all is called)
     ai_worker_instance = None
 
+# Flag to track if components are initialized
+_components_initialized = False
+
+def ensure_components_initialized():
+    """Ensure components are initialized on first use"""
+    global _components_initialized
+    if not _components_initialized:
+        init_components()
+        _components_initialized = True
+
 @app.route('/')
 def dashboard():
     return render_template('dashboard.html')
@@ -719,6 +729,7 @@ def restart_worker():
 @app.route('/api/start_all', methods=['POST'])
 def start_all():
     try:
+        ensure_components_initialized()
         global ai_worker_instance
         
         # Initialize AI worker with trading capabilities if not exists
@@ -1129,8 +1140,7 @@ def handle_connect():
 def handle_disconnect():
     print('Client disconnected')
 
-# Initialize components for production (Heroku)
-init_components()
+# Initialize components will be called on first request
 
 if __name__ == '__main__':
     init_components()
