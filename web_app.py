@@ -303,23 +303,53 @@ def init_components():
         except Exception as dns_pretest:
             print(f"⚠️ DNS pre-warm failed: {dns_pretest}, continuing anyway...")
         
-        # Initialize ByBit with enhanced error handling
-        print("🔧 Initializing ByBit session with enhanced DNS handling...")
+        # Initialize ByBit with enhanced error handling and SSL bypass
+        print("🔧 Initializing ByBit session with enhanced DNS/SSL handling...")
+        
+        # Monkey patch pybit's session to disable SSL verification
+        import pybit
+        from pybit import HTTP as OriginalHTTP
+        
+        class PatchedHTTP(OriginalHTTP):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                # Disable SSL verification on the internal session
+                if hasattr(self, 'session'):
+                    self.session.verify = False
+                    if vpn_proxy:
+                        self.session.proxies = vpn_proxy
+                        print("🔒 VPN proxy applied to pybit session")
+                elif hasattr(self, '_session'):
+                    self._session.verify = False
+                    if vpn_proxy:
+                        self._session.proxies = vpn_proxy
+                        print("🔒 VPN proxy applied to pybit _session")
+                
+                # Also try to patch the client if it exists
+                if hasattr(self, 'client'):
+                    if hasattr(self.client, 'session'):
+                        self.client.session.verify = False
+                        if vpn_proxy:
+                            self.client.session.proxies = vpn_proxy
+        
+        # Replace pybit's HTTP class
+        pybit.unified_trading.HTTP = PatchedHTTP
+        
         try:
-            bybit_session = HTTP(
+            bybit_session = PatchedHTTP(
                 testnet=False,  # ALTIJD LIVE
                 api_key=api_key,
                 api_secret=api_secret,
                 recv_window=20000  # Increase receive window for slow connections
             )
-            print("✅ ByBit session created successfully")
+            print("✅ ByBit session created with SSL bypass")
         except Exception as init_error:
             print(f"⚠️ ByBit session creation failed: {init_error}")
             print("🔄 Attempting with alternative configuration...")
             
             # Try with more permissive settings
             try:
-                bybit_session = HTTP(
+                bybit_session = PatchedHTTP(
                     testnet=False,
                     api_key=api_key,
                     api_secret=api_secret,
