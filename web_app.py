@@ -74,15 +74,23 @@ def init_components():
         # Fallback to environment variables if config file doesn't exist
         settings = type('Settings', (), {})()
     
-    # Override with environment variables
-    settings.bybit_api_key = os.getenv('BYBIT_API_KEY', getattr(settings, 'bybit_api_key', ''))
-    settings.bybit_api_secret = os.getenv('BYBIT_API_SECRET', getattr(settings, 'bybit_api_secret', ''))
+    # Override with environment variables - use setattr to avoid setter issues
+    api_key = os.getenv('BYBIT_API_KEY', getattr(settings, 'bybit_api_key', ''))
+    api_secret = os.getenv('BYBIT_API_SECRET', getattr(settings, 'bybit_api_secret', ''))
+    
+    # Set attributes safely
+    if hasattr(settings, '__dict__'):
+        settings.__dict__['bybit_api_key'] = api_key
+        settings.__dict__['bybit_api_secret'] = api_secret
+    else:
+        setattr(settings, 'bybit_api_key', api_key)
+        setattr(settings, 'bybit_api_secret', api_secret)
     
     # Initialize ByBit session
     bybit_session = HTTP(
         testnet=os.getenv('BYBIT_TESTNET', 'false').lower() == 'true',
-        api_key=settings.bybit_api_key,
-        api_secret=settings.bybit_api_secret,
+        api_key=api_key,
+        api_secret=api_secret,
     )
     
     # Initialize components
