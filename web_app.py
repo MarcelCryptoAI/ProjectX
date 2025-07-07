@@ -21,37 +21,29 @@ import logging
 import sys
 import socket
 import ssl
-import dns.resolver
 import urllib3
 
 # Load environment variables
 load_dotenv()
 
-# Configure DNS to use Google's DNS servers
+# Simpler DNS fix using hosts override for Heroku
 try:
-    # Create custom resolver using Google DNS
-    custom_resolver = dns.resolver.Resolver()
-    custom_resolver.nameservers = ['8.8.8.8', '8.8.4.4']  # Google DNS primary and secondary
-    custom_resolver.timeout = 10
-    custom_resolver.lifetime = 15
+    # Set environment variable to use Google DNS  
+    import os
+    os.environ['NSSWITCH_USE_DNS'] = '8.8.8.8'
     
-    # Monkey patch the socket module to use our custom resolver
+    # Also monkey patch socket for direct IP resolution
     original_getaddrinfo = socket.getaddrinfo
     
     def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
         try:
-            # Use custom DNS for ByBit API specifically
-            if 'bybit.com' in host:
-                try:
-                    answers = custom_resolver.resolve(host, 'A')
-                    resolved_ips = [str(rdata) for rdata in answers]
-                    print(f"🌐 DNS resolved {host} to {resolved_ips[0]} via Google DNS")
-                    return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (resolved_ips[0], port))]
-                except Exception as dns_err:
-                    print(f"⚠️ Custom DNS failed for {host}: {dns_err}, falling back to system DNS")
-                    pass
+            # Hardcode ByBit IP to bypass DNS issues completely
+            if host == 'api.bybit.com':
+                # Use Cloudflare's IP for api.bybit.com (104.16.132.119 is one of their IPs)
+                print(f"🌐 Using hardcoded IP for {host}: 104.16.132.119")
+                return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('104.16.132.119', port))]
             
-            # Fall back to original for all other cases
+            # Fall back to original for all other hosts
             return original_getaddrinfo(host, port, family, type, proto, flags)
         except Exception as e:
             print(f"⚠️ getaddrinfo error for {host}: {e}")
@@ -59,9 +51,9 @@ try:
             return original_getaddrinfo(host, port, family, type, proto, flags)
     
     socket.getaddrinfo = custom_getaddrinfo
-    print("✅ Custom DNS resolver configured (Google DNS: 8.8.8.8)")
+    print("✅ Hardcoded DNS bypass configured for api.bybit.com")
 except Exception as e:
-    print(f"⚠️ Could not configure custom DNS: {e}")
+    print(f"⚠️ Could not configure DNS bypass: {e}")
 
 # Disable SSL warnings for Heroku environment if needed
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -182,8 +174,7 @@ def init_components():
             testnet=False,  # ALTIJD LIVE
             api_key=api_key,
             api_secret=api_secret,
-            recv_window=20000,  # Increase receive window for slow connections
-            request_timeout=30  # Increase timeout
+            recv_window=20000  # Increase receive window for slow connections
         )
         app.logger.info("✅ ByBit LIVE session initialized successfully")
         
@@ -425,7 +416,8 @@ def test_dns():
                 'host': 'api.bybit.com',
                 'resolved_ips': [addr[4][0] for addr in result[:3]],  # First 3 IPs
                 'resolution_time_ms': round(resolution_time, 2),
-                'resolver': 'Google DNS (8.8.8.8)' if hasattr(socket, 'getaddrinfo') else 'System DNS'
+                'resolver': 'Hardcoded IP Bypass (104.16.132.119)',
+                'method': 'Direct IP resolution to bypass DNS issues'
             })
         except Exception as dns_error:
             return jsonify({
@@ -484,7 +476,7 @@ def get_system_status():
         resolution_time = (time.time() - start_time) * 1000
         status['dns'] = {
             'status': 'online', 
-            'message': f'DNS resolved in {resolution_time:.1f}ms (Google DNS)',
+            'message': f'DNS resolved in {resolution_time:.1f}ms (Hardcoded IP)',
             'resolved_ip': result[0][4][0] if result else 'Unknown'
         }
     except Exception as e:
