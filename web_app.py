@@ -38,6 +38,11 @@ try:
     os.environ['PYTHONHTTPSVERIFY'] = '0'
     os.environ['CURL_CA_BUNDLE'] = ''
     os.environ['REQUESTS_CA_BUNDLE'] = ''
+    os.environ['SSL_VERIFY'] = 'false'
+    
+    # Try to force all SSL contexts to be permissive
+    import ssl
+    ssl._create_default_https_context = ssl._create_unverified_context
     
     # Create a custom SSL context that's more permissive
     ssl_context = ssl.create_default_context()
