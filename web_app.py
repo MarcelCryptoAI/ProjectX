@@ -92,15 +92,24 @@ try:
     # Disable SSL warnings globally
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     
-    # Monkey patch requests to disable SSL verification globally
+    # VPN/Proxy support for better connectivity
     import requests
     from requests.adapters import HTTPAdapter
     from requests.packages.urllib3.util.retry import Retry
     
     requests.packages.urllib3.disable_warnings()
     
-    # Create custom session that never verifies SSL
-    class NoSSLVerifyAdapter(HTTPAdapter):
+    # Check for VPN proxy configuration
+    vpn_proxy = None
+    if os.getenv('VPN_PROXY_URL'):
+        vpn_proxy = {
+            'http': os.getenv('VPN_PROXY_URL'),
+            'https': os.getenv('VPN_PROXY_URL')
+        }
+        print(f"🔒 VPN Proxy configured: {os.getenv('VPN_PROXY_URL')}")
+    
+    # Create custom session that uses VPN proxy and disables SSL verification
+    class VPNAdapter(HTTPAdapter):
         def init_poolmanager(self, *args, **kwargs):
             kwargs['ssl_context'] = ssl_context
             return super().init_poolmanager(*args, **kwargs)
@@ -110,7 +119,9 @@ try:
     def patched_session():
         session = original_session()
         session.verify = False
-        session.mount('https://', NoSSLVerifyAdapter())
+        if vpn_proxy:
+            session.proxies.update(vpn_proxy)
+        session.mount('https://', VPNAdapter())
         return session
     
     requests.Session = patched_session
