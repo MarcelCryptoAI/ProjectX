@@ -40,14 +40,24 @@ try:
     os.environ['REQUESTS_CA_BUNDLE'] = ''
     os.environ['SSL_VERIFY'] = 'false'
     
-    # Try to force all SSL contexts to be permissive
+    # Advanced TLS configuration for SOCKS5 proxy compatibility
     import ssl
-    ssl._create_default_https_context = ssl._create_unverified_context
     
-    # Create a custom SSL context that's more permissive
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
+    # Create enhanced SSL context for proxy compatibility
+    def create_proxy_ssl_context():
+        context = ssl.create_default_context()
+        # Force modern TLS versions for better compatibility
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.maximum_version = ssl.TLSVersion.TLSv1_3
+        # Configure cipher suites that work well with SOCKS5 proxies
+        context.set_ciphers('ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS')
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        return context
+    
+    # Apply the enhanced SSL context globally
+    ssl._create_default_https_context = create_proxy_ssl_context
+    ssl_context = create_proxy_ssl_context()
     
     # Store original functions
     original_getaddrinfo = socket.getaddrinfo
@@ -306,28 +316,51 @@ def init_components():
         # Initialize ByBit with enhanced error handling and SSL bypass
         print("🔧 Initializing ByBit session with enhanced DNS/SSL handling...")
         
-        # Monkey patch pybit's session to disable SSL verification
+        # Advanced SSL/TLS configuration for SOCKS5 proxy compatibility
         import pybit
         from pybit.unified_trading import HTTP as OriginalHTTP
+        import ssl
+        from requests.adapters import HTTPAdapter
+        from urllib3.poolmanager import PoolManager
+        
+        # Create custom SSL adapter for TLS 1.2+ and secure cipher suites
+        class SecureSSLAdapter(HTTPAdapter):
+            def init_poolmanager(self, *args, **kwargs):
+                context = ssl.create_default_context()
+                # Force TLS 1.2 or higher for ByBit compatibility
+                context.minimum_version = ssl.TLSVersion.TLSv1_2
+                context.maximum_version = ssl.TLSVersion.TLSv1_3
+                # Set secure cipher suites that work with SOCKS5 proxies
+                context.set_ciphers('ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS')
+                # Disable hostname verification for proxy compatibility
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+                kwargs['ssl_context'] = context
+                return super().init_poolmanager(*args, **kwargs)
         
         class PatchedHTTP(OriginalHTTP):
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
-                # Disable SSL verification on the internal session
+                
+                # Configure session with advanced SSL/TLS settings
                 if hasattr(self, 'session'):
+                    # Mount the secure SSL adapter
+                    self.session.mount('https://', SecureSSLAdapter())
                     self.session.verify = False
                     if vpn_proxy:
                         self.session.proxies = vpn_proxy
-                        print("🔒 VPN proxy applied to pybit session")
+                        print("🔒 VPN proxy + Advanced SSL applied to pybit session")
                 elif hasattr(self, '_session'):
+                    self._session.mount('https://', SecureSSLAdapter())
                     self._session.verify = False
                     if vpn_proxy:
                         self._session.proxies = vpn_proxy
-                        print("🔒 VPN proxy applied to pybit _session")
+                        print("🔒 VPN proxy + Advanced SSL applied to pybit _session")
                 
                 # Also try to patch the client if it exists
                 if hasattr(self, 'client'):
                     if hasattr(self.client, 'session'):
+                        self.client.session.mount('https://', SecureSSLAdapter())
                         self.client.session.verify = False
                         if vpn_proxy:
                             self.client.session.proxies = vpn_proxy
