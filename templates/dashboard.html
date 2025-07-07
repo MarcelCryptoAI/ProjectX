@@ -990,7 +990,7 @@
 
         function updateHeaderBalance() {
             // Update header balance and P&L
-            fetch('/api/balance')
+            fetch('/api/balance_header')
             .then(response => response.json())
             .then(data => {
                 if (data.success) {

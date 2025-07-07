@@ -514,14 +514,16 @@ bot:
   - SWEATUSDT
   - SWELLUSDT
   - SXPUSDT
+  leverage_type: cross
   max_concurrent_trades: 5
   max_daily_loss_percent: 10
-  max_daily_trades: 50
+  max_daily_trades: 500
   max_drawdown_percent: 15
+  min_trade_amount: 5
   risk_per_trade_percent: 2
   stop_loss_percent: 2
   take_profit_percent: 3
-  trailing_stop_percent: 0
+  trailing_stop_percent: 1
 dashboard:
   password: changeme123
   port: 8000

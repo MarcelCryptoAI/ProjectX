@@ -219,18 +219,24 @@ def get_balance_header():
         # Get wallet balance for header display
         balance_data = handle_bybit_request(bybit_session.get_wallet_balance, accountType="UNIFIED")
         
+        # Debug logging
+        if balance_data:
+            app.logger.info(f"Balance data received: {json.dumps(balance_data.get('result', {}), indent=2)}")
+        
         if balance_data and 'result' in balance_data and 'list' in balance_data['result']:
             account = balance_data['result']['list'][0] if balance_data['result']['list'] else {}
             
             # Calculate total balance and 24h P&L
-            total_balance = 0
-            total_pnl_24h = 0
+            total_balance = float(account.get('totalWalletBalance', 0))
+            total_pnl_24h = float(account.get('totalPerpUPL', 0))
             
-            if 'coin' in account:
+            # If totalWalletBalance is 0, try to get from coins
+            if total_balance == 0 and 'coin' in account:
                 for coin in account['coin']:
                     if coin['coin'] == 'USDT':
                         total_balance = float(coin.get('equity', 0))
-                        total_pnl_24h = float(coin.get('unrealisedPnl', 0))
+                        if total_balance == 0:
+                            total_balance = float(coin.get('walletBalance', 0))
                         break
             
             # Calculate 24h P&L percentage
