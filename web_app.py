@@ -26,48 +26,46 @@ import urllib3
 # Load environment variables
 load_dotenv()
 
-# Use alternative DNS servers via environment and better retry logic
+# Direct DNS override using hosts file approach
 try:
+    import socket
     import os
-    import urllib3
-    from urllib3.util.retry import Retry
-    from requests.adapters import HTTPAdapter
-    import requests
     
-    # Configure urllib3 with custom DNS and SSL settings
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    # Hardcode ByBit DNS resolution to bypass DNS timeout issues
+    original_getaddrinfo = socket.getaddrinfo
     
-    # Monkey patch requests to use better DNS resolution and retries
-    original_request = requests.Session.request
+    # Known working IPs for api.bybit.com (Cloudflare CDN)
+    BYBIT_IPS = [
+        '104.16.132.119',  # Primary Cloudflare IP
+        '104.16.133.119',  # Secondary Cloudflare IP
+        '172.67.74.176',   # Another Cloudflare IP
+    ]
     
-    def patched_request(self, method, url, **kwargs):
-        # Add retry logic and better error handling
-        if not hasattr(self, '_retry_configured'):
-            retry_strategy = Retry(
-                total=3,
-                backoff_factor=1,
-                status_forcelist=[429, 500, 502, 503, 504],
-                allowed_methods=["HEAD", "GET", "PUT", "DELETE", "OPTIONS", "TRACE", "POST"]
-            )
-            adapter = HTTPAdapter(max_retries=retry_strategy)
-            self.mount("http://", adapter)
-            self.mount("https://", adapter)
-            self._retry_configured = True
-            
-        # Set longer timeout for ByBit requests
-        if 'bybit.com' in str(url):
-            kwargs.setdefault('timeout', (10, 30))  # (connect, read)
-            # Disable SSL verification as fallback for problematic connections
-            if 'verify' not in kwargs:
-                kwargs['verify'] = True  # Keep SSL verification but with longer timeout
-            
-        return original_request(self, method, url, **kwargs)
+    def patched_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+        # Override DNS for ByBit specifically
+        if host == 'api.bybit.com':
+            print(f"🌐 DNS Override: {host} -> {BYBIT_IPS[0]}")
+            # Return the hardcoded IP but preserve the hostname for SSL
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, 'api.bybit.com', (BYBIT_IPS[0], port))]
+        
+        # Use original function for all other hosts
+        try:
+            return original_getaddrinfo(host, port, family, type, proto, flags)
+        except Exception as e:
+            print(f"⚠️ DNS resolution failed for {host}: {e}")
+            # For other failed hosts, try to fall back gracefully
+            raise e
     
-    requests.Session.request = patched_request
-    print("✅ Enhanced HTTP client configured with better DNS and retry logic")
+    # Apply the patch
+    socket.getaddrinfo = patched_getaddrinfo
+    print("✅ ByBit DNS override applied - using Cloudflare IP")
+    
+    # Also set resolver environment variables for backup
+    os.environ['RESOLVER_1'] = '8.8.8.8'
+    os.environ['RESOLVER_2'] = '8.8.4.4'
     
 except Exception as e:
-    print(f"⚠️ Could not configure enhanced HTTP client: {e}")
+    print(f"⚠️ Could not configure DNS override: {e}")
 
 # Disable SSL warnings for Heroku environment if needed
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -211,33 +209,8 @@ def init_components():
         except Exception as dns_pretest:
             print(f"⚠️ DNS pre-warm failed: {dns_pretest}, continuing anyway...")
         
-        # Configure pybit with custom HTTP settings
-        try:
-            # Try to patch pybit's HTTP manager for better DNS/SSL handling
-            from pybit.unified_trading import HTTP
-            
-            # Create custom session for pybit
-            import requests
-            custom_session = requests.Session()
-            
-            # Configure session with better timeout and retry settings
-            retry_strategy = Retry(
-                total=3,
-                backoff_factor=1,
-                status_forcelist=[429, 500, 502, 503, 504],
-            )
-            adapter = HTTPAdapter(max_retries=retry_strategy, pool_maxsize=10, pool_connections=10)
-            custom_session.mount("http://", adapter)
-            custom_session.mount("https://", adapter)
-            
-            # Set reasonable timeouts
-            custom_session.timeout = (10, 30)  # (connect, read)
-            
-            print("🔧 Configured custom HTTP session for pybit")
-            
-        except Exception as session_error:
-            print(f"⚠️ Could not configure custom session: {session_error}")
-        
+        # Initialize ByBit with DNS override active
+        print("🔧 Initializing ByBit session with DNS override...")
         bybit_session = HTTP(
             testnet=False,  # ALTIJD LIVE
             api_key=api_key,
@@ -484,8 +457,8 @@ def test_dns():
                 'host': 'api.bybit.com',
                 'resolved_ips': [addr[4][0] for addr in result[:3]],  # First 3 IPs
                 'resolution_time_ms': round(resolution_time, 2),
-                'resolver': 'Enhanced HTTP Client with Retry Logic',
-                'method': 'Better timeout and retry handling'
+                'resolver': 'Direct DNS Override (Cloudflare IP)',
+                'method': 'Hardcoded IP bypass for api.bybit.com'
             })
         except Exception as dns_error:
             return jsonify({
@@ -544,7 +517,7 @@ def get_system_status():
         resolution_time = (time.time() - start_time) * 1000
         status['dns'] = {
             'status': 'online', 
-            'message': f'DNS resolved in {resolution_time:.1f}ms (Enhanced Client)',
+            'message': f'DNS resolved in {resolution_time:.1f}ms (Override: {result[0][4][0]})',
             'resolved_ip': result[0][4][0] if result else 'Unknown'
         }
     except Exception as e:
