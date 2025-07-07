@@ -49,19 +49,14 @@
       "description": "Jouw ByBit API Secret (krijg je van ByBit account)",
       "required": true
     },
-    "BYBIT_TESTNET": {
-      "description": "Gebruik testnet voor veilig testen (true/false)",
-      "value": "true",
-      "required": true
-    },
     "BOT_ENABLED": {
       "description": "Bot ingeschakeld (true/false)",
       "value": "true",
       "required": true
     },
     "TRADING_ENABLED": {
-      "description": "Live trading ingeschakeld - START MET FALSE!",
-      "value": "false",
+      "description": "Live trading ingeschakeld - ALTIJD LIVE!",
+      "value": "true",
       "required": true
     },
     "AI_CONFIDENCE_THRESHOLD": {
@@ -80,8 +75,8 @@
       "required": true
     },
     "ENABLE_LIVE_TRADING": {
-      "description": "Feature flag voor live trading - START MET FALSE!",
-      "value": "false",
+      "description": "Feature flag voor live trading - ALTIJD LIVE!",
+      "value": "true",
       "required": true
     },
     "ENABLE_AI_TRAINING": {

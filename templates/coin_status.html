@@ -18,8 +18,8 @@
         .confidence-medium { background-color: #ffc107; }
         .confidence-low { background-color: #dc3545; }
         .table-responsive { max-height: 70vh; overflow-y: auto; }
-        .status-open { background-color: #007bff; color: white; }
-        .status-waiting { background-color: #ffc107; color: black; }
+        .status-low { background-color: #dc3545; color: white; }
+        .status-signal { background-color: #28a745; color: white; }
         .status-closed { background-color: #6c757d; color: white; }
         .trade-button { min-width: 80px; }
         .filter-controls { margin-bottom: 20px; }
@@ -90,8 +90,8 @@
                                 <label for="statusFilter">Status:</label>
                                 <select id="statusFilter" class="form-select" onchange="filterTable()">
                                     <option value="all">All</option>
-                                    <option value="open">Open</option>
-                                    <option value="waiting">Waiting</option>
+                                    <option value="signal">Signal</option>
+                                    <option value="te-lage-score">Te lage score</option>
                                     <option value="closed">Closed</option>
                                 </select>
                             </div>
@@ -112,6 +112,7 @@
                                         <th>Take Profit</th>
                                         <th>Stop Loss</th>
                                         <th>Confidence</th>
+                                        <th>Tijd Sinds</th>
                                         <th>Status</th>
                                         <th>Action</th>
                                     </tr>
@@ -272,7 +273,8 @@
                         </div>
                         <small>${coin.confidence}%</small>
                     </td>
-                    <td><span class="badge status-${coin.status.toLowerCase()}">${coin.status}</span></td>
+                    <td><small class="text-muted">${coin.time_since || 'N/A'}</small></td>
+                    <td><span class="badge ${coin.status_class || 'status-low'}">${coin.status}</span></td>
                     <td>
                         <button class="btn btn-sm btn-primary trade-button" onclick="openTradeModal('${coin.symbol}', '${coin.direction}', ${coin.takeProfit}, ${coin.stopLoss}, ${coin.confidence})">
                             <i class="fas fa-chart-line"></i> Trade
@@ -284,7 +286,7 @@
             });
             
             if (filteredData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No coins match the current filters</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No coins match the current filters</td></tr>';
             }
         }
         
@@ -306,8 +308,11 @@
                 }
                 
                 // Status filter
-                if (statusFilter !== 'all' && coin.status.toLowerCase() !== statusFilter) {
-                    return false;
+                if (statusFilter !== 'all') {
+                    const coinStatusLower = coin.status.toLowerCase().replace(' ', '-');
+                    if (coinStatusLower !== statusFilter) {
+                        return false;
+                    }
                 }
                 
                 // Search filter

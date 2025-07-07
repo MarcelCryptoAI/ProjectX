@@ -95,22 +95,20 @@ def init_components():
         setattr(settings, 'bybit_api_key', api_key)
         setattr(settings, 'bybit_api_secret', api_secret)
     
-    # Initialize ByBit session - handle demo/invalid credentials gracefully
+    # Initialize ByBit session - LIVE ONLY
     try:
-        # Skip ByBit initialization if using demo credentials
-        if api_key in ['demo_key', 'your_api_key_here', ''] or api_secret in ['demo_secret', 'your_api_secret_here', '']:
-            app.logger.warning("Demo credentials detected - ByBit session will use fallback mode")
-            bybit_session = None
-        else:
-            bybit_session = HTTP(
-                testnet=os.getenv('BYBIT_TESTNET', 'false').lower() == 'true',
-                api_key=api_key,
-                api_secret=api_secret,
-            )
-            app.logger.info("ByBit session initialized successfully")
+        if not api_key or not api_secret:
+            raise ValueError("API_KEY en API_SECRET zijn verplicht!")
+            
+        bybit_session = HTTP(
+            testnet=False,  # ALTIJD LIVE
+            api_key=api_key,
+            api_secret=api_secret,
+        )
+        app.logger.info("✅ ByBit LIVE session initialized successfully")
     except Exception as e:
-        app.logger.error(f"ByBit session initialization failed: {e}")
-        bybit_session = None
+        app.logger.error(f"❌ ByBit session initialization failed: {e}")
+        raise e  # Stop de app als ByBit niet werkt
     
     # Initialize components
     trade_logger = TradeLogger()
@@ -131,16 +129,12 @@ def ensure_components_initialized():
         _components_initialized = True
 
 def handle_bybit_request(func, *args, **kwargs):
-    """Handle ByBit API requests with DNS error fallback for testnet"""
+    """Handle ByBit API requests - LIVE ONLY"""
     try:
         return func(*args, **kwargs)
     except Exception as e:
-        error_str = str(e)
-        if ("Failed to resolve" in error_str or "NameResolutionError" in error_str) and os.getenv('BYBIT_TESTNET', 'false').lower() == 'true':
-            # Return None to trigger demo data fallback
-            return None
-        else:
-            raise e
+        app.logger.error(f"ByBit API request failed: {str(e)}")
+        raise e  # Altijd doorgooi errors, geen demo fallback
 
 @app.route('/')
 def dashboard():
@@ -166,30 +160,14 @@ def signals():
 def get_balance():
     ensure_components_initialized()
     try:
-        # Try to get wallet balance with DNS error handling
-        balance = handle_bybit_request(bybit_session.get_wallet_balance, accountType="UNIFIED")
+        # Check if bybit_session exists
+        if not bybit_session:
+            return jsonify({'error': 'ByBit session not initialized - check API credentials'}), 500
+            
+        # Try to get wallet balance
+        balance = bybit_session.get_wallet_balance(accountType="UNIFIED")
         
-        # If DNS failed in testnet, return demo data
-        if balance is None:
-            return jsonify({
-                'success': True,
-                'balance': {
-                    'totalEquity': '10000.00',
-                    'totalWalletBalance': '10000.00',
-                    'totalMarginBalance': '10000.00',
-                    'totalAvailableBalance': '10000.00',
-                    'accountType': 'UNIFIED',
-                    'coins': [
-                        {
-                            'coin': 'USDT',
-                            'equity': '10000.00',
-                            'usdValue': '10000.00',
-                            'walletBalance': '10000.00',
-                            'availableToWithdraw': '10000.00'
-                        }
-                    ]
-                }
-            })
+        app.logger.info(f"Raw balance response: {balance}")
         
         # Extract useful balance information
         if balance and 'result' in balance and 'list' in balance['result'] and balance['result']['list']:
@@ -207,21 +185,26 @@ def get_balance():
                 'coin': wallet_data.get('coin', [])
             })
         else:
-            return jsonify({'error': 'No balance data available'}), 500
+            return jsonify({'error': f'Invalid balance response: {balance}'}), 500
             
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"Balance API error: {str(e)}")
+        return jsonify({'error': f'ByBit API error: {str(e)}'}), 500
 
 @app.route('/api/balance_header')
 def get_balance_header():
     ensure_components_initialized()
     try:
+        # Check if bybit_session exists
+        if not bybit_session:
+            return jsonify({'error': 'ByBit session not initialized - check API credentials'}), 500
+            
         # Get wallet balance for header display
-        balance_data = handle_bybit_request(bybit_session.get_wallet_balance, accountType="UNIFIED")
+        balance_data = bybit_session.get_wallet_balance(accountType="UNIFIED")
         
         # Debug logging
         if balance_data:
-            app.logger.info(f"Balance data received: {json.dumps(balance_data.get('result', {}), indent=2)}")
+            app.logger.info(f"Header balance data received: {json.dumps(balance_data.get('result', {}), indent=2)}")
         
         if balance_data and 'result' in balance_data and 'list' in balance_data['result']:
             account = balance_data['result']['list'][0] if balance_data['result']['list'] else {}
@@ -249,29 +232,22 @@ def get_balance_header():
                 'pnl_24h_percent': pnl_percent
             })
         else:
-            # Demo data fallback
-            return jsonify({
-                'success': True,
-                'balance': 10000.00,
-                'pnl_24h': 125.50,
-                'pnl_24h_percent': 1.26
-            })
+            return jsonify({'error': f'Invalid balance response: {balance_data}'}), 500
             
     except Exception as e:
-        # Demo data fallback on error
-        return jsonify({
-            'success': True,
-            'balance': 10000.00,
-            'pnl_24h': 125.50,
-            'pnl_24h_percent': 1.26
-        })
+        app.logger.error(f"Header balance API error: {str(e)}")
+        return jsonify({'error': f'ByBit API error: {str(e)}'}), 500
 
 @app.route('/api/account_name')
 def get_account_name():
     ensure_components_initialized()
     try:
+        # Check if bybit_session exists
+        if not bybit_session:
+            return jsonify({'error': 'ByBit session not initialized - check API credentials'}), 500
+            
         # Try to get account info to extract account name/ID
-        account_info = handle_bybit_request(bybit_session.get_account_info)
+        account_info = bybit_session.get_account_info()
         
         if account_info and 'result' in account_info:
             # Extract useful account identifiers
@@ -285,20 +261,11 @@ def get_account_name():
                 'margin_mode': margin_mode
             })
         else:
-            return jsonify({
-                'success': True,
-                'account_name': "ByBit Demo",
-                'uid': "demo",
-                'margin_mode': "REGULAR_MARGIN"
-            })
+            return jsonify({'error': f'Invalid account response: {account_info}'}), 500
             
     except Exception as e:
-        return jsonify({
-            'success': True,
-            'account_name': "ByBit Demo",
-            'uid': "demo",
-            'margin_mode': "REGULAR_MARGIN"
-        })
+        app.logger.error(f"Account name API error: {str(e)}")
+        return jsonify({'error': f'ByBit API error: {str(e)}'}), 500
 
 @app.route('/api/account_info')
 def get_account_info():
@@ -1090,9 +1057,13 @@ def get_analytics_data():
 
 @app.route('/api/coin_analysis')
 def get_coin_analysis():
-    """Get AI analysis for all coins"""
+    """Get AI analysis for all coins with REAL status logic"""
     try:
+        ensure_components_initialized()
         ai_worker = get_ai_worker(socketio, bybit_session)
+        
+        # Get AI confidence threshold from settings
+        ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
         
         # Get training results from database
         coins_analysis = []
@@ -1105,19 +1076,43 @@ def get_coin_analysis():
                 training_results = ai_worker.database.get_training_results(latest_session['session_id'])
                 
                 for result in training_results:
+                    # Calculate tijd sinds aanbeveling
+                    training_time = datetime.fromisoformat(result.get('timestamp', datetime.now().isoformat()).replace('Z', '+00:00'))
+                    now = datetime.now()
+                    time_diff = now - training_time
+                    
+                    # Format tijd als "25min" of "1h 10m"
+                    if time_diff.total_seconds() < 3600:  # Minder dan 1 uur
+                        time_since = f"{int(time_diff.total_seconds() // 60)}min"
+                    else:  # Meer dan 1 uur
+                        hours = int(time_diff.total_seconds() // 3600)
+                        minutes = int((time_diff.total_seconds() % 3600) // 60)
+                        time_since = f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
+                    
+                    # ECHTE STATUS LOGIC
+                    confidence = result['confidence']
+                    if confidence < ai_confidence_threshold:
+                        status = "Te lage score"
+                        status_class = "status-low"
+                    else:
+                        # Check if this coin is in signals queue (ready to trade)
+                        # TODO: Implement check against actual signals queue
+                        # For now, assume high confidence = signal
+                        if confidence >= ai_confidence_threshold:
+                            status = "Signal"
+                            status_class = "status-signal"
+                        else:
+                            status = "Te lage score"
+                            status_class = "status-low"
+                    
                     # Generate AI analysis based on training data
-                    analysis = "Bullish" if result['accuracy'] > 70 and result['confidence'] > 75 else "Bearish"
-                    if result['confidence'] < 60:
+                    analysis = "Bullish" if result['accuracy'] > 70 and confidence > 75 else "Bearish"
+                    if confidence < 60:
                         analysis = "Neutral"
                     
                     # Calculate take profit and stop loss based on confidence
-                    take_profit = round(2 + (result['confidence'] / 25), 1)  # 2-6% range
-                    stop_loss = round(1 + (result['confidence'] / 50), 1)    # 1-3% range
-                    
-                    # Determine status (simulated for demo)
-                    import random
-                    status_options = ["Open", "Waiting", "Closed"]
-                    status = random.choice(status_options)
+                    take_profit = round(2 + (confidence / 25), 1)  # 2-6% range
+                    stop_loss = round(1 + (confidence / 50), 1)    # 1-3% range
                     
                     coin_data = {
                         'symbol': result['symbol'],
@@ -1125,40 +1120,21 @@ def get_coin_analysis():
                         'direction': "Buy" if analysis == "Bullish" else "Sell",
                         'takeProfit': take_profit,
                         'stopLoss': stop_loss,
-                        'confidence': round(result['confidence'], 1),
+                        'confidence': round(confidence, 1),
                         'status': status,
+                        'status_class': status_class,
                         'accuracy': round(result['accuracy'], 1),
+                        'time_since': time_since,
                         'last_updated': result.get('timestamp', datetime.now().isoformat())
                     }
                     
                     coins_analysis.append(coin_data)
         except Exception as db_error:
-            print(f"Database error: {db_error}")
-            # If database fails, continue to demo data
+            app.logger.error(f"Database error in coin_analysis: {db_error}")
+            return jsonify({'success': False, 'error': 'No training data available'}), 500
         
-        # If no training data, provide some demo data
         if not coins_analysis:
-            import random
-            demo_symbols = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT', 'DOGEUSDT', 'BNBUSDT', 'XRPUSDT', 'MATICUSDT']
-            
-            for symbol in demo_symbols[:5]:  # Show 5 demo coins
-                accuracy = round(random.uniform(60, 90), 1)
-                confidence = round(random.uniform(65, 95), 1)
-                analysis = "Bullish" if accuracy > 70 and confidence > 75 else "Bearish"
-                
-                coin_data = {
-                    'symbol': symbol,
-                    'analysis': analysis,
-                    'direction': "Buy" if analysis == "Bullish" else "Sell",
-                    'takeProfit': round(2 + (confidence / 25), 1),
-                    'stopLoss': round(1 + (confidence / 50), 1),
-                    'confidence': confidence,
-                    'status': random.choice(["Open", "Waiting", "Closed"]),
-                    'accuracy': accuracy,
-                    'last_updated': datetime.now().isoformat()
-                }
-                
-                coins_analysis.append(coin_data)
+            return jsonify({'success': False, 'error': 'No training data available - start AI training first'}), 404
         
         # Sort by confidence descending
         coins_analysis.sort(key=lambda x: x['confidence'], reverse=True)
@@ -1167,10 +1143,12 @@ def get_coin_analysis():
             'success': True,
             'coins': coins_analysis,
             'total_count': len(coins_analysis),
+            'ai_threshold': ai_confidence_threshold,
             'last_updated': datetime.now().isoformat()
         })
         
     except Exception as e:
+        app.logger.error(f"Coin analysis error: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/trading_signals')
