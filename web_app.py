@@ -65,7 +65,7 @@ trade_stats = {
 }
 
 def init_components():
-    global settings, bybit_session, trade_logger, risk_manager, ai_trader
+    global settings, bybit_session, trade_logger, risk_manager, ai_trader, ai_worker_instance
     
     # Load settings - use environment variables if available
     try:
@@ -89,6 +89,9 @@ def init_components():
     trade_logger = TradeLogger()
     risk_manager = RiskManager(settings)
     ai_trader = AITrader(settings)
+    
+    # Initialize AI worker instance (will be properly configured when start_all is called)
+    ai_worker_instance = None
 
 @app.route('/')
 def dashboard():
@@ -1125,6 +1128,9 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     print('Client disconnected')
+
+# Initialize components for production (Heroku)
+init_components()
 
 if __name__ == '__main__':
     init_components()
