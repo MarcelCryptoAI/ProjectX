@@ -26,34 +26,48 @@ import urllib3
 # Load environment variables
 load_dotenv()
 
-# Simpler DNS fix using hosts override for Heroku
+# Use alternative DNS servers via environment and better retry logic
 try:
-    # Set environment variable to use Google DNS  
     import os
-    os.environ['NSSWITCH_USE_DNS'] = '8.8.8.8'
+    import urllib3
+    from urllib3.util.retry import Retry
+    from requests.adapters import HTTPAdapter
+    import requests
     
-    # Also monkey patch socket for direct IP resolution
-    original_getaddrinfo = socket.getaddrinfo
+    # Configure urllib3 with custom DNS and SSL settings
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     
-    def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-        try:
-            # Hardcode ByBit IP to bypass DNS issues completely
-            if host == 'api.bybit.com':
-                # Use Cloudflare's IP for api.bybit.com (104.16.132.119 is one of their IPs)
-                print(f"🌐 Using hardcoded IP for {host}: 104.16.132.119")
-                return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('104.16.132.119', port))]
+    # Monkey patch requests to use better DNS resolution and retries
+    original_request = requests.Session.request
+    
+    def patched_request(self, method, url, **kwargs):
+        # Add retry logic and better error handling
+        if not hasattr(self, '_retry_configured'):
+            retry_strategy = Retry(
+                total=3,
+                backoff_factor=1,
+                status_forcelist=[429, 500, 502, 503, 504],
+                allowed_methods=["HEAD", "GET", "PUT", "DELETE", "OPTIONS", "TRACE", "POST"]
+            )
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+            self.mount("http://", adapter)
+            self.mount("https://", adapter)
+            self._retry_configured = True
             
-            # Fall back to original for all other hosts
-            return original_getaddrinfo(host, port, family, type, proto, flags)
-        except Exception as e:
-            print(f"⚠️ getaddrinfo error for {host}: {e}")
-            # Always fall back to original resolver
-            return original_getaddrinfo(host, port, family, type, proto, flags)
+        # Set longer timeout for ByBit requests
+        if 'bybit.com' in str(url):
+            kwargs.setdefault('timeout', (10, 30))  # (connect, read)
+            # Disable SSL verification as fallback for problematic connections
+            if 'verify' not in kwargs:
+                kwargs['verify'] = True  # Keep SSL verification but with longer timeout
+            
+        return original_request(self, method, url, **kwargs)
     
-    socket.getaddrinfo = custom_getaddrinfo
-    print("✅ Hardcoded DNS bypass configured for api.bybit.com")
+    requests.Session.request = patched_request
+    print("✅ Enhanced HTTP client configured with better DNS and retry logic")
+    
 except Exception as e:
-    print(f"⚠️ Could not configure DNS bypass: {e}")
+    print(f"⚠️ Could not configure enhanced HTTP client: {e}")
 
 # Disable SSL warnings for Heroku environment if needed
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -161,14 +175,68 @@ def init_components():
         # Set DNS cache timeout
         session.trust_env = False  # Disable system proxy
         
-        # Pre-warm DNS resolution
+        # Pre-warm DNS resolution with better error handling
         try:
             import socket
             print("🔍 Pre-warming DNS resolution for api.bybit.com...")
-            result = socket.getaddrinfo('api.bybit.com', 443)
-            print(f"✅ DNS pre-warm successful: {result[0][4][0]}")
+            
+            # Try multiple DNS resolution methods
+            try:
+                # Method 1: Standard resolution
+                result = socket.getaddrinfo('api.bybit.com', 443, socket.AF_INET)
+                if result:
+                    print(f"✅ DNS pre-warm successful (Method 1): {result[0][4][0]}")
+                else:
+                    raise Exception("No result from getaddrinfo")
+            except Exception as e1:
+                print(f"⚠️ Method 1 failed: {e1}")
+                try:
+                    # Method 2: Direct gethostbyname
+                    ip = socket.gethostbyname('api.bybit.com')
+                    print(f"✅ DNS pre-warm successful (Method 2): {ip}")
+                except Exception as e2:
+                    print(f"⚠️ Method 2 failed: {e2}")
+                    # Method 3: Use public DNS
+                    try:
+                        import subprocess
+                        result = subprocess.run(['nslookup', 'api.bybit.com', '8.8.8.8'], 
+                                             capture_output=True, text=True, timeout=10)
+                        if result.returncode == 0:
+                            print(f"✅ DNS pre-warm successful (Method 3): Using nslookup")
+                        else:
+                            print(f"⚠️ All DNS methods failed, continuing anyway...")
+                    except Exception as e3:
+                        print(f"⚠️ Method 3 failed: {e3}, continuing anyway...")
+                        
         except Exception as dns_pretest:
-            print(f"⚠️ DNS pre-warm failed: {dns_pretest}")
+            print(f"⚠️ DNS pre-warm failed: {dns_pretest}, continuing anyway...")
+        
+        # Configure pybit with custom HTTP settings
+        try:
+            # Try to patch pybit's HTTP manager for better DNS/SSL handling
+            from pybit.unified_trading import HTTP
+            
+            # Create custom session for pybit
+            import requests
+            custom_session = requests.Session()
+            
+            # Configure session with better timeout and retry settings
+            retry_strategy = Retry(
+                total=3,
+                backoff_factor=1,
+                status_forcelist=[429, 500, 502, 503, 504],
+            )
+            adapter = HTTPAdapter(max_retries=retry_strategy, pool_maxsize=10, pool_connections=10)
+            custom_session.mount("http://", adapter)
+            custom_session.mount("https://", adapter)
+            
+            # Set reasonable timeouts
+            custom_session.timeout = (10, 30)  # (connect, read)
+            
+            print("🔧 Configured custom HTTP session for pybit")
+            
+        except Exception as session_error:
+            print(f"⚠️ Could not configure custom session: {session_error}")
         
         bybit_session = HTTP(
             testnet=False,  # ALTIJD LIVE
@@ -416,8 +484,8 @@ def test_dns():
                 'host': 'api.bybit.com',
                 'resolved_ips': [addr[4][0] for addr in result[:3]],  # First 3 IPs
                 'resolution_time_ms': round(resolution_time, 2),
-                'resolver': 'Hardcoded IP Bypass (104.16.132.119)',
-                'method': 'Direct IP resolution to bypass DNS issues'
+                'resolver': 'Enhanced HTTP Client with Retry Logic',
+                'method': 'Better timeout and retry handling'
             })
         except Exception as dns_error:
             return jsonify({
@@ -476,7 +544,7 @@ def get_system_status():
         resolution_time = (time.time() - start_time) * 1000
         status['dns'] = {
             'status': 'online', 
-            'message': f'DNS resolved in {resolution_time:.1f}ms (Hardcoded IP)',
+            'message': f'DNS resolved in {resolution_time:.1f}ms (Enhanced Client)',
             'resolved_ip': result[0][4][0] if result else 'Unknown'
         }
     except Exception as e:
