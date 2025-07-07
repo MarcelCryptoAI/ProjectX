@@ -262,18 +262,19 @@
 
                     <!-- API Settings -->
                     <div class="tab-pane fade" id="api" role="tabpanel">
-                        <div class="settings-group">
-                            <h5><i class="fas fa-exchange-alt"></i> ByBit API</h5>
-                            <div class="mb-3">
-                                <label for="bybitApiKey" class="form-label">API Key</label>
-                                <input type="password" class="form-control api-key-input" id="bybitApiKey">
-                                <div class="form-text">Your ByBit API key</div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="bybitApiSecret" class="form-label">API Secret</label>
-                                <input type="password" class="form-control api-key-input" id="bybitApiSecret">
-                                <div class="form-text">Your ByBit API secret</div>
-                            </div>
+                        <form id="apiSettingsForm">
+                            <div class="settings-group">
+                                <h5><i class="fas fa-exchange-alt"></i> ByBit API</h5>
+                                <div class="mb-3">
+                                    <label for="bybitApiKey" class="form-label">API Key</label>
+                                    <input type="text" class="form-control api-key-input" id="bybitApiKey" autocomplete="off">
+                                    <div class="form-text">Your ByBit API key</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="bybitApiSecret" class="form-label">API Secret</label>
+                                    <input type="text" class="form-control api-key-input" id="bybitApiSecret" autocomplete="off">
+                                    <div class="form-text">Your ByBit API secret</div>
+                                </div>
                             <div class="mb-3">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="testnetMode">
@@ -285,14 +286,15 @@
                             </div>
                         </div>
 
-                        <div class="settings-group">
-                            <h5><i class="fas fa-newspaper"></i> News API</h5>
-                            <div class="mb-3">
-                                <label for="cryptopanicApiKey" class="form-label">CryptoPanic API Key</label>
-                                <input type="password" class="form-control api-key-input" id="cryptopanicApiKey">
-                                <div class="form-text">API key for cryptocurrency news sentiment analysis</div>
+                            <div class="settings-group">
+                                <h5><i class="fas fa-newspaper"></i> News API</h5>
+                                <div class="mb-3">
+                                    <label for="cryptopanicApiKey" class="form-label">CryptoPanic API Key</label>
+                                    <input type="text" class="form-control api-key-input" id="cryptopanicApiKey" autocomplete="off">
+                                    <div class="form-text">API key for cryptocurrency news sentiment analysis</div>
+                                </div>
                             </div>
-                        </div>
+                        </form>
 
                         <div class="danger-zone">
                             <h5><i class="fas fa-exclamation-triangle"></i> API Testing</h5>
@@ -420,21 +422,22 @@
 
                     <!-- Telegram Settings -->
                     <div class="tab-pane fade" id="telegram" role="tabpanel">
-                        <div class="settings-group">
-                            <h5><i class="fab fa-telegram"></i> Telegram Bot Configuration</h5>
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="telegramEnabled" checked>
-                                    <label class="form-check-label" for="telegramEnabled">
-                                        Enable Telegram Notifications
-                                    </label>
+                        <form id="telegramSettingsForm">
+                            <div class="settings-group">
+                                <h5><i class="fab fa-telegram"></i> Telegram Bot Configuration</h5>
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="telegramEnabled" checked>
+                                        <label class="form-check-label" for="telegramEnabled">
+                                            Enable Telegram Notifications
+                                        </label>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="telegramBotToken" class="form-label">Bot Token</label>
-                                <input type="password" class="form-control api-key-input" id="telegramBotToken">
-                                <div class="form-text">Your Telegram bot token</div>
-                            </div>
+                                <div class="mb-3">
+                                    <label for="telegramBotToken" class="form-label">Bot Token</label>
+                                    <input type="text" class="form-control api-key-input" id="telegramBotToken" autocomplete="off">
+                                    <div class="form-text">Your Telegram bot token</div>
+                                </div>
                             <div class="mb-3">
                                 <label for="telegramChatId" class="form-label">Chat ID</label>
                                 <input type="text" class="form-control" id="telegramChatId">
@@ -475,6 +478,7 @@
                                 <i class="fas fa-paper-plane"></i> Test Telegram Connection
                             </button>
                         </div>
+                        </form>
                     </div>
                 </div>
             </div>

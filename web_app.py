@@ -32,21 +32,30 @@ try:
     # Create custom resolver using Google DNS
     custom_resolver = dns.resolver.Resolver()
     custom_resolver.nameservers = ['8.8.8.8', '8.8.4.4']  # Google DNS primary and secondary
+    custom_resolver.timeout = 10
+    custom_resolver.lifetime = 15
     
     # Monkey patch the socket module to use our custom resolver
     original_getaddrinfo = socket.getaddrinfo
     
     def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
         try:
-            # First try with custom DNS
-            if host == 'api.bybit.com':
-                answers = custom_resolver.resolve(host, 'A')
-                for rdata in answers:
-                    return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (str(rdata), port))]
-            # Fall back to original for other hosts
+            # Use custom DNS for ByBit API specifically
+            if 'bybit.com' in host:
+                try:
+                    answers = custom_resolver.resolve(host, 'A')
+                    resolved_ips = [str(rdata) for rdata in answers]
+                    print(f"🌐 DNS resolved {host} to {resolved_ips[0]} via Google DNS")
+                    return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (resolved_ips[0], port))]
+                except Exception as dns_err:
+                    print(f"⚠️ Custom DNS failed for {host}: {dns_err}, falling back to system DNS")
+                    pass
+            
+            # Fall back to original for all other cases
             return original_getaddrinfo(host, port, family, type, proto, flags)
-        except Exception:
-            # Fall back to original resolver
+        except Exception as e:
+            print(f"⚠️ getaddrinfo error for {host}: {e}")
+            # Always fall back to original resolver
             return original_getaddrinfo(host, port, family, type, proto, flags)
     
     socket.getaddrinfo = custom_getaddrinfo
@@ -160,6 +169,15 @@ def init_components():
         # Set DNS cache timeout
         session.trust_env = False  # Disable system proxy
         
+        # Pre-warm DNS resolution
+        try:
+            import socket
+            print("🔍 Pre-warming DNS resolution for api.bybit.com...")
+            result = socket.getaddrinfo('api.bybit.com', 443)
+            print(f"✅ DNS pre-warm successful: {result[0][4][0]}")
+        except Exception as dns_pretest:
+            print(f"⚠️ DNS pre-warm failed: {dns_pretest}")
+        
         bybit_session = HTTP(
             testnet=False,  # ALTIJD LIVE
             api_key=api_key,
@@ -169,7 +187,7 @@ def init_components():
         )
         app.logger.info("✅ ByBit LIVE session initialized successfully")
         
-        # Test connection
+        # Test connection with detailed error handling
         try:
             test_response = bybit_session.get_server_time()
             if test_response and 'result' in test_response:
