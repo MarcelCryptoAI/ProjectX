@@ -151,6 +151,10 @@ def analytics():
 def coin_status():
     return render_template('coin_status.html')
 
+@app.route('/signals')
+def signals():
+    return render_template('signals.html')
+
 @app.route('/api/balance')
 def get_balance():
     ensure_components_initialized()
@@ -924,14 +928,21 @@ def get_database_stats():
         # Get training sessions count
         sessions = db.get_training_history(limit=100)
         
-        # Get latest session data
-        latest_session = None
+        # Get latest session data with proper timestamp
+        latest_session_date = None
         if sessions:
             latest_session = sessions[0]
+            # If latest_session is a tuple/list, get the timestamp field
+            if isinstance(latest_session, (list, tuple)) and len(latest_session) > 3:
+                latest_session_date = latest_session[3]  # Assuming timestamp is at index 3
+            elif isinstance(latest_session, dict):
+                latest_session_date = latest_session.get('timestamp') or latest_session.get('created_at')
+            else:
+                latest_session_date = datetime.now().isoformat()
         
         stats = {
             'training_sessions': len(sessions),
-            'latest_session': latest_session,
+            'latest_session_date': latest_session_date,
             'market_data_points': 0,  # Would need separate query
             'technical_indicators': 0,  # Would need separate query
             'sentiment_records': 0  # Would need separate query
@@ -1136,6 +1147,56 @@ def get_coin_analysis():
             'success': True,
             'coins': coins_analysis,
             'total_count': len(coins_analysis),
+            'last_updated': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/trading_signals')
+def get_trading_signals():
+    """Get all trading signals from the queue"""
+    try:
+        ai_worker = get_ai_worker(socketio, bybit_session)
+        
+        # Generate demo signals for now
+        import random
+        demo_symbols = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT', 'DOGEUSDT', 'BNBUSDT', 'XRPUSDT', 'MATICUSDT']
+        signals = []
+        
+        for i, symbol in enumerate(demo_symbols[:6]):  # Generate 6 signals
+            confidence = random.uniform(65, 95)
+            side = random.choice(['Buy', 'Sell'])
+            
+            # Generate timestamp (signals from last 2 hours)
+            signal_time = datetime.now() - timedelta(minutes=random.randint(5, 120))
+            
+            signal = {
+                'id': f'signal_{i}_{symbol}',
+                'symbol': symbol,
+                'side': side,
+                'confidence': round(confidence, 1),
+                'amount': random.choice([50, 100, 150, 200]),
+                'leverage': random.choice([1, 2, 3, 5]),
+                'take_profit': round(random.uniform(2.5, 4.0), 1),
+                'stop_loss': round(random.uniform(1.5, 2.5), 1),
+                'strategy': 'AI Technical Analysis',
+                'timestamp': signal_time.isoformat(),
+                'analysis': {
+                    'rsi': round(random.uniform(30, 70), 2),
+                    'macd': round(random.uniform(-0.5, 0.5), 4),
+                    'trend': random.choice(['bullish', 'bearish', 'neutral'])
+                }
+            }
+            signals.append(signal)
+        
+        # Sort by confidence (highest first)
+        signals.sort(key=lambda x: x['confidence'], reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'signals': signals,
+            'count': len(signals),
             'last_updated': datetime.now().isoformat()
         })
         

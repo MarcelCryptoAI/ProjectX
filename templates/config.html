@@ -29,6 +29,8 @@
             </a>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="/">Dashboard</a>
+                <a class="nav-link" href="/coin_status">Coin Status</a>
+                <a class="nav-link" href="/signals">Signals</a>
                 <a class="nav-link active" href="/config">Settings</a>
                 <a class="nav-link" href="/analytics">Analytics</a>
             </div>
@@ -80,18 +82,25 @@
                         <div class="settings-group">
                             <h5><i class="fas fa-percentage"></i> Position Sizing</h5>
                             <div class="row">
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <div class="mb-3">
                                         <label for="riskPerTrade" class="form-label">Risk Per Trade (%)</label>
                                         <input type="number" class="form-control" id="riskPerTrade" step="0.1" min="0.1" max="10">
                                         <div class="form-text">Percentage of account balance to risk per trade</div>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <div class="mb-3">
                                         <label for="maxConcurrentTrades" class="form-label">Max Concurrent Trades</label>
-                                        <input type="number" class="form-control" id="maxConcurrentTrades" min="1" max="20">
+                                        <input type="number" class="form-control" id="maxConcurrentTrades" min="1" max="50" value="20">
                                         <div class="form-text">Maximum number of trades to run simultaneously</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="minTradeAmount" class="form-label">Minimum Trade Amount ($)</label>
+                                        <input type="number" class="form-control" id="minTradeAmount" step="1" min="1" max="1000" value="10">
+                                        <div class="form-text">Minimum dollar amount for each trade</div>
                                     </div>
                                 </div>
                             </div>
@@ -125,9 +134,12 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label for="trailingStopPercent" class="form-label">Trailing Stop (%)</label>
-                                        <input type="number" class="form-control" id="trailingStopPercent" step="0.1" min="0" max="5" value="0">
-                                        <div class="form-text">Trailing stop loss percentage (0 = disabled)</div>
+                                        <label for="leverageType" class="form-label">Leverage Type</label>
+                                        <select class="form-select" id="leverageType">
+                                            <option value="cross">Cross Margin</option>
+                                            <option value="isolated">Isolated Margin</option>
+                                        </select>
+                                        <div class="form-text">Cross: Uses entire account balance as margin. Isolated: Uses only position margin</div>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
@@ -140,6 +152,15 @@
                                             </label>
                                         </div>
                                         <div class="form-text">Enable automatic take profit and stop loss</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="trailingStopPercent" class="form-label">Trailing Stop (%)</label>
+                                        <input type="number" class="form-control" id="trailingStopPercent" step="0.1" min="0" max="5" value="1">
+                                        <div class="form-text">Trailing stop loss percentage (0 = disabled)</div>
                                     </div>
                                 </div>
                             </div>
@@ -491,11 +512,13 @@
         function populateForm(settings) {
             // Trading settings
             document.getElementById('riskPerTrade').value = settings.bot?.risk_per_trade_percent || 2.0;
-            document.getElementById('maxConcurrentTrades').value = settings.bot?.max_concurrent_trades || 5;
+            document.getElementById('maxConcurrentTrades').value = settings.bot?.max_concurrent_trades || 20;
+            document.getElementById('minTradeAmount').value = settings.bot?.min_trade_amount || 10;
             document.getElementById('takeProfitPercent').value = settings.bot?.take_profit_percent || 3.0;
             document.getElementById('stopLossPercent').value = settings.bot?.stop_loss_percent || 2.0;
             document.getElementById('defaultLeverage').value = settings.bot?.default_leverage || 1;
-            document.getElementById('trailingStopPercent').value = settings.bot?.trailing_stop_percent || 0;
+            document.getElementById('leverageType').value = settings.bot?.leverage_type || 'cross';
+            document.getElementById('trailingStopPercent').value = settings.bot?.trailing_stop_percent || 1.0;
             document.getElementById('autoTPSL').checked = settings.bot?.auto_tpsl !== false;
             
             // Store enabled pairs
@@ -532,9 +555,11 @@
                 bot: {
                     risk_per_trade_percent: parseFloat(document.getElementById('riskPerTrade').value),
                     max_concurrent_trades: parseInt(document.getElementById('maxConcurrentTrades').value),
+                    min_trade_amount: parseFloat(document.getElementById('minTradeAmount').value),
                     take_profit_percent: parseFloat(document.getElementById('takeProfitPercent').value),
                     stop_loss_percent: parseFloat(document.getElementById('stopLossPercent').value),
                     default_leverage: parseInt(document.getElementById('defaultLeverage').value),
+                    leverage_type: document.getElementById('leverageType').value,
                     trailing_stop_percent: parseFloat(document.getElementById('trailingStopPercent').value),
                     auto_tpsl: document.getElementById('autoTPSL').checked,
                     enabled_pairs: getEnabledPairs(),

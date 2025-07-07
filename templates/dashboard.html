@@ -34,8 +34,9 @@
                 <i class="fas fa-robot"></i> ByBit AI Trading Bot
             </a>
             <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="/">Dashboard</a>
+                <a class="nav-link active" href="/">Dashboard</a>
                 <a class="nav-link" href="/coin_status">Coin Status</a>
+                <a class="nav-link" href="/signals">Signals</a>
                 <a class="nav-link" href="/config">Settings</a>
                 <a class="nav-link" href="/analytics">Analytics</a>
                 <div class="nav-link text-light">
@@ -216,9 +217,9 @@
                     </div>
                 </div>
 
-                <!-- Positions and Orders -->
+                <!-- Current Positions -->
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-12">
                         <div class="card">
                             <div class="card-header">
                                 <h5>Current Positions</h5>
@@ -230,8 +231,11 @@
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="col-md-6">
+                </div>
+
+                <!-- Open Orders -->
+                <div class="row">
+                    <div class="col-md-12">
                         <div class="card">
                             <div class="card-header">
                                 <h5>Open Orders</h5>
@@ -1098,7 +1102,7 @@
                     
                     dbRecordCount.innerHTML = `
                         <strong>${stats.training_sessions}</strong> training sessions
-                        ${stats.latest_session ? `| Latest: ${new Date(stats.latest_session[3]).toLocaleDateString()}` : ''}
+                        ${stats.latest_session_date ? `| Latest: ${new Date(stats.latest_session_date).toLocaleDateString()}` : '| No sessions yet'}
                     `;
                 }
             })
