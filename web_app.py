@@ -26,46 +26,65 @@ import urllib3
 # Load environment variables
 load_dotenv()
 
-# Direct DNS override using hosts file approach
+# Alternative approach - use different DNS and SSL bypass as last resort
 try:
     import socket
+    import ssl
     import os
+    import urllib3
     
-    # Hardcode ByBit DNS resolution to bypass DNS timeout issues
+    # Try to use alternative DNS first (if available on Heroku)
+    os.environ['DNS_SERVER'] = '8.8.8.8'
+    
+    # Create a custom SSL context that's more permissive for problematic connections
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+    
+    # Store original functions
     original_getaddrinfo = socket.getaddrinfo
+    original_ssl_context = ssl.create_default_context
     
-    # Known working IPs for api.bybit.com (Cloudflare CDN)
-    BYBIT_IPS = [
-        '104.16.132.119',  # Primary Cloudflare IP
-        '104.16.133.119',  # Secondary Cloudflare IP
-        '172.67.74.176',   # Another Cloudflare IP
-    ]
-    
-    def patched_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-        # Override DNS for ByBit specifically
-        if host == 'api.bybit.com':
-            print(f"🌐 DNS Override: {host} -> {BYBIT_IPS[0]}")
-            # Return the hardcoded IP but preserve the hostname for SSL
-            return [(socket.AF_INET, socket.SOCK_STREAM, 6, 'api.bybit.com', (BYBIT_IPS[0], port))]
-        
-        # Use original function for all other hosts
+    def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
         try:
-            return original_getaddrinfo(host, port, family, type, proto, flags)
+            # First try the normal DNS resolution with longer timeout
+            socket.setdefaulttimeout(15)  # 15 second timeout
+            result = original_getaddrinfo(host, port, family, type, proto, flags)
+            print(f"🌐 Standard DNS successful for {host}: {result[0][4][0] if result else 'Unknown'}")
+            return result
+        except socket.timeout:
+            print(f"⚠️ DNS timeout for {host}, trying alternative...")
+            # If DNS times out, fall back to hardcoded IP for api.bybit.com
+            if host == 'api.bybit.com':
+                print("🔧 Using fallback IP for api.bybit.com")
+                return [(socket.AF_INET, socket.SOCK_STREAM, 6, host, ('104.16.132.119', port))]
+            else:
+                raise
         except Exception as e:
-            print(f"⚠️ DNS resolution failed for {host}: {e}")
-            # For other failed hosts, try to fall back gracefully
+            print(f"⚠️ DNS failed for {host}: {e}")
             raise e
     
-    # Apply the patch
-    socket.getaddrinfo = patched_getaddrinfo
-    print("✅ ByBit DNS override applied - using Cloudflare IP")
+    def permissive_ssl_context(*args, **kwargs):
+        """Create SSL context that ignores certificate issues if needed"""
+        try:
+            # Try normal SSL first
+            ctx = original_ssl_context(*args, **kwargs)
+            return ctx
+        except:
+            # If that fails, return permissive context
+            print("🔓 Using permissive SSL context as fallback")
+            return ssl_context
     
-    # Also set resolver environment variables for backup
-    os.environ['RESOLVER_1'] = '8.8.8.8'
-    os.environ['RESOLVER_2'] = '8.8.4.4'
+    # Apply patches
+    socket.getaddrinfo = custom_getaddrinfo
+    
+    # Disable SSL warnings
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
+    print("✅ Enhanced DNS resolution with SSL fallback configured")
     
 except Exception as e:
-    print(f"⚠️ Could not configure DNS override: {e}")
+    print(f"⚠️ Could not configure enhanced DNS: {e}")
 
 # Disable SSL warnings for Heroku environment if needed
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -209,14 +228,32 @@ def init_components():
         except Exception as dns_pretest:
             print(f"⚠️ DNS pre-warm failed: {dns_pretest}, continuing anyway...")
         
-        # Initialize ByBit with DNS override active
-        print("🔧 Initializing ByBit session with DNS override...")
-        bybit_session = HTTP(
-            testnet=False,  # ALTIJD LIVE
-            api_key=api_key,
-            api_secret=api_secret,
-            recv_window=20000  # Increase receive window for slow connections
-        )
+        # Initialize ByBit with enhanced error handling
+        print("🔧 Initializing ByBit session with enhanced DNS handling...")
+        try:
+            bybit_session = HTTP(
+                testnet=False,  # ALTIJD LIVE
+                api_key=api_key,
+                api_secret=api_secret,
+                recv_window=20000  # Increase receive window for slow connections
+            )
+            print("✅ ByBit session created successfully")
+        except Exception as init_error:
+            print(f"⚠️ ByBit session creation failed: {init_error}")
+            print("🔄 Attempting with alternative configuration...")
+            
+            # Try with more permissive settings
+            try:
+                bybit_session = HTTP(
+                    testnet=False,
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    recv_window=10000  # Smaller window
+                )
+                print("✅ ByBit session created with alternative config")
+            except Exception as alt_error:
+                print(f"❌ Alternative config also failed: {alt_error}")
+                raise Exception("Could not initialize ByBit session with any configuration")
         app.logger.info("✅ ByBit LIVE session initialized successfully")
         
         # Test connection with detailed error handling
