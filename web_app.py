@@ -46,20 +46,17 @@ try:
     original_ssl_context = ssl.create_default_context
     
     def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+        # For api.bybit.com, immediately use hardcoded IP to bypass DNS issues
+        if host == 'api.bybit.com':
+            print(f"🔧 Direct IP bypass for {host} -> 104.16.132.119")
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, host, ('104.16.132.119', port))]
+        
+        # For other hosts, try normal DNS with shorter timeout
         try:
-            # First try the normal DNS resolution with longer timeout
-            socket.setdefaulttimeout(15)  # 15 second timeout
+            socket.setdefaulttimeout(8)  # Shorter timeout for non-ByBit hosts
             result = original_getaddrinfo(host, port, family, type, proto, flags)
             print(f"🌐 Standard DNS successful for {host}: {result[0][4][0] if result else 'Unknown'}")
             return result
-        except socket.timeout:
-            print(f"⚠️ DNS timeout for {host}, trying alternative...")
-            # If DNS times out, fall back to hardcoded IP for api.bybit.com
-            if host == 'api.bybit.com':
-                print("🔧 Using fallback IP for api.bybit.com")
-                return [(socket.AF_INET, socket.SOCK_STREAM, 6, host, ('104.16.132.119', port))]
-            else:
-                raise
         except Exception as e:
             print(f"⚠️ DNS failed for {host}: {e}")
             raise e
