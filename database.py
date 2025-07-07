@@ -278,6 +278,18 @@ class TradingDatabase:
                     price_ema_12 = EXCLUDED.price_ema_12,
                     price_ema_26 = EXCLUDED.price_ema_26
                 ''', (
+                symbol, timestamp,
+                indicators.get('rsi_14'),
+                indicators.get('macd_line'),
+                indicators.get('macd_signal'),
+                indicators.get('bb_upper'),
+                indicators.get('bb_lower'),
+                indicators.get('bb_middle'),
+                indicators.get('volume_sma_20'),
+                indicators.get('price_sma_20'),
+                indicators.get('price_ema_12'),
+                indicators.get('price_ema_26')
+            ))
             else:
                 cursor.execute('''
                     INSERT OR REPLACE INTO technical_indicators 
@@ -320,6 +332,12 @@ class TradingDatabase:
                     social_sentiment = EXCLUDED.social_sentiment,
                     fear_greed_index = EXCLUDED.fear_greed_index
                 ''', (
+                symbol, timestamp,
+                sentiment.get('sentiment_score'),
+                sentiment.get('news_count'),
+                sentiment.get('social_sentiment'),
+                sentiment.get('fear_greed_index')
+            ))
             else:
                 cursor.execute('''
                     INSERT OR REPLACE INTO sentiment_data 
