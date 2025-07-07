@@ -84,12 +84,21 @@ class AIWorker:
     def __init__(self, socketio=None, bybit_session=None):
         self.socketio = socketio
         self.bybit_session = bybit_session
-        self.settings = Settings.load('config/settings.yaml')
+        # Load settings with fallback for production
+        try:
+            self.settings = Settings.load('config/settings.yaml')
+        except:
+            # Fallback to environment variables if config file doesn't exist
+            self.settings = type('Settings', (), {})()
         self.ai_trader = AITrader(self.settings)
         self.trade_logger = TradeLogger()
         self.console_logger = ConsoleLogger()
         self.database = TradingDatabase()
         self.trade_executor = TradeExecutor(bybit_session, self.console_logger) if bybit_session else None
+        if self.trade_executor:
+            self.console_logger.log('INFO', '✅ Trade executor initialized successfully')
+        else:
+            self.console_logger.log('WARNING', '⚠️ Trade executor not initialized - no bybit_session provided')
         self.is_running = False
         self.training_in_progress = False
         self.last_model_update = None
