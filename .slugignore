@@ -1,6 +1,5 @@
 # Ignore these files during Heroku deployment
 *.md
-*.txt
 .git/
 .gitignore
 .DS_Store
@@ -22,3 +21,6 @@ dashboard/templates/
 README_OLD.md
 HANDOVER.md
 DEPLOYMENT.md
+# IMPORTANT: Do not ignore requirements.txt or runtime.txt
+# Keep text files that are needed for Heroku
+trades.csv
