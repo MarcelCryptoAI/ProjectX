@@ -540,4 +540,10 @@ def get_ai_worker(socketio=None, bybit_session=None):
     global ai_worker
     if ai_worker is None:
         ai_worker = AIWorker(socketio, bybit_session)
+    elif bybit_session and not ai_worker.bybit_session:
+        # Update existing worker with bybit_session if it was missing
+        ai_worker.bybit_session = bybit_session
+        if bybit_session:
+            ai_worker.trade_executor = TradeExecutor(bybit_session, ai_worker.console_logger)
+            ai_worker.console_logger.log('INFO', '✅ Trade executor initialized with ByBit session')
     return ai_worker

@@ -704,7 +704,8 @@ def get_trading_history():
 @app.route('/api/console_logs')
 def get_console_logs():
     try:
-        ai_worker = get_ai_worker()
+        ensure_components_initialized()
+        ai_worker = get_ai_worker(socketio=socketio, bybit_session=bybit_session)
         if ai_worker:
             logs = ai_worker.get_console_logs()
             return jsonify(logs)
@@ -716,8 +717,9 @@ def get_console_logs():
 @app.route('/api/worker_stats')
 def get_worker_stats():
     try:
+        ensure_components_initialized()
         global ai_worker_instance
-        ai_worker = ai_worker_instance or get_ai_worker()
+        ai_worker = ai_worker_instance or get_ai_worker(socketio=socketio, bybit_session=bybit_session)
         if ai_worker:
             stats = ai_worker.get_worker_stats()
             return jsonify({
@@ -741,7 +743,8 @@ def get_worker_stats():
 @app.route('/api/training_progress')
 def get_training_progress():
     try:
-        ai_worker = get_ai_worker()
+        ensure_components_initialized()
+        ai_worker = get_ai_worker(socketio=socketio, bybit_session=bybit_session)
         if ai_worker:
             return jsonify({
                 'success': True,
@@ -766,7 +769,8 @@ def get_training_progress():
 @app.route('/api/start_training', methods=['POST'])
 def start_training():
     try:
-        ai_worker = get_ai_worker()
+        ensure_components_initialized()
+        ai_worker = get_ai_worker(socketio=socketio, bybit_session=bybit_session)
         if ai_worker:
             if ai_worker.training_in_progress:
                 return jsonify({
@@ -809,7 +813,8 @@ def enable_trading():
 @app.route('/api/disable_trading', methods=['POST'])
 def disable_trading():
     try:
-        ai_worker = get_ai_worker()
+        ensure_components_initialized()
+        ai_worker = get_ai_worker(socketio=socketio, bybit_session=bybit_session)
         if ai_worker and ai_worker.trade_executor:
             ai_worker.trade_executor.disable_trading()
             return jsonify({
@@ -827,8 +832,9 @@ def disable_trading():
 @app.route('/api/trading_status')
 def get_trading_status():
     try:
+        ensure_components_initialized()
         global ai_worker_instance
-        ai_worker = ai_worker_instance or get_ai_worker()
+        ai_worker = ai_worker_instance or get_ai_worker(socketio=socketio, bybit_session=bybit_session)
         if ai_worker and ai_worker.trade_executor:
             status = ai_worker.trade_executor.get_trading_status()
             return jsonify({
@@ -850,7 +856,8 @@ def get_trading_status():
 @app.route('/api/start_worker', methods=['POST'])
 def start_worker():
     try:
-        ai_worker = get_ai_worker()
+        ensure_components_initialized()
+        ai_worker = get_ai_worker(socketio=socketio, bybit_session=bybit_session)
         if ai_worker:
             ai_worker.start()
             return jsonify({

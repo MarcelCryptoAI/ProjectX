@@ -301,7 +301,7 @@
                                         </button>
                                     </div>
                                 </div>
-                                <div id="liveConsole" style="height: calc(100% - 50px); overflow-y: scroll; background: #1a1a1a; color: #00ff00; font-family: 'Courier New', monospace; font-size: 13px; padding: 10px; line-height: 1.4; scroll-behavior: smooth;">
+                                <div id="liveConsole" style="height: calc(100% - 50px); overflow-y: auto; background: #1a1a1a; color: #00ff00; font-family: 'Courier New', monospace; font-size: 13px; padding: 10px; line-height: 1.4; scroll-behavior: smooth; max-height: 300px;">
                                     <!-- Live console output -->
                                 </div>
                             </div>
@@ -582,24 +582,18 @@
                 logLine.appendChild(detailsDiv);
             }
             
-            // Add NEW logs at the TOP for better visibility
-            if (console.firstChild) {
-                console.insertBefore(logLine, console.firstChild);
-            } else {
-                console.appendChild(logLine);
+            // Add NEW logs at the BOTTOM for natural scrolling behavior
+            console.appendChild(logLine);
+            
+            // Auto-scroll to bottom for new entries (only if user is already near bottom)
+            const isNearBottom = console.scrollTop + console.clientHeight >= console.scrollHeight - 50;
+            if (isNearBottom) {
+                console.scrollTop = console.scrollHeight;
             }
             
-            // Keep console scrolled to TOP for newest entries
-            console.scrollTop = 0;
-            
-            // Limit console lines to keep it performant (remove old entries from bottom)
+            // Limit console lines to keep it performant (remove old entries from top)
             if (console.children.length > 500) {
-                console.removeChild(console.lastChild);
-            }
-            
-            // Auto-scroll to show new entries if user is at top
-            if (console.scrollTop < 50) {
-                console.scrollTop = 0;
+                console.removeChild(console.firstChild);
             }
         }
         

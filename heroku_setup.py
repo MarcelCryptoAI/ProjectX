@@ -43,11 +43,23 @@ def verify_no_redis_dependencies():
         print("✅ No Celery dependencies detected (correct)")
 
 def initialize_database():
-    """Initialize SQLite database for local development"""
+    """Initialize database (PostgreSQL on Heroku, SQLite locally)"""
     try:
         from database import TradingDatabase
-        db = TradingDatabase()
-        print("✅ Database initialized successfully")
+        
+        # Check if we're on Heroku
+        if os.getenv('DATABASE_URL'):
+            print("🗄️  Detected PostgreSQL database on Heroku")
+            print("📊 Database will be automatically initialized on first access")
+            # PostgreSQL database is created automatically by Heroku
+            # Tables will be created by TradingDatabase on first instantiation
+            db = TradingDatabase()
+            print("✅ PostgreSQL database connection verified")
+        else:
+            print("🗄️  Using SQLite database for local development")
+            db = TradingDatabase()
+            print("✅ SQLite database initialized successfully")
+        
         return True
     except Exception as e:
         print(f"⚠️  Database initialization warning: {e}")
@@ -70,6 +82,11 @@ def main():
     if env_ok:
         print("✅ Heroku setup completed successfully!")
         print("🌐 Application ready to deploy")
+        print("\n📊 Database Information:")
+        print("• PostgreSQL database will be auto-created by Heroku addon")
+        print("• All required tables will be created automatically on first access")
+        print("• Historical data will be populated when AI training starts")
+        print("• Real-time data collection begins when the bot starts running")
     else:
         print("❌ Setup failed - check environment variables")
         sys.exit(1)
