@@ -308,7 +308,7 @@ def init_components():
         
         # Monkey patch pybit's session to disable SSL verification
         import pybit
-        from pybit import HTTP as OriginalHTTP
+        from pybit.unified_trading import HTTP as OriginalHTTP
         
         class PatchedHTTP(OriginalHTTP):
             def __init__(self, *args, **kwargs):
