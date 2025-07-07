@@ -99,14 +99,41 @@ try:
     
     requests.packages.urllib3.disable_warnings()
     
-    # Check for VPN proxy configuration
+    # Check for VPN proxy configuration (supports both HTTP and SOCKS5)
     vpn_proxy = None
-    if os.getenv('VPN_PROXY_URL'):
+    proxy_url = os.getenv('VPN_PROXY_URL')
+    if proxy_url:
         vpn_proxy = {
-            'http': os.getenv('VPN_PROXY_URL'),
-            'https': os.getenv('VPN_PROXY_URL')
+            'http': proxy_url,
+            'https': proxy_url
         }
-        print(f"🔒 VPN Proxy configured: {os.getenv('VPN_PROXY_URL')}")
+        proxy_type = "SOCKS5" if proxy_url.startswith('socks5://') else "HTTP"
+        print(f"🔒 VPN Proxy configured ({proxy_type}): {proxy_url[:50]}...")
+        
+        # For SOCKS5, we need additional setup
+        if proxy_url.startswith('socks5://'):
+            try:
+                import socks
+                import socket as sock_module
+                # Configure global SOCKS proxy
+                parsed_url = proxy_url.replace('socks5://', '').split('@')
+                if len(parsed_url) == 2:
+                    auth, server = parsed_url
+                    username, password = auth.split(':')
+                    host, port = server.split(':')
+                    
+                    # Set default proxy for all socket connections
+                    socks.set_default_proxy(socks.SOCKS5, host, int(port), username=username, password=password)
+                    sock_module.socket = socks.socksocket
+                    print(f"🔗 SOCKS5 proxy active: {host}:{port}")
+                else:
+                    print("⚠️ SOCKS5 URL format incorrect")
+            except ImportError:
+                print("⚠️ PySocks not installed, falling back to HTTP proxy")
+            except Exception as e:
+                print(f"⚠️ SOCKS5 setup failed: {e}")
+    else:
+        print("ℹ️ No VPN proxy configured")
     
     # Create custom session that uses VPN proxy and disables SSL verification
     class VPNAdapter(HTTPAdapter):
