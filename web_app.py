@@ -143,6 +143,7 @@ def coin_status():
 
 @app.route('/api/balance')
 def get_balance():
+    ensure_components_initialized()
     try:
         # Try to get wallet balance with DNS error handling
         balance = handle_bybit_request(bybit_session.get_wallet_balance, accountType="UNIFIED")
@@ -192,6 +193,7 @@ def get_balance():
 
 @app.route('/api/account_info')
 def get_account_info():
+    ensure_components_initialized()
     try:
         # Get account information for verification
         balance = bybit_session.get_wallet_balance(accountType="UNIFIED")
@@ -239,6 +241,7 @@ def get_all_symbols():
 
 @app.route('/api/positions')
 def get_positions():
+    ensure_components_initialized()
     try:
         positions = bybit_session.get_positions(
             category="linear",
@@ -282,6 +285,7 @@ def get_orders():
 
 @app.route('/api/market_data/<symbol>')
 def get_market_data(symbol):
+    ensure_components_initialized()
     try:
         # Get current ticker data
         ticker = bybit_session.get_tickers(category="linear", symbol=symbol)
