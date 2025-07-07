@@ -104,6 +104,6 @@
     }
   },
   "scripts": {
-    "postdeploy": "echo 'Deployment voltooid! Dashboard beschikbaar op: https://$HEROKU_APP_NAME.herokuapp.com'"
+    "postdeploy": "python heroku_setup.py && echo 'Deployment voltooid! Dashboard beschikbaar op: https://$HEROKU_APP_NAME.herokuapp.com'"
   }
 }

@@ -25,6 +25,13 @@ import ssl
 # Load environment variables
 load_dotenv()
 
+# Heroku deployment check
+if os.getenv('DYNO'):
+    print("🌐 Running on Heroku - Production mode")
+    print("📊 No Redis/Celery workers needed - using internal threading")
+else:
+    print("💻 Running locally - Development mode")
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here-change-in-production')
 

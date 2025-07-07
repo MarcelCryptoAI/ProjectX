@@ -1,0 +1,24 @@
+# Ignore these files during Heroku deployment
+*.md
+*.txt
+.git/
+.gitignore
+.DS_Store
+*.log
+logs/
+trading_data.db
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+install.sh
+systemd/
+dashboard/static/chart.js
+dashboard/static/js/
+dashboard/static/styles.css
+dashboard/templates/
+README_OLD.md
+HANDOVER.md
+DEPLOYMENT.md
