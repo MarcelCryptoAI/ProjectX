@@ -426,6 +426,23 @@
                 
                 const plotData = data; // data is already a JavaScript object
                 Plotly.newPlot('priceChart', plotData.data, plotData.layout, {responsive: true});
+            })
+            .catch(error => {
+                console.error('Chart fetch error:', error);
+                // Show placeholder chart when API is unavailable
+                const placeholderData = [{
+                    x: [new Date()],
+                    y: [0],
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Price Data Unavailable'
+                }];
+                const placeholderLayout = {
+                    title: 'Price Chart - Data Unavailable',
+                    xaxis: { title: 'Time' },
+                    yaxis: { title: 'Price (USDT)' }
+                };
+                Plotly.newPlot('priceChart', placeholderData, placeholderLayout, {responsive: true});
             });
         }
         
@@ -715,7 +732,13 @@
             const statusBadge = document.getElementById('workerStatus');
             const consoleBadge = document.getElementById('consoleStatus');
             
-            if (status.worker_running) {
+            // Check if elements exist before updating
+            if (!statusBadge || !consoleBadge) {
+                console.warn('Worker status elements not found');
+                return;
+            }
+            
+            if (status && status.worker_running) {
                 statusBadge.textContent = status.training_in_progress ? 'Training' : 'Active';
                 statusBadge.className = 'badge bg-success';
                 consoleBadge.textContent = 'Connected';

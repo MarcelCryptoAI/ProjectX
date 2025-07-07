@@ -544,6 +544,12 @@
         }
 
         function updatePerformanceChart() {
+            // Check if analyticsData and required arrays exist
+            if (!analyticsData || !analyticsData.portfolioValues || !analyticsData.drawdowns) {
+                console.warn('Performance chart data not available');
+                return;
+            }
+
             const portfolioTrace = {
                 x: analyticsData.portfolioValues.map(d => d.date),
                 y: analyticsData.portfolioValues.map(d => d.value),
