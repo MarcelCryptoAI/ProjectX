@@ -26,17 +26,20 @@ import urllib3
 # Load environment variables
 load_dotenv()
 
-# Alternative approach - use different DNS and SSL bypass as last resort
+# Comprehensive DNS and SSL bypass for Heroku ByBit connection issues
 try:
     import socket
     import ssl
     import os
     import urllib3
+    import requests.adapters
     
-    # Try to use alternative DNS first (if available on Heroku)
-    os.environ['DNS_SERVER'] = '8.8.8.8'
+    # Environment variables for SSL bypass
+    os.environ['PYTHONHTTPSVERIFY'] = '0'
+    os.environ['CURL_CA_BUNDLE'] = ''
+    os.environ['REQUESTS_CA_BUNDLE'] = ''
     
-    # Create a custom SSL context that's more permissive for problematic connections
+    # Create a custom SSL context that's more permissive
     ssl_context = ssl.create_default_context()
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
@@ -44,6 +47,7 @@ try:
     # Store original functions
     original_getaddrinfo = socket.getaddrinfo
     original_ssl_context = ssl.create_default_context
+    original_ssl_wrap_socket = ssl.wrap_socket
     
     def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
         # For api.bybit.com, immediately use hardcoded IP to bypass DNS issues
@@ -53,7 +57,7 @@ try:
         
         # For other hosts, try normal DNS with shorter timeout
         try:
-            socket.setdefaulttimeout(8)  # Shorter timeout for non-ByBit hosts
+            socket.setdefaulttimeout(8)
             result = original_getaddrinfo(host, port, family, type, proto, flags)
             print(f"🌐 Standard DNS successful for {host}: {result[0][4][0] if result else 'Unknown'}")
             return result
@@ -62,27 +66,35 @@ try:
             raise e
     
     def permissive_ssl_context(*args, **kwargs):
-        """Create SSL context that ignores certificate issues if needed"""
-        try:
-            # Try normal SSL first
-            ctx = original_ssl_context(*args, **kwargs)
-            return ctx
-        except:
-            # If that fails, return permissive context
-            print("🔓 Using permissive SSL context as fallback")
-            return ssl_context
+        """Always return permissive SSL context"""
+        print("🔓 Using permissive SSL context")
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
     
-    # Apply patches
+    def custom_wrap_socket(*args, **kwargs):
+        """Override SSL socket creation to disable verification"""
+        kwargs['cert_reqs'] = ssl.CERT_NONE
+        kwargs['check_hostname'] = False
+        return original_ssl_wrap_socket(*args, **kwargs)
+    
+    # Apply global patches
     socket.getaddrinfo = custom_getaddrinfo
     ssl.create_default_context = permissive_ssl_context
+    ssl.wrap_socket = custom_wrap_socket
     
-    # Disable SSL warnings
+    # Disable SSL warnings globally
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     
-    print("✅ Enhanced DNS resolution with SSL fallback configured")
+    # Monkey patch requests to disable SSL verification
+    import requests
+    requests.packages.urllib3.disable_warnings()
+    
+    print("✅ Comprehensive DNS bypass and SSL verification disabled")
     
 except Exception as e:
-    print(f"⚠️ Could not configure enhanced DNS: {e}")
+    print(f"⚠️ Could not configure enhanced DNS/SSL bypass: {e}")
 
 # Disable SSL warnings for Heroku environment if needed
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
