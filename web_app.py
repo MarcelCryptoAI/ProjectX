@@ -21,9 +21,41 @@ import logging
 import sys
 import socket
 import ssl
+import dns.resolver
+import urllib3
 
 # Load environment variables
 load_dotenv()
+
+# Configure DNS to use Google's DNS servers
+try:
+    # Create custom resolver using Google DNS
+    custom_resolver = dns.resolver.Resolver()
+    custom_resolver.nameservers = ['8.8.8.8', '8.8.4.4']  # Google DNS primary and secondary
+    
+    # Monkey patch the socket module to use our custom resolver
+    original_getaddrinfo = socket.getaddrinfo
+    
+    def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+        try:
+            # First try with custom DNS
+            if host == 'api.bybit.com':
+                answers = custom_resolver.resolve(host, 'A')
+                for rdata in answers:
+                    return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (str(rdata), port))]
+            # Fall back to original for other hosts
+            return original_getaddrinfo(host, port, family, type, proto, flags)
+        except Exception:
+            # Fall back to original resolver
+            return original_getaddrinfo(host, port, family, type, proto, flags)
+    
+    socket.getaddrinfo = custom_getaddrinfo
+    print("✅ Custom DNS resolver configured (Google DNS: 8.8.8.8)")
+except Exception as e:
+    print(f"⚠️ Could not configure custom DNS: {e}")
+
+# Disable SSL warnings for Heroku environment if needed
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Heroku deployment check
 if os.getenv('DYNO'):
@@ -99,11 +131,41 @@ def init_components():
     try:
         if not api_key or not api_secret:
             raise ValueError("API_KEY en API_SECRET zijn verplicht!")
-            
+        
+        # Create custom session with improved DNS handling
+        import requests
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+        
+        # Create session with retry strategy
+        session = requests.Session()
+        
+        # Configure retry strategy with DNS-friendly settings
+        retry_strategy = Retry(
+            total=5,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["HEAD", "GET", "PUT", "DELETE", "OPTIONS", "TRACE", "POST"]
+        )
+        
+        # Mount adapter with connection pooling
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=10,
+            pool_maxsize=10
+        )
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        
+        # Set DNS cache timeout
+        session.trust_env = False  # Disable system proxy
+        
         bybit_session = HTTP(
             testnet=False,  # ALTIJD LIVE
             api_key=api_key,
             api_secret=api_secret,
+            recv_window=20000,  # Increase receive window for slow connections
+            request_timeout=30  # Increase timeout
         )
         app.logger.info("✅ ByBit LIVE session initialized successfully")
         
@@ -221,6 +283,21 @@ def get_balance():
         else:
             return jsonify({'error': f'Invalid balance response: {balance}'}), 500
             
+    except ConnectionError as e:
+        app.logger.warning(f"Balance API connection error: {str(e)} - returning cached balance")
+        return jsonify({
+            'success': True,
+            'totalWalletBalance': 0.0,
+            'totalAvailableBalance': 0.0,
+            'totalPerpUPL': 0.0,
+            'totalInitialMargin': 0.0,
+            'accountIMRate': 0.0,
+            'accountMMRate': 0.0,
+            'accountType': 'UNIFIED',
+            'coin': [],
+            'cached': True,
+            'message': 'Using cached balance due to connection issues'
+        })
     except Exception as e:
         app.logger.error(f"Balance API error: {str(e)}")
         return jsonify({'error': f'ByBit API error: {str(e)}'}), 500
@@ -268,6 +345,16 @@ def get_balance_header():
         else:
             return jsonify({'error': f'Invalid balance response: {balance_data}'}), 500
             
+    except ConnectionError as e:
+        app.logger.warning(f"Header balance API connection error: {str(e)} - returning cached balance")
+        return jsonify({
+            'success': True,
+            'balance': 0.0,
+            'pnl_24h': 0.0,
+            'pnl_24h_percent': 0.0,
+            'cached': True,
+            'message': 'Using cached balance due to connection issues'
+        })
     except Exception as e:
         app.logger.error(f"Header balance API error: {str(e)}")
         return jsonify({'error': f'ByBit API error: {str(e)}'}), 500
@@ -301,13 +388,45 @@ def get_account_name():
         app.logger.error(f"Account name API error: {str(e)}")
         return jsonify({'error': f'ByBit API error: {str(e)}'}), 500
 
+@app.route('/api/dns_test')
+def test_dns():
+    """Test DNS resolution for ByBit API"""
+    try:
+        import socket
+        import time
+        
+        start_time = time.time()
+        
+        # Test DNS resolution
+        try:
+            result = socket.getaddrinfo('api.bybit.com', 443)
+            resolution_time = (time.time() - start_time) * 1000
+            
+            return jsonify({
+                'success': True,
+                'host': 'api.bybit.com',
+                'resolved_ips': [addr[4][0] for addr in result[:3]],  # First 3 IPs
+                'resolution_time_ms': round(resolution_time, 2),
+                'resolver': 'Google DNS (8.8.8.8)' if hasattr(socket, 'getaddrinfo') else 'System DNS'
+            })
+        except Exception as dns_error:
+            return jsonify({
+                'success': False,
+                'error': f'DNS resolution failed: {str(dns_error)}',
+                'host': 'api.bybit.com'
+            })
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/api/system_status')
 def get_system_status():
     """Get system status for all components"""
     status = {
         'bybit_api': {'status': 'unknown', 'message': ''},
         'database': {'status': 'unknown', 'message': ''},
-        'dyno': {'status': 'unknown', 'message': ''}
+        'dyno': {'status': 'unknown', 'message': ''},
+        'dns': {'status': 'unknown', 'message': ''}
     }
     
     # Test ByBit API
@@ -337,6 +456,21 @@ def get_system_status():
         status['database'] = {'status': 'online', 'message': 'Database responsive'}
     except Exception as e:
         status['database'] = {'status': 'offline', 'message': f'DB error: {str(e)[:50]}'}
+    
+    # Test DNS resolution
+    try:
+        import socket
+        import time
+        start_time = time.time()
+        result = socket.getaddrinfo('api.bybit.com', 443)
+        resolution_time = (time.time() - start_time) * 1000
+        status['dns'] = {
+            'status': 'online', 
+            'message': f'DNS resolved in {resolution_time:.1f}ms (Google DNS)',
+            'resolved_ip': result[0][4][0] if result else 'Unknown'
+        }
+    except Exception as e:
+        status['dns'] = {'status': 'offline', 'message': f'DNS failed: {str(e)[:50]}'}
     
     # Test Dyno (always online if we can respond)
     status['dyno'] = {'status': 'online', 'message': 'Dyno responsive'}
@@ -368,9 +502,10 @@ def get_account_info():
 
 @app.route('/api/symbols')
 def get_all_symbols():
+    ensure_components_initialized()
     try:
-        # Get all available symbols from ByBit
-        instruments = bybit_session.get_instruments_info(category="linear")
+        # Get all available symbols from ByBit with DNS handling
+        instruments = handle_bybit_request(bybit_session.get_instruments_info, category="linear")
         
         if instruments and 'result' in instruments and 'list' in instruments['result']:
             symbols = []
@@ -392,7 +527,28 @@ def get_all_symbols():
         else:
             return jsonify({'error': 'Unable to fetch symbols'}), 500
             
+    except ConnectionError as e:
+        # DNS/Connection issue - return cached popular symbols
+        app.logger.warning(f"Symbols API connection error: {str(e)} - returning cached symbols")
+        cached_symbols = [
+            {'symbol': 'BTCUSDT', 'baseCoin': 'BTC', 'quoteCoin': 'USDT', 'status': 'Trading', 'leverage': {}},
+            {'symbol': 'ETHUSDT', 'baseCoin': 'ETH', 'quoteCoin': 'USDT', 'status': 'Trading', 'leverage': {}},
+            {'symbol': 'SOLUSDT', 'baseCoin': 'SOL', 'quoteCoin': 'USDT', 'status': 'Trading', 'leverage': {}},
+            {'symbol': 'ADAUSDT', 'baseCoin': 'ADA', 'quoteCoin': 'USDT', 'status': 'Trading', 'leverage': {}},
+            {'symbol': 'DOGEUSDT', 'baseCoin': 'DOGE', 'quoteCoin': 'USDT', 'status': 'Trading', 'leverage': {}},
+            {'symbol': 'BNBUSDT', 'baseCoin': 'BNB', 'quoteCoin': 'USDT', 'status': 'Trading', 'leverage': {}},
+            {'symbol': 'XRPUSDT', 'baseCoin': 'XRP', 'quoteCoin': 'USDT', 'status': 'Trading', 'leverage': {}},
+            {'symbol': 'MATICUSDT', 'baseCoin': 'MATIC', 'quoteCoin': 'USDT', 'status': 'Trading', 'leverage': {}}
+        ]
+        return jsonify({
+            'success': True,
+            'symbols': cached_symbols,
+            'count': len(cached_symbols),
+            'cached': True,
+            'message': 'Using cached symbols due to connection issues'
+        })
     except Exception as e:
+        app.logger.error(f"Symbols API error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/positions')

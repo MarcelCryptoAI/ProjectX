@@ -84,6 +84,10 @@
                                     <span class="status-dot" id="statusDyno"></span>
                                     <small>Dyno</small>
                                 </div>
+                                <div class="status-indicator" title="DNS">
+                                    <span class="status-dot" id="statusDns"></span>
+                                    <small>DNS</small>
+                                </div>
                             </div>
                         </div>
                         <div class="text-end me-3">
@@ -551,12 +555,19 @@
                     const dynoDot = document.getElementById('statusDyno');
                     dynoDot.className = `status-dot status-${status.dyno.status}`;
                     dynoDot.title = `Dyno: ${status.dyno.message}`;
+                    
+                    // Update DNS status
+                    const dnsDot = document.getElementById('statusDns');
+                    if (dnsDot && status.dns) {
+                        dnsDot.className = `status-dot status-${status.dns.status}`;
+                        dnsDot.title = `DNS: ${status.dns.message}`;
+                    }
                 }
             })
             .catch(error => {
                 console.error('Status lights update error:', error);
                 // Set all to unknown on error
-                ['statusBybitApi', 'statusDatabase', 'statusDyno'].forEach(id => {
+                ['statusBybitApi', 'statusDatabase', 'statusDyno', 'statusDns'].forEach(id => {
                     const dot = document.getElementById(id);
                     if (dot) {
                         dot.className = 'status-dot status-unknown';
