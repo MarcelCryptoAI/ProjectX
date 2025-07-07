@@ -545,7 +545,8 @@ def get_console_logs():
 @app.route('/api/worker_stats')
 def get_worker_stats():
     try:
-        ai_worker = get_ai_worker()
+        global ai_worker_instance
+        ai_worker = ai_worker_instance or get_ai_worker()
         if ai_worker:
             stats = ai_worker.get_worker_stats()
             return jsonify({
@@ -618,7 +619,8 @@ def start_training():
 @app.route('/api/enable_trading', methods=['POST'])
 def enable_trading():
     try:
-        ai_worker = get_ai_worker()
+        global ai_worker_instance
+        ai_worker = ai_worker_instance or get_ai_worker()
         if ai_worker and ai_worker.trade_executor:
             ai_worker.trade_executor.enable_trading()
             return jsonify({
@@ -654,7 +656,8 @@ def disable_trading():
 @app.route('/api/trading_status')
 def get_trading_status():
     try:
-        ai_worker = get_ai_worker()
+        global ai_worker_instance
+        ai_worker = ai_worker_instance or get_ai_worker()
         if ai_worker and ai_worker.trade_executor:
             status = ai_worker.trade_executor.get_trading_status()
             return jsonify({
