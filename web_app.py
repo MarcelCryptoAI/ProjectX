@@ -74,6 +74,7 @@ try:
     
     # Apply patches
     socket.getaddrinfo = custom_getaddrinfo
+    ssl.create_default_context = permissive_ssl_context
     
     # Disable SSL warnings
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
