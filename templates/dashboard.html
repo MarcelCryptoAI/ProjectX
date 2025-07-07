@@ -275,28 +275,6 @@
                         </div>
                     </div>
                     
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5>AI Console</h5>
-                                <div>
-                                    <span class="badge bg-success" id="workerStatus">Active</span>
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="clearConsole()">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="card-body p-0">
-                                <div id="console" style="height: 300px; overflow-y: auto; background: #1a1a1a; color: #00ff00; font-family: 'Courier New', monospace; font-size: 12px; padding: 10px;">
-                                    <div class="console-line">
-                                        <span class="timestamp">[00:00:00]</span>
-                                        <span class="level info">[INFO]</span>
-                                        <span class="message">AI Console initialized...</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Console Fixed at Bottom -->
@@ -524,26 +502,83 @@
             }, 3000);
         }
         
-        // Console functions
+        // Enhanced Console functions with detailed logging
         function addConsoleLog(logData) {
             const console = document.getElementById('liveConsole');
             const logLine = document.createElement('div');
             logLine.className = 'console-line';
+            logLine.style.cssText = 'margin-bottom: 4px; padding: 4px 8px; border-radius: 3px; font-size: 12px; line-height: 1.4;';
             
-            const levelColor = {
-                'INFO': '#00ff00',
-                'SUCCESS': '#00ff00',
-                'WARNING': '#ffff00',
-                'ERROR': '#ff0000'
+            const levelColors = {
+                'INFO': { bg: '#1a4c96', text: '#87ceeb', icon: 'ℹ️' },
+                'SUCCESS': { bg: '#155724', text: '#d4edda', icon: '✅' },
+                'WARNING': { bg: '#856404', text: '#fff3cd', icon: '⚠️' },
+                'ERROR': { bg: '#721c24', text: '#f8d7da', icon: '❌' },
+                'DEBUG': { bg: '#2d2d30', text: '#cccccc', icon: '🔍' },
+                'TRADE': { bg: '#0f5132', text: '#d1e7dd', icon: '💰' },
+                'SIGNAL': { bg: '#664d03', text: '#fff3cd', icon: '🎯' }
             };
             
+            const levelStyle = levelColors[logData.level] || levelColors['INFO'];
+            logLine.style.backgroundColor = levelStyle.bg;
+            logLine.style.color = levelStyle.text;
+            
+            // Enhanced timestamp with milliseconds
+            const now = new Date();
+            const timestamp = logData.timestamp || now.toLocaleTimeString() + '.' + now.getMilliseconds().toString().padStart(3, '0');
+            
+            // Add stack trace for errors if available
+            let stackTrace = '';
+            if (logData.level === 'ERROR' && logData.stack) {
+                stackTrace = `\n    at ${logData.stack}`;
+            }
+            
+            // Enhanced message formatting
+            let formattedMessage = logData.message || '';
+            
+            // Detect and format JSON objects
+            try {
+                if (typeof logData.data === 'object') {
+                    formattedMessage += '\n' + JSON.stringify(logData.data, null, 2);
+                }
+            } catch (e) {
+                // Not JSON, continue
+            }
+            
+            // Enhanced log line with more browser-like formatting
             logLine.innerHTML = `
-                <span style="color: #888;">[${logData.timestamp}]</span>
-                <span style="color: ${levelColor[logData.level] || '#00ff00'};">[${logData.level}]</span>
-                <span>${logData.message}</span>
+                <div style="display: flex; align-items: flex-start; gap: 8px;">
+                    <span style="color: #888; font-family: monospace; font-size: 11px; min-width: 90px;">${timestamp}</span>
+                    <span style="font-size: 14px; min-width: 20px;">${levelStyle.icon}</span>
+                    <span style="font-weight: bold; color: ${levelStyle.text}; min-width: 60px;">[${logData.level}]</span>
+                    <span style="flex: 1; word-wrap: break-word; white-space: pre-wrap;">${formattedMessage}${stackTrace}</span>
+                    ${logData.source ? `<span style="color: #888; font-size: 10px; font-style: italic;">${logData.source}</span>` : ''}
+                </div>
             `;
             
-            // Add NEW logs at the TOP instead of bottom for better visibility
+            // Add collapsible details for complex objects
+            if (logData.details) {
+                const detailsDiv = document.createElement('div');
+                detailsDiv.style.cssText = 'margin-left: 120px; margin-top: 4px; font-size: 11px; color: #aaa; cursor: pointer;';
+                detailsDiv.innerHTML = `<span style="color: #666;">▶ Show details...</span>`;
+                detailsDiv.onclick = function() {
+                    const details = this.querySelector('.details-content');
+                    if (details) {
+                        details.style.display = details.style.display === 'none' ? 'block' : 'none';
+                        this.querySelector('span').textContent = details.style.display === 'none' ? '▶ Show details...' : '▼ Hide details...';
+                    }
+                };
+                
+                const detailsContent = document.createElement('div');
+                detailsContent.className = 'details-content';
+                detailsContent.style.cssText = 'display: none; margin-top: 4px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 3px; font-family: monospace;';
+                detailsContent.textContent = JSON.stringify(logData.details, null, 2);
+                
+                detailsDiv.appendChild(detailsContent);
+                logLine.appendChild(detailsDiv);
+            }
+            
+            // Add NEW logs at the TOP for better visibility
             if (console.firstChild) {
                 console.insertBefore(logLine, console.firstChild);
             } else {
@@ -554,9 +589,66 @@
             console.scrollTop = 0;
             
             // Limit console lines to keep it performant (remove old entries from bottom)
-            if (console.children.length > 300) {
+            if (console.children.length > 500) {
                 console.removeChild(console.lastChild);
             }
+            
+            // Auto-scroll to show new entries if user is at top
+            if (console.scrollTop < 50) {
+                console.scrollTop = 0;
+            }
+        }
+        
+        // Enhanced logging functions for different types
+        function logInfo(message, data = null, source = null) {
+            addConsoleLog({
+                timestamp: new Date().toLocaleTimeString() + '.' + new Date().getMilliseconds().toString().padStart(3, '0'),
+                level: 'INFO',
+                message: message,
+                data: data,
+                source: source
+            });
+        }
+        
+        function logSuccess(message, data = null, source = null) {
+            addConsoleLog({
+                timestamp: new Date().toLocaleTimeString() + '.' + new Date().getMilliseconds().toString().padStart(3, '0'),
+                level: 'SUCCESS',
+                message: message,
+                data: data,
+                source: source
+            });
+        }
+        
+        function logError(message, error = null, source = null) {
+            addConsoleLog({
+                timestamp: new Date().toLocaleTimeString() + '.' + new Date().getMilliseconds().toString().padStart(3, '0'),
+                level: 'ERROR',
+                message: message,
+                data: error,
+                stack: error?.stack,
+                source: source
+            });
+        }
+        
+        function logTrade(message, tradeData = null) {
+            addConsoleLog({
+                timestamp: new Date().toLocaleTimeString() + '.' + new Date().getMilliseconds().toString().padStart(3, '0'),
+                level: 'TRADE',
+                message: message,
+                details: tradeData,
+                source: 'TradeExecutor'
+            });
+        }
+        
+        function logSignal(message, signalData = null) {
+            addConsoleLog({
+                timestamp: new Date().toLocaleTimeString() + '.' + new Date().getMilliseconds().toString().padStart(3, '0'),
+                level: 'SIGNAL',
+                message: message,
+                details: signalData,
+                source: 'AIWorker'
+            });
         }
         
         function clearConsole() {
@@ -598,13 +690,16 @@
         }
         
         function handleTradingSignal(signal) {
-            addConsoleLog({
-                timestamp: new Date().toLocaleTimeString(),
-                level: 'INFO',
-                message: `🎯 Signal: ${signal.side} ${signal.symbol} (${signal.confidence}%)`
+            logSignal(`🎯 Trading Signal Generated: ${signal.side} ${signal.symbol}`, {
+                symbol: signal.symbol,
+                side: signal.side,
+                confidence: signal.confidence,
+                price: signal.price,
+                timestamp: signal.timestamp,
+                strategy: signal.strategy || 'AI Analysis'
             });
             
-            showNotification(`New signal: ${signal.side} ${signal.symbol}`, 'info');
+            showNotification(`New signal: ${signal.side} ${signal.symbol} (${signal.confidence}%)`, 'info');
         }
         
         function loadAllSymbols() {
@@ -640,19 +735,15 @@
                         }
                     });
                     
-                    addConsoleLog({
-                        timestamp: new Date().toLocaleTimeString(),
-                        level: 'SUCCESS',
-                        message: `Loaded ${data.count} trading symbols`
-                    });
+                    logSuccess(`📈 Loaded ${data.count} trading symbols successfully`, {
+                        count: data.count,
+                        popular_symbols: popularSymbols,
+                        total_available: data.symbols.length
+                    }, 'SymbolLoader');
                 }
             })
             .catch(error => {
-                addConsoleLog({
-                    timestamp: new Date().toLocaleTimeString(),
-                    level: 'ERROR',
-                    message: `Failed to load symbols: ${error.message}`
-                });
+                logError(`❌ Failed to load trading symbols`, error, 'SymbolLoader');
             });
         }
         
@@ -744,26 +835,77 @@
         
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
+            // Enhanced console initialization
+            logInfo('🚀 ByBit AI Trading Bot Dashboard Initialized', {
+                timestamp: new Date().toISOString(),
+                version: '2.0',
+                browser: navigator.userAgent.split(' ')[0],
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            }, 'Dashboard');
+            
+            logInfo('📊 Loading market data and symbols...', null, 'DataLoader');
             loadAllSymbols();
+            
+            logInfo('📈 Initializing price charts...', null, 'ChartEngine');
             updatePriceChart();
+            
+            logInfo('💼 Fetching current positions...', null, 'PositionManager');
             updatePositions();
+            
+            logInfo('📜 Loading trading history...', null, 'HistoryLoader');
             updateTradingHistory();
             
-            // Load console logs
+            // Load existing console logs from server
             fetch('/api/console_logs')
             .then(response => response.json())
             .then(logs => {
-                logs.forEach(log => addConsoleLog(log));
+                if (logs && logs.length > 0) {
+                    logSuccess(`📥 Loaded ${logs.length} previous console entries`, { count: logs.length }, 'ConsoleLoader');
+                    logs.forEach(log => addConsoleLog(log));
+                } else {
+                    logInfo('🆕 No previous console logs found, starting fresh', null, 'ConsoleLoader');
+                }
+            })
+            .catch(error => {
+                logError('❌ Failed to load console logs', error, 'ConsoleLoader');
             });
             
-            // Refresh data every 30 seconds
+            // Enhanced refresh cycle with detailed logging
             setInterval(() => {
-                updatePositions();
-                updateTradingHistory();
+                const refreshStart = performance.now();
+                
+                logInfo('🔄 Starting data refresh cycle...', { cycle: 'auto-refresh' }, 'RefreshManager');
+                
+                Promise.all([
+                    updatePositions(),
+                    updateTradingHistory(),
+                    updateSystemStatus()
+                ]).then(() => {
+                    const refreshTime = (performance.now() - refreshStart).toFixed(2);
+                    logSuccess(`✅ Data refresh completed in ${refreshTime}ms`, { 
+                        duration: refreshTime,
+                        timestamp: new Date().toISOString()
+                    }, 'RefreshManager');
+                }).catch(error => {
+                    logError('❌ Data refresh failed', error, 'RefreshManager');
+                });
+                
                 if (isTrading) {
-                    // Additional updates when trading
+                    logInfo('⚡ Additional trading updates...', { trading: true }, 'TradingManager');
                 }
-            }, 10000); // Refresh every 10 seconds for more responsive updates
+            }, 10000); // Refresh every 10 seconds
+            
+            // Log console capabilities
+            logInfo('🛠️ Enhanced console features available:', {
+                features: [
+                    'Detailed timestamps with milliseconds',
+                    'Colored log levels with icons',
+                    'Collapsible object details',
+                    'Source tracking',
+                    'Stack trace for errors',
+                    'JSON object formatting'
+                ]
+            }, 'ConsoleEngine');
         });
 
         // Initialize status on page load

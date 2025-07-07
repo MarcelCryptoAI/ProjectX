@@ -88,12 +88,22 @@ def init_components():
         setattr(settings, 'bybit_api_key', api_key)
         setattr(settings, 'bybit_api_secret', api_secret)
     
-    # Initialize ByBit session
-    bybit_session = HTTP(
-        testnet=os.getenv('BYBIT_TESTNET', 'false').lower() == 'true',
-        api_key=api_key,
-        api_secret=api_secret,
-    )
+    # Initialize ByBit session - handle demo/invalid credentials gracefully
+    try:
+        # Skip ByBit initialization if using demo credentials
+        if api_key in ['demo_key', 'your_api_key_here', ''] or api_secret in ['demo_secret', 'your_api_secret_here', '']:
+            app.logger.warning("Demo credentials detected - ByBit session will use fallback mode")
+            bybit_session = None
+        else:
+            bybit_session = HTTP(
+                testnet=os.getenv('BYBIT_TESTNET', 'false').lower() == 'true',
+                api_key=api_key,
+                api_secret=api_secret,
+            )
+            app.logger.info("ByBit session initialized successfully")
+    except Exception as e:
+        app.logger.error(f"ByBit session initialization failed: {e}")
+        bybit_session = None
     
     # Initialize components
     trade_logger = TradeLogger()
@@ -191,8 +201,8 @@ def get_balance():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/balance')
-def get_balance():
+@app.route('/api/balance_header')
+def get_balance_header():
     ensure_components_initialized()
     try:
         # Get wallet balance for header display
