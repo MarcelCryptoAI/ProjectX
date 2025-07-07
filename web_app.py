@@ -87,9 +87,31 @@ try:
     # Disable SSL warnings globally
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     
-    # Monkey patch requests to disable SSL verification
+    # Monkey patch requests to disable SSL verification globally
     import requests
+    from requests.adapters import HTTPAdapter
+    from requests.packages.urllib3.util.retry import Retry
+    
     requests.packages.urllib3.disable_warnings()
+    
+    # Create custom session that never verifies SSL
+    class NoSSLVerifyAdapter(HTTPAdapter):
+        def init_poolmanager(self, *args, **kwargs):
+            kwargs['ssl_context'] = ssl_context
+            return super().init_poolmanager(*args, **kwargs)
+    
+    # Monkey patch the default session
+    original_session = requests.Session
+    def patched_session():
+        session = original_session()
+        session.verify = False
+        session.mount('https://', NoSSLVerifyAdapter())
+        return session
+    
+    requests.Session = patched_session
+    
+    # Also patch the global session
+    requests.packages.urllib3.util.ssl_.create_urllib3_context = lambda: ssl_context
     
     print("✅ Comprehensive DNS bypass and SSL verification disabled")
     
