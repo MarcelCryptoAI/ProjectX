@@ -690,14 +690,19 @@
         }
         
         function toggleConsole() {
-            const console = document.getElementById('liveConsole').parentElement.parentElement.parentElement;
+            const consoleContainer = document.querySelector('.fixed-bottom');
+            const consoleContent = document.getElementById('liveConsole');
             const icon = document.getElementById('consoleToggleIcon');
             
-            if (console.style.height === '50px') {
-                console.style.height = '200px';
+            if (consoleContainer.style.height === '50px') {
+                // Expand console
+                consoleContainer.style.height = '350px';
+                consoleContent.style.display = 'block';
                 icon.className = 'fas fa-chevron-down';
             } else {
-                console.style.height = '50px';
+                // Minimize console
+                consoleContainer.style.height = '50px';
+                consoleContent.style.display = 'none';
                 icon.className = 'fas fa-chevron-up';
             }
         }

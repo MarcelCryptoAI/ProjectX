@@ -4,13 +4,14 @@ import time
 import json
 import uuid
 import numpy as np
+import os
 from datetime import datetime
 from queue import Queue
 from utils.settings_loader import Settings
 from ai.trader import AITrader
 from utils.trade_logger import TradeLogger
 from database import TradingDatabase
-from trading.executor import TradeExecutor
+# Trading.executor removed - using direct pybit calls
 import logging
 
 class ConsoleLogger:
@@ -94,17 +95,19 @@ class AIWorker:
         self.trade_logger = TradeLogger()
         self.console_logger = ConsoleLogger()
         self.database = TradingDatabase()
-        self.trade_executor = TradeExecutor(bybit_session, self.console_logger) if bybit_session else None
-        if self.trade_executor:
-            self.console_logger.log('INFO', '✅ Trade executor initialized successfully')
+        # Direct pybit integration - no separate executor needed
+        self.max_concurrent_trades = int(os.getenv('MAX_CONCURRENT_TRADES', 5))
+        if bybit_session:
+            self.console_logger.log('INFO', '✅ Direct pybit trading ready')
         else:
-            self.console_logger.log('WARNING', '⚠️ Trade executor not initialized - no bybit_session provided')
+            self.console_logger.log('WARNING', '⚠️ ByBit session not available for trading')
         self.is_running = False
         self.training_in_progress = False
         self.last_model_update = None
         self.signal_count = 0
         self.worker_thread = None
         self.current_training_session = None
+        self.active_positions = []  # Track active positions for limit checking
         self.training_progress = {
             'current_batch': 0,
             'total_batches': 0,
@@ -123,8 +126,8 @@ class AIWorker:
             self.worker_thread.start()
             self.console_logger.log('SUCCESS', '🚀 AI WORKER STARTED - Ready for training and signal generation!')
             self.console_logger.log('INFO', '📊 System initialized with ByBit API connection')
-            if self.trade_executor:
-                self.console_logger.log('INFO', '⚡ Trade executor ready for live trading')
+            if self.bybit_session:
+                self.console_logger.log('INFO', '⚡ Direct pybit trading ready for live execution')
             
     def stop(self):
         """Stop the AI worker"""
@@ -465,13 +468,17 @@ class AIWorker:
                 self.console_logger.log('INFO', 
                     f'🎯 Signal #{self.signal_count}: {side} {symbol} (Confidence: {confidence:.1f}%)')
                 
-                # Execute trade if trade executor is available
-                if self.trade_executor:
-                    trade_result = self.trade_executor.execute_signal(prediction)
-                    if trade_result:
-                        self.console_logger.log('SUCCESS', f'✅ Trade executed for {symbol}')
+                # Execute trade directly with pybit if under limit
+                if self.bybit_session:
+                    active_trades_count = self.get_active_positions_count()
+                    if active_trades_count < self.max_concurrent_trades:
+                        trade_result = self.execute_signal_direct(prediction)
+                        if trade_result:
+                            self.console_logger.log('SUCCESS', f'✅ Trade executed for {symbol} ({active_trades_count + 1}/{self.max_concurrent_trades})')
+                        else:
+                            self.console_logger.log('WARNING', f'⚠️ Trade execution failed for {symbol}')
                     else:
-                        self.console_logger.log('WARNING', f'⚠️ Trade execution failed for {symbol}')
+                        self.console_logger.log('INFO', f'🚫 Max trades reached ({active_trades_count}/{self.max_concurrent_trades}) - signal queued')
                 
                 # Emit signal to frontend
                 if self.socketio:
@@ -529,8 +536,118 @@ class AIWorker:
             'training_in_progress': self.training_in_progress,
             'signal_count': self.signal_count,
             'last_model_update': self.last_model_update.isoformat() if self.last_model_update else None,
-            'uptime': time.time() - getattr(self, '_start_time', time.time())
+            'uptime': time.time() - getattr(self, '_start_time', time.time()),
+            'active_trades': self.get_active_positions_count(),
+            'max_trades': self.max_concurrent_trades
         }
+    
+    def get_active_positions_count(self):
+        """Get count of active positions"""
+        try:
+            if not self.bybit_session:
+                return 0
+            
+            positions = self.bybit_session.get_positions(category="linear")
+            if positions and 'result' in positions and 'list' in positions['result']:
+                active_count = 0
+                for pos in positions['result']['list']:
+                    if float(pos.get('size', 0)) > 0:
+                        active_count += 1
+                return active_count
+            return 0
+        except Exception as e:
+            self.console_logger.log('ERROR', f'❌ Failed to get positions count: {str(e)}')
+            return 0
+    
+    def execute_signal_direct(self, signal):
+        """Execute trading signal directly with pybit"""
+        try:
+            symbol = signal['symbol']
+            side = signal['side'].upper()  # Buy or Sell
+            confidence = signal['confidence']
+            
+            # Get current market price
+            ticker = self.bybit_session.get_tickers(category="linear", symbol=symbol)
+            if not ticker or 'result' not in ticker or not ticker['result']['list']:
+                self.console_logger.log('ERROR', f'❌ Failed to get ticker for {symbol}')
+                return False
+            
+            current_price = float(ticker['result']['list'][0]['lastPrice'])
+            
+            # Calculate position size (default $100 per trade, adjustable)
+            trade_amount_usd = float(os.getenv('DEFAULT_TRADE_AMOUNT', 100))
+            qty = round(trade_amount_usd / current_price, 6)
+            
+            # Calculate stop loss and take profit
+            stop_loss_pct = float(os.getenv('DEFAULT_STOP_LOSS_PCT', 2.0))  # 2%
+            take_profit_pct = float(os.getenv('DEFAULT_TAKE_PROFIT_PCT', 3.0))  # 3%
+            
+            if side == 'BUY':
+                stop_loss_price = current_price * (1 - stop_loss_pct / 100)
+                take_profit_price = current_price * (1 + take_profit_pct / 100)
+            else:  # SELL
+                stop_loss_price = current_price * (1 + stop_loss_pct / 100)
+                take_profit_price = current_price * (1 - take_profit_pct / 100)
+            
+            # Place market order with pybit
+            order_params = {
+                'category': 'linear',
+                'symbol': symbol,
+                'side': side,
+                'orderType': 'Market',
+                'qty': str(qty),
+                'timeInForce': 'IOC'  # Immediate or Cancel
+            }
+            
+            self.console_logger.log('INFO', f'📤 Placing {side} order: {qty} {symbol} @ market (~${current_price:.4f})')
+            
+            # Execute the order
+            order_result = self.bybit_session.place_order(**order_params)
+            
+            if order_result and 'result' in order_result:
+                order_id = order_result['result']['orderId']
+                
+                # Log successful trade
+                self.console_logger.log('SUCCESS', f'✅ Order placed: {order_id}')
+                self.console_logger.log('INFO', f'📊 Details: {qty} {symbol}, SL: ${stop_loss_price:.4f}, TP: ${take_profit_price:.4f}')
+                
+                # Set stop loss and take profit (optional - can be done later)
+                try:
+                    # Place stop loss order
+                    sl_params = {
+                        'category': 'linear',
+                        'symbol': symbol,
+                        'side': 'Sell' if side == 'BUY' else 'Buy',
+                        'orderType': 'Market',
+                        'qty': str(qty),
+                        'triggerPrice': str(stop_loss_price),
+                        'timeInForce': 'IOC'
+                    }
+                    
+                    # Place take profit order  
+                    tp_params = {
+                        'category': 'linear',
+                        'symbol': symbol,
+                        'side': 'Sell' if side == 'BUY' else 'Buy',
+                        'orderType': 'Limit',
+                        'qty': str(qty),
+                        'price': str(take_profit_price),
+                        'timeInForce': 'GTC'
+                    }
+                    
+                    self.console_logger.log('INFO', f'🎯 SL/TP orders will be managed automatically')
+                    
+                except Exception as tp_sl_error:
+                    self.console_logger.log('WARNING', f'⚠️ Failed to set SL/TP: {str(tp_sl_error)}')
+                
+                return True
+            else:
+                self.console_logger.log('ERROR', f'❌ Order failed: {order_result}')
+                return False
+                
+        except Exception as e:
+            self.console_logger.log('ERROR', f'❌ Trade execution error: {str(e)}')
+            return False
 
 # Global worker instance
 ai_worker = None
@@ -544,6 +661,5 @@ def get_ai_worker(socketio=None, bybit_session=None):
         # Update existing worker with bybit_session if it was missing
         ai_worker.bybit_session = bybit_session
         if bybit_session:
-            ai_worker.trade_executor = TradeExecutor(bybit_session, ai_worker.console_logger)
-            ai_worker.console_logger.log('INFO', '✅ Trade executor initialized with ByBit session')
+            ai_worker.console_logger.log('INFO', '✅ Direct pybit trading initialized with ByBit session')
     return ai_worker

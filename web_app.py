@@ -951,9 +951,7 @@ def start_all():
         # Start worker (training + signals)
         ai_worker_instance.start()
         
-        # Enable trading
-        if ai_worker_instance.trade_executor:
-            ai_worker_instance.trade_executor.enable_trading()
+        # Trading is automatically enabled if bybit_session exists
         
         # Start training if not in progress
         if not ai_worker_instance.training_in_progress:
@@ -972,11 +970,7 @@ def stop_all():
         global ai_worker_instance
         
         if ai_worker_instance:
-            # Disable trading first
-            if ai_worker_instance.trade_executor:
-                ai_worker_instance.trade_executor.disable_trading()
-            
-            # Stop worker (stops training + signals)
+            # Stop worker (stops training + signals + trading)
             ai_worker_instance.stop()
         
         return jsonify({
@@ -1318,12 +1312,21 @@ def execute_ai_trade():
             return jsonify({'success': False, 'message': 'Missing required fields'}), 400
         
         # Get AI worker for trade execution
+        ensure_components_initialized()
         ai_worker = get_ai_worker(socketio, bybit_session)
         
-        if not ai_worker.trade_executor:
-            return jsonify({'success': False, 'message': 'Trade executor not available'}), 500
+        if not ai_worker.bybit_session:
+            return jsonify({'success': False, 'message': 'ByBit session not available'}), 500
         
-        # Create trade signal
+        # Check if under trade limit
+        active_trades = ai_worker.get_active_positions_count()
+        if active_trades >= ai_worker.max_concurrent_trades:
+            return jsonify({
+                'success': False, 
+                'message': f'Max trades reached ({active_trades}/{ai_worker.max_concurrent_trades})'
+            }), 400
+        
+        # Create trade signal for direct execution
         trade_signal = {
             'symbol': symbol,
             'side': side,
@@ -1334,15 +1337,15 @@ def execute_ai_trade():
             'timestamp': datetime.now().isoformat()
         }
         
-        # Execute the trade
-        result = ai_worker.trade_executor.execute_signal(trade_signal)
+        # Execute the trade directly with pybit
+        result = ai_worker.execute_signal_direct(trade_signal)
         
         if result:
             ai_worker.console_logger.log('SUCCESS', f'✅ Manual trade executed: {side} {symbol} (${amount})')
             return jsonify({
                 'success': True,
                 'message': f'Trade executed successfully for {symbol}',
-                'trade_id': result.get('orderId', 'unknown')
+                'active_trades': f'{active_trades + 1}/{ai_worker.max_concurrent_trades}'
             })
         else:
             return jsonify({'success': False, 'message': 'Trade execution failed'}), 500
