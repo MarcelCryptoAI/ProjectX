@@ -256,16 +256,35 @@ class TradingDatabase:
     
     def store_technical_indicators(self, symbol, timestamp, indicators):
         """Store calculated technical indicators"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection()
         cursor = conn.cursor()
         
         try:
-            cursor.execute('''
-                INSERT OR REPLACE INTO technical_indicators 
-                (symbol, timestamp, rsi_14, macd_line, macd_signal, bb_upper, bb_lower, bb_middle,
-                 volume_sma_20, price_sma_20, price_ema_12, price_ema_26)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
+            if self.use_postgres:
+                cursor.execute('''
+                    INSERT INTO technical_indicators 
+                    (symbol, timestamp, rsi_14, macd_line, macd_signal, bb_upper, bb_lower, bb_middle,
+                     volume_sma_20, price_sma_20, price_ema_12, price_ema_26)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (symbol, timestamp) DO UPDATE SET
+                    rsi_14 = EXCLUDED.rsi_14,
+                    macd_line = EXCLUDED.macd_line,
+                    macd_signal = EXCLUDED.macd_signal,
+                    bb_upper = EXCLUDED.bb_upper,
+                    bb_lower = EXCLUDED.bb_lower,
+                    bb_middle = EXCLUDED.bb_middle,
+                    volume_sma_20 = EXCLUDED.volume_sma_20,
+                    price_sma_20 = EXCLUDED.price_sma_20,
+                    price_ema_12 = EXCLUDED.price_ema_12,
+                    price_ema_26 = EXCLUDED.price_ema_26
+                ''', (
+            else:
+                cursor.execute('''
+                    INSERT OR REPLACE INTO technical_indicators 
+                    (symbol, timestamp, rsi_14, macd_line, macd_signal, bb_upper, bb_lower, bb_middle,
+                     volume_sma_20, price_sma_20, price_ema_12, price_ema_26)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
                 symbol, timestamp,
                 indicators.get('rsi_14'),
                 indicators.get('macd_line'),
@@ -286,15 +305,27 @@ class TradingDatabase:
     
     def store_sentiment_data(self, symbol, timestamp, sentiment):
         """Store sentiment analysis data"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection()
         cursor = conn.cursor()
         
         try:
-            cursor.execute('''
-                INSERT OR REPLACE INTO sentiment_data 
-                (symbol, timestamp, sentiment_score, news_count, social_sentiment, fear_greed_index)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (
+            if self.use_postgres:
+                cursor.execute('''
+                    INSERT INTO sentiment_data 
+                    (symbol, timestamp, sentiment_score, news_count, social_sentiment, fear_greed_index)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (symbol, timestamp) DO UPDATE SET
+                    sentiment_score = EXCLUDED.sentiment_score,
+                    news_count = EXCLUDED.news_count,
+                    social_sentiment = EXCLUDED.social_sentiment,
+                    fear_greed_index = EXCLUDED.fear_greed_index
+                ''', (
+            else:
+                cursor.execute('''
+                    INSERT OR REPLACE INTO sentiment_data 
+                    (symbol, timestamp, sentiment_score, news_count, social_sentiment, fear_greed_index)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
                 symbol, timestamp,
                 sentiment.get('sentiment_score'),
                 sentiment.get('news_count'),
@@ -309,15 +340,16 @@ class TradingDatabase:
     
     def store_training_results(self, session_id, symbol, features, accuracy, confidence, model_params):
         """Store AI training results"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection()
         cursor = conn.cursor()
         
         try:
-            cursor.execute('''
-                INSERT INTO ai_training_results 
-                (training_session_id, symbol, features_json, prediction_accuracy, 
-                 confidence_score, model_params_json)
-                VALUES (?, ?, ?, ?, ?, ?)
+            placeholder = '%s' if self.use_postgres else '?'
+            cursor.execute(f'''
+                INSERT INTO training_results 
+                (session_id, symbol, features, accuracy, 
+                 confidence, model_params)
+                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
             ''', (
                 session_id, symbol,
                 json.dumps(features),
@@ -332,34 +364,47 @@ class TradingDatabase:
     
     def create_training_session(self, session_id, total_symbols):
         """Create a new training session"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('''
-            INSERT OR REPLACE INTO training_sessions 
-            (session_id, start_time, total_symbols, completed_symbols, status)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (session_id, datetime.now(), total_symbols, 0, 'running'))
+        if self.use_postgres:
+            cursor.execute('''
+                INSERT INTO training_sessions 
+                (session_id, start_time, total_symbols, completed_symbols, status)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (session_id) DO UPDATE SET
+                start_time = EXCLUDED.start_time,
+                total_symbols = EXCLUDED.total_symbols,
+                completed_symbols = EXCLUDED.completed_symbols,
+                status = EXCLUDED.status
+            ''', (session_id, datetime.now(), total_symbols, 0, 'running'))
+        else:
+            cursor.execute('''
+                INSERT OR REPLACE INTO training_sessions 
+                (session_id, start_time, total_symbols, completed_symbols, status)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (session_id, datetime.now(), total_symbols, 0, 'running'))
         
         conn.commit()
         conn.close()
     
     def update_training_session(self, session_id, completed_symbols, overall_accuracy=None, status=None):
         """Update training session progress"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection()
         cursor = conn.cursor()
         
+        placeholder = '%s' if self.use_postgres else '?'
         if status == 'completed':
-            cursor.execute('''
+            cursor.execute(f'''
                 UPDATE training_sessions 
-                SET completed_symbols = ?, overall_accuracy = ?, status = ?, end_time = ?
-                WHERE session_id = ?
+                SET completed_symbols = {placeholder}, overall_accuracy = {placeholder}, status = {placeholder}, end_time = {placeholder}
+                WHERE session_id = {placeholder}
             ''', (completed_symbols, overall_accuracy, status, datetime.now(), session_id))
         else:
-            cursor.execute('''
+            cursor.execute(f'''
                 UPDATE training_sessions 
-                SET completed_symbols = ?
-                WHERE session_id = ?
+                SET completed_symbols = {placeholder}
+                WHERE session_id = {placeholder}
             ''', (completed_symbols, session_id))
         
         conn.commit()
@@ -402,9 +447,10 @@ class TradingDatabase:
     
     def get_features_for_training(self, symbol, limit=1000):
         """Get combined features for AI training"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection()
         
-        query = '''
+        placeholder = '%s' if self.use_postgres else '?'
+        query = f'''
             SELECT 
                 m.symbol, m.timestamp, m.close_price, m.volume,
                 t.rsi_14, t.macd_line, t.macd_signal, t.bb_upper, t.bb_lower,
@@ -413,9 +459,9 @@ class TradingDatabase:
             FROM market_data m
             LEFT JOIN technical_indicators t ON m.symbol = t.symbol AND m.timestamp = t.timestamp
             LEFT JOIN sentiment_data s ON m.symbol = s.symbol AND m.timestamp = s.timestamp
-            WHERE m.symbol = ?
+            WHERE m.symbol = {placeholder}
             ORDER BY m.timestamp DESC
-            LIMIT ?
+            LIMIT {placeholder}
         '''
         
         df = pd.read_sql_query(query, conn, params=(symbol, limit))
@@ -425,7 +471,7 @@ class TradingDatabase:
     
     def get_latest_training_session(self):
         """Get the most recent training session"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection()
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -451,13 +497,14 @@ class TradingDatabase:
     
     def get_training_results(self, session_id):
         """Get training results for a specific session"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('''
+        placeholder = '%s' if self.use_postgres else '?'
+        cursor.execute(f'''
             SELECT symbol, accuracy, confidence, features, model_params, timestamp
             FROM training_results
-            WHERE session_id = ?
+            WHERE session_id = {placeholder}
             ORDER BY confidence DESC, accuracy DESC
         ''', (session_id,))
         
