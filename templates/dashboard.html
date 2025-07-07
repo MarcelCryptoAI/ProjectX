@@ -22,7 +22,22 @@
         .sidebar { min-height: 100vh; background: #f8f9fa; }
         .main-content { padding: 20px; padding-bottom: 370px; }
         .real-time-price { font-size: 1.5em; font-weight: bold; color: #007bff; }
-        .status-indicator { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .status-indicator { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 2px;
+        }
+        .status-dot { 
+            width: 8px; 
+            height: 8px; 
+            border-radius: 50%; 
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        .status-online { background-color: #28a745; box-shadow: 0 0 5px #28a745; }
+        .status-offline { background-color: #dc3545; box-shadow: 0 0 5px #dc3545; }
+        .status-unknown { background-color: #6c757d; }
         .status-active { background-color: #28a745; }
         .status-inactive { background-color: #dc3545; }
     </style>
@@ -41,6 +56,23 @@
                 <a class="nav-link" href="/analytics">Analytics</a>
                 <div class="nav-link text-light">
                     <div class="d-flex align-items-center">
+                        <!-- Status Lampjes -->
+                        <div class="me-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="status-indicator" title="ByBit API">
+                                    <span class="status-dot" id="statusBybitApi"></span>
+                                    <small>API</small>
+                                </div>
+                                <div class="status-indicator" title="Database">
+                                    <span class="status-dot" id="statusDatabase"></span>
+                                    <small>DB</small>
+                                </div>
+                                <div class="status-indicator" title="Dyno">
+                                    <span class="status-dot" id="statusDyno"></span>
+                                    <small>Dyno</small>
+                                </div>
+                            </div>
+                        </div>
                         <div class="text-end me-3">
                             <div class="fw-bold">Balance: <span id="headerBalance">$0.00</span></div>
                             <div class="small">24h P&L: <span id="headerPnl" class="profit">+$0.00 (0%)</span></div>
@@ -1019,10 +1051,50 @@
                 console.error('Account name update error:', error);
             });
         }
+        
+        function updateStatusLights() {
+            // Get system status
+            fetch('/api/system_status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.status) {
+                    const status = data.status;
+                    
+                    // Update ByBit API status
+                    const bybitApiDot = document.getElementById('statusBybitApi');
+                    bybitApiDot.className = `status-dot status-${status.bybit_api.status}`;
+                    bybitApiDot.title = `ByBit API: ${status.bybit_api.message}`;
+                    
+                    // Update Database status
+                    const databaseDot = document.getElementById('statusDatabase');
+                    databaseDot.className = `status-dot status-${status.database.status}`;
+                    databaseDot.title = `Database: ${status.database.message}`;
+                    
+                    // Update Dyno status
+                    const dynoDot = document.getElementById('statusDyno');
+                    dynoDot.className = `status-dot status-${status.dyno.status}`;
+                    dynoDot.title = `Dyno: ${status.dyno.message}`;
+                }
+            })
+            .catch(error => {
+                console.error('Status lights update error:', error);
+                // Set all to unknown on error
+                ['statusBybitApi', 'statusDatabase', 'statusDyno'].forEach(id => {
+                    const dot = document.getElementById(id);
+                    if (dot) {
+                        dot.className = 'status-dot status-unknown';
+                        dot.title = 'Status unknown - connection error';
+                    }
+                });
+            });
+        }
 
         function updateSystemStatus() {
             // Update header balance
             updateHeaderBalance();
+            
+            // Update status lampjes
+            updateStatusLights();
             
             // Get worker status
             fetch('/api/worker_stats')

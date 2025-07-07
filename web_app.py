@@ -106,6 +106,18 @@ def init_components():
             api_secret=api_secret,
         )
         app.logger.info("✅ ByBit LIVE session initialized successfully")
+        
+        # Test connection
+        try:
+            test_response = bybit_session.get_server_time()
+            if test_response and 'result' in test_response:
+                app.logger.info("✅ ByBit API connection test successful")
+            else:
+                app.logger.warning("⚠️ ByBit API test response unexpected")
+        except Exception as test_e:
+            app.logger.error(f"❌ ByBit API connection test failed: {test_e}")
+            # Don't fail initialization, just log the error
+            
     except Exception as e:
         app.logger.error(f"❌ ByBit session initialization failed: {e}")
         raise e  # Stop de app als ByBit niet werkt
@@ -129,12 +141,34 @@ def ensure_components_initialized():
         _components_initialized = True
 
 def handle_bybit_request(func, *args, **kwargs):
-    """Handle ByBit API requests - LIVE ONLY"""
-    try:
-        return func(*args, **kwargs)
-    except Exception as e:
-        app.logger.error(f"ByBit API request failed: {str(e)}")
-        raise e  # Altijd doorgooi errors, geen demo fallback
+    """Handle ByBit API requests with retry logic for DNS issues"""
+    import time
+    max_retries = 3
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            result = func(*args, **kwargs)
+            return result
+        except Exception as e:
+            error_str = str(e)
+            
+            # Check for DNS/network issues
+            if any(x in error_str.lower() for x in ['failed to resolve', 'nameresolutionerror', 'timeout', 'connection']):
+                if attempt < max_retries - 1:
+                    app.logger.warning(f"🔄 ByBit API DNS issue (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    continue
+                else:
+                    app.logger.error("🌐 ByBit API unreachable after all retries")
+                    raise ConnectionError(f"ByBit API connection failed: {error_str}")
+            else:
+                # Not a network issue, re-raise immediately
+                app.logger.error(f"ByBit API error: {error_str}")
+                raise e
+    
+    raise Exception("Should never reach here")
 
 @app.route('/')
 def dashboard():
@@ -165,7 +199,7 @@ def get_balance():
             return jsonify({'error': 'ByBit session not initialized - check API credentials'}), 500
             
         # Try to get wallet balance
-        balance = bybit_session.get_wallet_balance(accountType="UNIFIED")
+        balance = handle_bybit_request(bybit_session.get_wallet_balance, accountType="UNIFIED")
         
         app.logger.info(f"Raw balance response: {balance}")
         
@@ -200,7 +234,7 @@ def get_balance_header():
             return jsonify({'error': 'ByBit session not initialized - check API credentials'}), 500
             
         # Get wallet balance for header display
-        balance_data = bybit_session.get_wallet_balance(accountType="UNIFIED")
+        balance_data = handle_bybit_request(bybit_session.get_wallet_balance, accountType="UNIFIED")
         
         # Debug logging
         if balance_data:
@@ -247,7 +281,7 @@ def get_account_name():
             return jsonify({'error': 'ByBit session not initialized - check API credentials'}), 500
             
         # Try to get account info to extract account name/ID
-        account_info = bybit_session.get_account_info()
+        account_info = handle_bybit_request(bybit_session.get_account_info)
         
         if account_info and 'result' in account_info:
             # Extract useful account identifiers
@@ -266,6 +300,52 @@ def get_account_name():
     except Exception as e:
         app.logger.error(f"Account name API error: {str(e)}")
         return jsonify({'error': f'ByBit API error: {str(e)}'}), 500
+
+@app.route('/api/system_status')
+def get_system_status():
+    """Get system status for all components"""
+    status = {
+        'bybit_api': {'status': 'unknown', 'message': ''},
+        'database': {'status': 'unknown', 'message': ''},
+        'dyno': {'status': 'unknown', 'message': ''}
+    }
+    
+    # Test ByBit API
+    try:
+        ensure_components_initialized()
+        if bybit_session:
+            # Quick API test
+            server_time = handle_bybit_request(bybit_session.get_server_time)
+            if server_time and 'result' in server_time:
+                status['bybit_api'] = {'status': 'online', 'message': 'API responsive'}
+            else:
+                status['bybit_api'] = {'status': 'offline', 'message': 'Invalid API response'}
+        else:
+            status['bybit_api'] = {'status': 'offline', 'message': 'Session not initialized'}
+    except ConnectionError as e:
+        status['bybit_api'] = {'status': 'offline', 'message': 'DNS/Connection failed'}
+    except Exception as e:
+        status['bybit_api'] = {'status': 'offline', 'message': f'API error: {str(e)[:50]}'}
+    
+    # Test Database
+    try:
+        from database import TradingDatabase
+        db = TradingDatabase()
+        # Simple test query
+        test_query = db.get_connection()
+        test_query.close()
+        status['database'] = {'status': 'online', 'message': 'Database responsive'}
+    except Exception as e:
+        status['database'] = {'status': 'offline', 'message': f'DB error: {str(e)[:50]}'}
+    
+    # Test Dyno (always online if we can respond)
+    status['dyno'] = {'status': 'online', 'message': 'Dyno responsive'}
+    
+    return jsonify({
+        'success': True,
+        'status': status,
+        'timestamp': datetime.now().isoformat()
+    })
 
 @app.route('/api/account_info')
 def get_account_info():
@@ -1153,40 +1233,56 @@ def get_coin_analysis():
 
 @app.route('/api/trading_signals')
 def get_trading_signals():
-    """Get all trading signals from the queue"""
+    """Get trading signals ONLY above AI confidence threshold"""
     try:
+        ensure_components_initialized()
         ai_worker = get_ai_worker(socketio, bybit_session)
         
-        # Generate demo signals for now
-        import random
-        demo_symbols = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT', 'DOGEUSDT', 'BNBUSDT', 'XRPUSDT', 'MATICUSDT']
+        # Get AI confidence threshold from settings
+        ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
+        
         signals = []
         
-        for i, symbol in enumerate(demo_symbols[:6]):  # Generate 6 signals
-            confidence = random.uniform(65, 95)
-            side = random.choice(['Buy', 'Sell'])
+        try:
+            # Get recent training session data
+            latest_session = ai_worker.database.get_latest_training_session()
             
-            # Generate timestamp (signals from last 2 hours)
-            signal_time = datetime.now() - timedelta(minutes=random.randint(5, 120))
-            
-            signal = {
-                'id': f'signal_{i}_{symbol}',
-                'symbol': symbol,
-                'side': side,
-                'confidence': round(confidence, 1),
-                'amount': random.choice([50, 100, 150, 200]),
-                'leverage': random.choice([1, 2, 3, 5]),
-                'take_profit': round(random.uniform(2.5, 4.0), 1),
-                'stop_loss': round(random.uniform(1.5, 2.5), 1),
-                'strategy': 'AI Technical Analysis',
-                'timestamp': signal_time.isoformat(),
-                'analysis': {
-                    'rsi': round(random.uniform(30, 70), 2),
-                    'macd': round(random.uniform(-0.5, 0.5), 4),
-                    'trend': random.choice(['bullish', 'bearish', 'neutral'])
-                }
-            }
-            signals.append(signal)
+            if latest_session:
+                training_results = ai_worker.database.get_training_results(latest_session['session_id'])
+                
+                signal_id = 0
+                for result in training_results:
+                    confidence = result['confidence']
+                    
+                    # ALLEEN signals boven threshold
+                    if confidence >= ai_confidence_threshold:
+                        signal_time = datetime.fromisoformat(result.get('timestamp', datetime.now().isoformat()).replace('Z', '+00:00'))
+                        
+                        # Determine side based on analysis
+                        side = "Buy" if result['accuracy'] > 70 else "Sell"
+                        
+                        signal = {
+                            'id': f'signal_{signal_id}_{result["symbol"]}',
+                            'symbol': result['symbol'],
+                            'side': side,
+                            'confidence': round(confidence, 1),
+                            'amount': 100,  # Default amount
+                            'leverage': 1,  # Default leverage
+                            'take_profit': round(2 + (confidence / 25), 1),
+                            'stop_loss': round(1 + (confidence / 50), 1),
+                            'strategy': 'AI Technical Analysis',
+                            'timestamp': signal_time.isoformat(),
+                            'analysis': {
+                                'accuracy': result['accuracy'],
+                                'threshold': ai_confidence_threshold,
+                                'status': 'ready_to_trade'
+                            }
+                        }
+                        signals.append(signal)
+                        signal_id += 1
+        except Exception as db_error:
+            app.logger.error(f"Database error in trading_signals: {db_error}")
+            return jsonify({'success': False, 'error': 'No training data available'}), 500
         
         # Sort by confidence (highest first)
         signals.sort(key=lambda x: x['confidence'], reverse=True)
@@ -1195,10 +1291,12 @@ def get_trading_signals():
             'success': True,
             'signals': signals,
             'count': len(signals),
+            'ai_threshold': ai_confidence_threshold,
             'last_updated': datetime.now().isoformat()
         })
         
     except Exception as e:
+        app.logger.error(f"Trading signals error: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/execute_ai_trade', methods=['POST'])

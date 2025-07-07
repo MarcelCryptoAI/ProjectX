@@ -35,6 +35,24 @@
             height: 100%;
             transition: width 0.3s ease;
         }
+        .profit { color: #28a745; }
+        .loss { color: #dc3545; }
+        .status-indicator { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 2px;
+        }
+        .status-dot { 
+            width: 8px; 
+            height: 8px; 
+            border-radius: 50%; 
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        .status-online { background-color: #28a745; box-shadow: 0 0 5px #28a745; }
+        .status-offline { background-color: #dc3545; box-shadow: 0 0 5px #dc3545; }
+        .status-unknown { background-color: #6c757d; }
     </style>
 </head>
 <body>
@@ -46,8 +64,38 @@
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="/">Dashboard</a>
                 <a class="nav-link active" href="/coin_status">Coin Status</a>
+                <a class="nav-link" href="/signals">Signals</a>
                 <a class="nav-link" href="/config">Settings</a>
                 <a class="nav-link" href="/analytics">Analytics</a>
+                <div class="nav-link text-light">
+                    <div class="d-flex align-items-center">
+                        <!-- Status Lampjes -->
+                        <div class="me-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="status-indicator" title="ByBit API">
+                                    <span class="status-dot" id="statusBybitApi"></span>
+                                    <small>API</small>
+                                </div>
+                                <div class="status-indicator" title="Database">
+                                    <span class="status-dot" id="statusDatabase"></span>
+                                    <small>DB</small>
+                                </div>
+                                <div class="status-indicator" title="Dyno">
+                                    <span class="status-dot" id="statusDyno"></span>
+                                    <small>Dyno</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-end me-3">
+                            <div class="fw-bold">Balance: <span id="headerBalance">$0.00</span></div>
+                            <div class="small">24h P&L: <span id="headerPnl" class="profit">+$0.00 (0%)</span></div>
+                            <div class="small text-muted">Account: <span id="headerAccountName">Loading...</span></div>
+                        </div>
+                        <div class="avatar bg-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                            <i class="fas fa-user text-white"></i>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </nav>
@@ -215,11 +263,19 @@
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
             loadCoinAnalysis();
+            updateHeaderBalance();
+            updateStatusLights();
             
             // Update confidence slider display
             document.getElementById('confidenceFilter').addEventListener('input', function() {
                 document.getElementById('confidenceValue').textContent = this.value + '%';
             });
+            
+            // Update header and status every 30 seconds
+            setInterval(() => {
+                updateHeaderBalance();
+                updateStatusLights();
+            }, 30000);
         });
         
         function loadCoinAnalysis() {
@@ -442,6 +498,72 @@
             setTimeout(() => {
                 notification.remove();
             }, 5000);
+        }
+        
+        // Header balance functions
+        function updateHeaderBalance() {
+            // Update balance
+            fetch('/api/balance_header')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('headerBalance').textContent = `$${data.balance.toFixed(2)}`;
+                    
+                    const pnlElement = document.getElementById('headerPnl');
+                    const pnlClass = data.pnl_24h >= 0 ? 'profit' : 'loss';
+                    const pnlSign = data.pnl_24h >= 0 ? '+' : '';
+                    pnlElement.className = pnlClass;
+                    pnlElement.textContent = `${pnlSign}$${data.pnl_24h.toFixed(2)} (${data.pnl_24h_percent.toFixed(1)}%)`;
+                }
+            })
+            .catch(error => console.error('Error updating header balance:', error));
+            
+            // Update account name
+            fetch('/api/account_name')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('headerAccountName').textContent = data.account_name;
+                }
+            })
+            .catch(error => console.error('Error updating account name:', error));
+        }
+        
+        function updateStatusLights() {
+            // Get system status
+            fetch('/api/system_status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.status) {
+                    const status = data.status;
+                    
+                    // Update ByBit API status
+                    const bybitApiDot = document.getElementById('statusBybitApi');
+                    bybitApiDot.className = `status-dot status-${status.bybit_api.status}`;
+                    bybitApiDot.title = `ByBit API: ${status.bybit_api.message}`;
+                    
+                    // Update Database status
+                    const databaseDot = document.getElementById('statusDatabase');
+                    databaseDot.className = `status-dot status-${status.database.status}`;
+                    databaseDot.title = `Database: ${status.database.message}`;
+                    
+                    // Update Dyno status
+                    const dynoDot = document.getElementById('statusDyno');
+                    dynoDot.className = `status-dot status-${status.dyno.status}`;
+                    dynoDot.title = `Dyno: ${status.dyno.message}`;
+                }
+            })
+            .catch(error => {
+                console.error('Status lights update error:', error);
+                // Set all to unknown on error
+                ['statusBybitApi', 'statusDatabase', 'statusDyno'].forEach(id => {
+                    const dot = document.getElementById(id);
+                    if (dot) {
+                        dot.className = 'status-dot status-unknown';
+                        dot.title = 'Status unknown - connection error';
+                    }
+                });
+            });
         }
     </script>
 </body>
