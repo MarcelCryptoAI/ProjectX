@@ -1,538 +1,461 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Signals - ByBit AI Trading Bot</title>
+    <title>Trading Signals - A.R.I.E AI Trading Bot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'neon-cyan': '#00D9FF',
+                        'neon-yellow': '#FFD700',
+                        'neon-pink': '#FF00C1',
+                        'neon-green': '#00FF88',
+                        'neon-orange': '#FF6B00',
+                        'dark-bg': '#0A0A0F',
+                        'dark-panel': '#0F0F1A',
+                        'dark-border': '#1A1A2E',
+                        'dark-hover': '#16213E'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
+                        'mono': ['SF Mono', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        .signal-card {
-            border-left: 4px solid #007bff;
-            transition: all 0.3s ease;
-            cursor: pointer;
+        body {
+            background: #0A0A0F;
+            position: relative;
+            overflow-x: hidden;
         }
-        .signal-card:hover {
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            transform: translateY(-2px);
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 217, 255, 0.03) 2px,
+                    rgba(0, 217, 255, 0.03) 4px
+                ),
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(255, 215, 0, 0.03) 2px,
+                    rgba(255, 215, 0, 0.03) 4px
+                );
+            pointer-events: none;
+            z-index: 1;
         }
-        .signal-card.signal-ready {
-            border-left-color: #28a745;
-            background: linear-gradient(135deg, #d4edda 0%, #f8fff9 100%);
-        }
-        .signal-card.signal-queue {
-            border-left-color: #ffc107;
-            background: linear-gradient(135deg, #fff3cd 0%, #fffef7 100%);
-        }
-        .signal-card.signal-low {
-            border-left-color: #6c757d;
-            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-        }
-        .confidence-bar {
-            height: 8px;
-            background: #e9ecef;
-            border-radius: 4px;
+        
+        .glass-card {
+            background: rgba(15, 15, 26, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 0 40px rgba(0, 217, 255, 0.1);
+            position: relative;
             overflow: hidden;
         }
+        
+        .signal-card {
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .signal-card.high-confidence {
+            border-left: 4px solid #00FF88;
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 217, 255, 0.05));
+        }
+        
+        .signal-card.medium-confidence {
+            border-left: 4px solid #FFD700;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 107, 0, 0.05));
+        }
+        
+        .signal-card.low-confidence {
+            border-left: 4px solid #FF00C1;
+            background: linear-gradient(135deg, rgba(255, 0, 193, 0.1), rgba(108, 117, 125, 0.05));
+        }
+        
+        .confidence-bar {
+            position: relative;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 9999px;
+            overflow: hidden;
+            height: 6px;
+        }
+        
         .confidence-fill {
             height: 100%;
-            transition: width 0.3s ease;
+            background: linear-gradient(90deg, #FF00C1, #FFD700, #00D9FF);
+            box-shadow: 0 0 10px currentColor;
+            transition: width 0.5s ease-out;
         }
-        .confidence-high { background: linear-gradient(90deg, #28a745, #20c997); }
-        .confidence-medium { background: linear-gradient(90deg, #ffc107, #fd7e14); }
-        .confidence-low { background: linear-gradient(90deg, #6c757d, #adb5bd); }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
+        
+        .profit-text { color: #00FF88; text-shadow: 0 0 10px #00FF88; }
+        .loss-text { color: #FF00C1; text-shadow: 0 0 10px #FF00C1; }
+        
+        .cyber-button {
+            position: relative;
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(255, 215, 0, 0.1));
+            border: 1px solid rgba(0, 217, 255, 0.5);
+            color: #00D9FF;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.3s;
+            overflow: hidden;
         }
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
+        
+        .cyber-button:hover {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(255, 215, 0, 0.2));
+            border-color: #00D9FF;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.5), inset 0 0 20px rgba(0, 217, 255, 0.1);
+            transform: translateY(-2px);
         }
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .signal-details {
-            font-size: 0.9em;
-            color: #6c757d;
-        }
-        .signal-age {
-            font-size: 0.8em;
-            color: #868e96;
-            font-style: italic;
-        }
-        .execute-btn {
-            background: linear-gradient(135deg, #28a745, #20c997);
-            border: none;
-            color: white;
-            font-weight: bold;
-        }
-        .execute-btn:hover {
-            background: linear-gradient(135deg, #20c997, #28a745);
-            color: white;
-        }
-        .filters-bar {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .signal-icon {
-            font-size: 1.5em;
-            margin-right: 10px;
-        }
-        .signal-buy { color: #28a745; }
-        .signal-sell { color: #dc3545; }
     </style>
 </head>
-<body>
+<body class="bg-dark-bg text-white font-sans min-h-screen relative">
+    <!-- Include shared header -->
     {% include 'includes/header.html' %}
-
-    <div class="container-fluid mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2><i class="fas fa-broadcast-tower"></i> Trading Signals Queue</h2>
-            <div class="d-flex gap-2">
-                <button class="btn btn-primary" onclick="refreshSignals()">
-                    <i class="fas fa-sync"></i> Refresh
-                </button>
-                <button class="btn btn-success" onclick="executeTopSignals()">
-                    <i class="fas fa-play"></i> Execute Top Signals
-                </button>
+    
+    <!-- Main Content -->
+    <div class="container mx-auto px-6 py-8 relative z-10">
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold text-neon-cyan mb-2">
+                <i class="fas fa-chart-line mr-3"></i>AI TRADING SIGNALS
+            </h1>
+            <p class="text-gray-400">Real-time AI-generated trading signals based on technical analysis and market sentiment</p>
+        </div>
+        
+        <!-- Stats Summary -->
+        <div class="grid grid-cols-4 gap-6 mb-8">
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">TOTAL SIGNALS</h3>
+                <div class="text-3xl font-bold text-white" id="totalSignals">0</div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">HIGH CONFIDENCE</h3>
+                <div class="text-3xl font-bold text-neon-green" id="highConfidenceSignals">0</div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">ACTIVE TRADES</h3>
+                <div class="text-3xl font-bold text-neon-yellow" id="activeTrades">0</div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">SUCCESS RATE</h3>
+                <div class="text-3xl font-bold text-neon-pink" id="successRate">0%</div>
             </div>
         </div>
-
-        <!-- Stats Overview -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="h3" id="totalSignals">0</div>
-                <div>Total Signals</div>
-            </div>
-            <div class="stat-card">
-                <div class="h3" id="readyToTrade">0</div>
-                <div>Ready to Trade</div>
-            </div>
-            <div class="stat-card">
-                <div class="h3" id="inQueue">0</div>
-                <div>In Queue</div>
-            </div>
-            <div class="stat-card">
-                <div class="h3" id="activeTrades">0</div>
-                <div>Active Trades</div>
-            </div>
-        </div>
-
-        <!-- Filters -->
-        <div class="filters-bar">
-            <div class="row align-items-center">
-                <div class="col-md-3">
-                    <label class="form-label">Filter by Status:</label>
-                    <select class="form-select form-select-sm" id="statusFilter" onchange="filterSignals()">
-                        <option value="all">All Signals</option>
-                        <option value="ready">Ready to Trade</option>
-                        <option value="queue">In Queue</option>
-                        <option value="low">Low Score</option>
-                    </select>
+        
+        <!-- Filters and Controls -->
+        <div class="glass-card rounded-xl p-6 mb-8">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div class="flex items-center gap-4">
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm active" onclick="filterSignals('all')" data-filter="all">
+                        <i class="fas fa-th mr-2"></i>ALL SIGNALS
+                    </button>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="filterSignals('buy')" data-filter="buy">
+                        <i class="fas fa-arrow-up mr-2"></i>BUY SIGNALS
+                    </button>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="filterSignals('sell')" data-filter="sell">
+                        <i class="fas fa-arrow-down mr-2"></i>SELL SIGNALS
+                    </button>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="filterSignals('high')" data-filter="high">
+                        <i class="fas fa-star mr-2"></i>HIGH CONFIDENCE
+                    </button>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">Minimum Confidence:</label>
-                    <input type="range" class="form-range" id="confidenceFilter" min="0" max="100" value="70" oninput="filterSignals()">
-                    <small class="text-muted">Current: <span id="confidenceValue">70</span>%</small>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Sort by:</label>
-                    <select class="form-select form-select-sm" id="sortBy" onchange="sortSignals()">
-                        <option value="confidence">Confidence</option>
-                        <option value="age">Age</option>
-                        <option value="symbol">Symbol</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Max Concurrent Trades:</label>
-                    <div class="d-flex align-items-center">
-                        <span class="badge bg-primary me-2" id="maxTradesDisplay">20</span>
-                        <small class="text-muted">Active: <span id="currentActiveCount">0</span></small>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-gray-400">Auto Execute:</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" class="sr-only peer" id="autoExecute" onchange="toggleAutoExecute()">
+                            <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-neon-yellow"></div>
+                        </label>
                     </div>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="refreshSignals()">
+                        <i class="fas fa-sync-alt mr-2"></i>REFRESH
+                    </button>
                 </div>
             </div>
         </div>
-
-        <!-- Signals List -->
-        <div class="row" id="signalsContainer">
-            <div class="col-12 text-center p-5">
-                <div class="spinner-border text-primary" role="status"></div>
-                <div class="mt-3">Loading trading signals...</div>
+        
+        <!-- Trading Signals Grid -->
+        <div id="signalsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Loading state -->
+            <div class="col-span-full text-center py-16">
+                <i class="fas fa-spinner fa-spin text-6xl text-neon-cyan mb-4"></i>
+                <p class="text-gray-400">Loading AI trading signals...</p>
             </div>
+        </div>
+        
+        <!-- No Signals Message -->
+        <div id="noSignalsMessage" class="text-center py-16 hidden">
+            <i class="fas fa-chart-line text-6xl text-gray-600 mb-4"></i>
+            <p class="text-xl text-gray-400 mb-2">No trading signals available</p>
+            <p class="text-gray-500">AI is analyzing market conditions...</p>
         </div>
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
     <script>
-        // Initialize Socket.IO
+        let allSignals = [];
+        let currentFilter = 'all';
         const socket = io();
         
-        // Global variables
-        let allSignals = [];
-        let maxConcurrentTrades = 20;
-        let aiConfidenceThreshold = 75;
-        let activeTradesCount = 0;
-        
         // Socket event handlers
-        socket.on('connect', function() {
-            console.log('Connected to signals server');
-        });
-        
         socket.on('trading_signal', function(signal) {
-            addNewSignal(signal);
+            addSignal(signal);
             updateStats();
         });
         
         socket.on('signal_executed', function(data) {
-            markSignalAsExecuted(data.signal_id);
-            updateStats();
+            updateSignalStatus(data.signalId, 'executed');
         });
-        
-        socket.on('signal_expired', function(data) {
-            removeSignal(data.signal_id);
-            updateStats();
-        });
-        
-        // Initialize page
-        document.addEventListener('DOMContentLoaded', function() {
-            loadSettings();
-            loadSignals();
-            updateHeaderBalance();
-            updateStatusLights();
-            
-            // Update confidence filter display
-            document.getElementById('confidenceFilter').addEventListener('input', function() {
-                document.getElementById('confidenceValue').textContent = this.value;
-            });
-            
-            // Refresh signals every 30 seconds
-            setInterval(loadSignals, 30000);
-            
-            // Update header and status every 30 seconds
-            setInterval(() => {
-                updateHeaderBalance();
-                updateStatusLights();
-            }, 30000);
-        });
-        
-        function loadSettings() {
-            fetch('/api/settings')
-            .then(response => response.json())
-            .then(data => {
-                maxConcurrentTrades = data.bot?.max_concurrent_trades || 20;
-                aiConfidenceThreshold = data.bot?.ai_confidence_threshold || 75;
-                document.getElementById('maxTradesDisplay').textContent = maxConcurrentTrades;
-                document.getElementById('confidenceFilter').value = aiConfidenceThreshold;
-                document.getElementById('confidenceValue').textContent = aiConfidenceThreshold;
-            })
-            .catch(error => {
-                console.error('Error loading settings:', error);
-            });
-        }
         
         function loadSignals() {
             fetch('/api/trading_signals')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    allSignals = data.signals || [];
-                    renderSignals();
-                    updateStats();
-                } else {
-                    console.error('Failed to load signals:', data.error);
-                    showNotification('Failed to load signals', 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Error loading signals:', error);
-                showNotification('Error loading signals', 'error');
-            });
-        }
-        
-        function renderSignals() {
-            const container = document.getElementById('signalsContainer');
-            container.innerHTML = '';
-            
-            if (allSignals.length === 0) {
-                container.innerHTML = `
-                    <div class="col-12 text-center p-5">
-                        <i class="fas fa-satellite-dish fa-4x text-muted mb-3"></i>
-                        <h4 class="text-muted">No Trading Signals</h4>
-                        <p class="text-muted">Waiting for AI to generate trading signals...</p>
-                        <button class="btn btn-primary" onclick="loadSignals()">
-                            <i class="fas fa-sync"></i> Check for Signals
-                        </button>
-                    </div>
-                `;
-                return;
-            }
-            
-            // Sort signals by confidence (highest first)
-            const sortedSignals = [...allSignals].sort((a, b) => b.confidence - a.confidence);
-            
-            sortedSignals.forEach((signal, index) => {
-                const signalCard = createSignalCard(signal, index);
-                container.appendChild(signalCard);
-            });
-        }
-        
-        function createSignalCard(signal, index) {
-            const col = document.createElement('div');
-            col.className = 'col-md-6 col-lg-4 mb-3';
-            
-            // Determine signal status
-            let status = 'low';
-            let statusText = 'Te lage score';
-            let statusIcon = 'fas fa-times-circle';
-            let statusClass = 'text-muted';
-            
-            if (signal.confidence >= aiConfidenceThreshold) {
-                if (activeTradesCount < maxConcurrentTrades && index < maxConcurrentTrades) {
-                    status = 'ready';
-                    statusText = 'Ready to Trade';
-                    statusIcon = 'fas fa-check-circle';
-                    statusClass = 'text-success';
-                } else {
-                    status = 'queue';
-                    statusText = 'In Queue';
-                    statusIcon = 'fas fa-clock';
-                    statusClass = 'text-warning';
-                }
-            }
-            
-            // Calculate signal age
-            const signalTime = new Date(signal.timestamp);
-            const now = new Date();
-            const ageMs = now - signalTime;
-            const ageText = formatAge(ageMs);
-            
-            // Confidence styling
-            let confidenceClass = 'confidence-low';
-            if (signal.confidence >= 80) confidenceClass = 'confidence-high';
-            else if (signal.confidence >= 60) confidenceClass = 'confidence-medium';
-            
-            col.innerHTML = `
-                <div class="card signal-card signal-${status}" data-signal-id="${signal.id}">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <div>
-                                <h5 class="card-title mb-1">
-                                    <i class="fas fa-${signal.side === 'Buy' ? 'arrow-up signal-buy' : 'arrow-down signal-sell'} signal-icon"></i>
-                                    ${signal.symbol}
-                                </h5>
-                                <div class="signal-details">
-                                    <strong>${signal.side}</strong> • 
-                                    $${signal.amount || 100} • 
-                                    ${signal.leverage || 1}x leverage
-                                </div>
-                            </div>
-                            <div class="text-end">
-                                <div class="h4 mb-1">${signal.confidence}%</div>
-                                <small class="text-muted">Confidence</small>
-                            </div>
-                        </div>
-                        
-                        <div class="confidence-bar mb-3">
-                            <div class="confidence-fill ${confidenceClass}" style="width: ${signal.confidence}%"></div>
-                        </div>
-                        
-                        <div class="signal-details mb-3">
-                            <div class="row">
-                                <div class="col-6">
-                                    <small class="text-muted">Take Profit:</small><br>
-                                    <strong>${signal.take_profit || 3.0}%</strong>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted">Stop Loss:</small><br>
-                                    <strong>${signal.stop_loss || 2.0}%</strong>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div class="signal-age">
-                                <i class="fas fa-clock"></i> ${ageText}
-                            </div>
-                            <div class="${statusClass}">
-                                <i class="${statusIcon}"></i> ${statusText}
-                            </div>
-                        </div>
-                        
-                        <div class="action-buttons">
-                            ${status === 'ready' ? 
-                                `<button class="btn btn-sm execute-btn" onclick="executeSignal('${signal.id}')">
-                                    <i class="fas fa-play"></i> Execute Trade
-                                </button>` : ''
-                            }
-                            <button class="btn btn-sm btn-outline-info" onclick="viewSignalDetails('${signal.id}')">
-                                <i class="fas fa-info-circle"></i> Details
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="removeSignal('${signal.id}')">
-                                <i class="fas fa-trash"></i> Remove
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            return col;
-        }
-        
-        function formatAge(ageMs) {
-            const minutes = Math.floor(ageMs / 60000);
-            const hours = Math.floor(minutes / 60);
-            const days = Math.floor(hours / 24);
-            
-            if (days > 0) return `${days}d ${hours % 24}h`;
-            if (hours > 0) return `${hours}h ${minutes % 60}m`;
-            return `${minutes}m`;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        allSignals = data.signals || [];
+                        updateStats();
+                        displaySignals();
+                    } else {
+                        console.error('Failed to load signals:', data.error);
+                        showNoSignals();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading signals:', error);
+                    showNoSignals();
+                });
         }
         
         function updateStats() {
-            const totalSignals = allSignals.length;
-            const readyToTrade = allSignals.filter(s => 
-                s.confidence >= aiConfidenceThreshold && 
-                allSignals.indexOf(s) < maxConcurrentTrades
-            ).length;
-            const inQueue = allSignals.filter(s => 
-                s.confidence >= aiConfidenceThreshold && 
-                allSignals.indexOf(s) >= maxConcurrentTrades
-            ).length;
+            const total = allSignals.length;
+            const highConfidence = allSignals.filter(s => s.confidence >= 75).length;
+            const activeTrades = allSignals.filter(s => s.status === 'executed').length;
+            const successfulTrades = allSignals.filter(s => s.status === 'completed' && s.profit > 0).length;
+            const successRate = total > 0 ? (successfulTrades / total * 100) : 0;
             
-            document.getElementById('totalSignals').textContent = totalSignals;
-            document.getElementById('readyToTrade').textContent = readyToTrade;
-            document.getElementById('inQueue').textContent = inQueue;
-            document.getElementById('activeTrades').textContent = activeTradesCount;
-            document.getElementById('currentActiveCount').textContent = activeTradesCount;
+            document.getElementById('totalSignals').textContent = total;
+            document.getElementById('highConfidenceSignals').textContent = highConfidence;
+            document.getElementById('activeTrades').textContent = activeTrades;
+            document.getElementById('successRate').textContent = `${successRate.toFixed(1)}%`;
         }
         
-        function executeSignal(signalId) {
-            const signal = allSignals.find(s => s.id === signalId);
-            if (!signal) return;
+        function displaySignals() {
+            const grid = document.getElementById('signalsGrid');
+            let filteredSignals = [...allSignals];
             
-            if (confirm(`Execute ${signal.side} trade for ${signal.symbol}?`)) {
+            // Apply filter
+            if (currentFilter === 'buy') {
+                filteredSignals = filteredSignals.filter(signal => signal.side === 'Buy');
+            } else if (currentFilter === 'sell') {
+                filteredSignals = filteredSignals.filter(signal => signal.side === 'Sell');
+            } else if (currentFilter === 'high') {
+                filteredSignals = filteredSignals.filter(signal => signal.confidence >= 75);
+            }
+            
+            if (filteredSignals.length === 0) {
+                document.getElementById('signalsGrid').classList.add('hidden');
+                document.getElementById('noSignalsMessage').classList.remove('hidden');
+                return;
+            }
+            
+            document.getElementById('signalsGrid').classList.remove('hidden');
+            document.getElementById('noSignalsMessage').classList.add('hidden');
+            
+            grid.innerHTML = filteredSignals.map(signal => {
+                const confidenceClass = signal.confidence >= 75 ? 'high-confidence' : 
+                                       signal.confidence >= 60 ? 'medium-confidence' : 'low-confidence';
+                
+                return `
+                    <div class="glass-card signal-card ${confidenceClass} rounded-xl p-6 hover:scale-105 transition-all duration-300">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-xl font-bold text-white">${signal.symbol}</h3>
+                            <div class="flex items-center gap-2">
+                                <span class="px-3 py-1 rounded-full text-sm font-bold ${signal.side === 'Buy' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}">
+                                    ${signal.side}
+                                </span>
+                                <span class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-300">
+                                    ${signal.strategy || 'AI Analysis'}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-400">Confidence</span>
+                                    <span class="text-neon-cyan font-bold">${signal.confidence}%</span>
+                                </div>
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill" style="width: ${signal.confidence}%"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span class="text-gray-400">Take Profit:</span>
+                                    <div class="text-neon-green font-bold">${signal.take_profit}%</div>
+                                </div>
+                                <div>
+                                    <span class="text-gray-400">Stop Loss:</span>
+                                    <div class="text-neon-pink font-bold">${signal.stop_loss}%</div>
+                                </div>
+                                <div>
+                                    <span class="text-gray-400">Amount:</span>
+                                    <div class="text-white font-bold">$${signal.amount || 100}</div>
+                                </div>
+                                <div>
+                                    <span class="text-gray-400">Leverage:</span>
+                                    <div class="text-neon-yellow font-bold">${signal.leverage || 1}x</div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-xs text-gray-500">
+                                <div>Signal ID: ${signal.id}</div>
+                                <div>Generated: ${new Date(signal.timestamp).toLocaleString()}</div>
+                            </div>
+                            
+                            <div class="flex gap-2">
+                                <button class="flex-1 cyber-button py-2 px-4 rounded-lg text-sm" 
+                                        onclick="executeSignal('${signal.id}', '${signal.symbol}', '${signal.side}', ${signal.take_profit}, ${signal.stop_loss})"
+                                        ${signal.status === 'executed' ? 'disabled' : ''}>
+                                    <i class="fas fa-rocket mr-2"></i>
+                                    ${signal.status === 'executed' ? 'EXECUTED' : 'EXECUTE'}
+                                </button>
+                                <button class="cyber-button py-2 px-3 rounded-lg text-sm" 
+                                        onclick="analyzeSignal('${signal.symbol}')">
+                                    <i class="fas fa-chart-bar"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function filterSignals(filter) {
+            currentFilter = filter;
+            
+            // Update button states
+            document.querySelectorAll('[data-filter]').forEach(btn => {
+                if (btn.dataset.filter === filter) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            displaySignals();
+        }
+        
+        function executeSignal(signalId, symbol, side, takeProfit, stopLoss) {
+            if (confirm(`Execute ${side} signal for ${symbol}?\\n\\nTake Profit: ${takeProfit}%\\nStop Loss: ${stopLoss}%`)) {
                 fetch('/api/execute_ai_trade', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        symbol: signal.symbol,
-                        side: signal.side,
-                        amount: signal.amount || 100,
-                        takeProfit: signal.take_profit,
-                        stopLoss: signal.stop_loss
+                        signal_id: signalId,
+                        symbol: symbol,
+                        side: side,
+                        amount: 100,
+                        takeProfit: takeProfit,
+                        stopLoss: stopLoss
                     })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        showNotification(`Trade executed: ${signal.side} ${signal.symbol}`, 'success');
-                        markSignalAsExecuted(signalId);
-                        activeTradesCount++;
-                        updateStats();
+                        updateSignalStatus(signalId, 'executed');
+                        showNotification(`Trade executed: ${symbol} ${side}`, 'success');
                     } else {
                         showNotification(`Trade failed: ${data.message}`, 'error');
                     }
                 })
                 .catch(error => {
-                    showNotification('Error executing trade', 'error');
-                    console.error('Execute error:', error);
+                    showNotification(`Error: ${error.message}`, 'error');
                 });
             }
         }
         
-        function executeTopSignals() {
-            const readySignals = allSignals
-                .filter(s => s.confidence >= aiConfidenceThreshold)
-                .slice(0, maxConcurrentTrades - activeTradesCount);
-                
-            if (readySignals.length === 0) {
-                showNotification('No signals ready for execution', 'info');
-                return;
-            }
-            
-            if (confirm(`Execute ${readySignals.length} top signals?`)) {
-                readySignals.forEach(signal => executeSignal(signal.id));
-            }
+        function analyzeSignal(symbol) {
+            window.open(`/coin_status?symbol=${symbol}`, '_blank');
         }
         
-        function markSignalAsExecuted(signalId) {
-            allSignals = allSignals.filter(s => s.id !== signalId);
-            renderSignals();
-        }
-        
-        function removeSignal(signalId) {
-            if (confirm('Remove this signal from the queue?')) {
-                allSignals = allSignals.filter(s => s.id !== signalId);
-                renderSignals();
-                updateStats();
-                showNotification('Signal removed', 'info');
-            }
-        }
-        
-        function viewSignalDetails(signalId) {
+        function updateSignalStatus(signalId, status) {
             const signal = allSignals.find(s => s.id === signalId);
-            if (!signal) return;
-            
-            alert(`Signal Details:\n\nSymbol: ${signal.symbol}\nSide: ${signal.side}\nConfidence: ${signal.confidence}%\nStrategy: ${signal.strategy || 'AI Analysis'}\nTimestamp: ${new Date(signal.timestamp).toLocaleString()}\n\nTechnical Analysis:\n${JSON.stringify(signal.analysis || {}, null, 2)}`);
+            if (signal) {
+                signal.status = status;
+                displaySignals();
+                updateStats();
+            }
+        }
+        
+        function addSignal(signal) {
+            allSignals.unshift(signal);
+            displaySignals();
+        }
+        
+        function showNoSignals() {
+            document.getElementById('signalsGrid').innerHTML = `
+                <div class="col-span-full text-center py-16">
+                    <i class="fas fa-exclamation-triangle text-6xl text-neon-pink mb-4"></i>
+                    <p class="text-gray-400">Failed to load trading signals</p>
+                </div>
+            `;
         }
         
         function refreshSignals() {
-            showNotification('Refreshing signals...', 'info');
+            document.getElementById('signalsGrid').innerHTML = `
+                <div class="col-span-full text-center py-16">
+                    <i class="fas fa-spinner fa-spin text-6xl text-neon-cyan mb-4"></i>
+                    <p class="text-gray-400">Refreshing signals...</p>
+                </div>
+            `;
             loadSignals();
         }
         
-        function filterSignals() {
-            // Implementation for filtering signals
-            renderSignals();
-        }
-        
-        function sortSignals() {
-            const sortBy = document.getElementById('sortBy').value;
-            
-            allSignals.sort((a, b) => {
-                switch(sortBy) {
-                    case 'confidence':
-                        return b.confidence - a.confidence;
-                    case 'age':
-                        return new Date(a.timestamp) - new Date(b.timestamp);
-                    case 'symbol':
-                        return a.symbol.localeCompare(b.symbol);
-                    default:
-                        return 0;
-                }
-            });
-            
-            renderSignals();
-        }
-        
-        function addNewSignal(signal) {
-            // Add new signal to the beginning
-            allSignals.unshift(signal);
-            renderSignals();
-            showNotification(`New signal: ${signal.side} ${signal.symbol}`, 'info');
+        function toggleAutoExecute() {
+            const checked = document.getElementById('autoExecute').checked;
+            showNotification(`Auto-execute ${checked ? 'enabled' : 'disabled'}`, 'info');
         }
         
         function showNotification(message, type) {
+            // Simple notification (you can enhance this)
+            const colors = {
+                success: 'text-neon-green',
+                error: 'text-neon-pink',
+                info: 'text-neon-cyan'
+            };
+            
             const notification = document.createElement('div');
-            notification.className = `alert alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'} alert-dismissible fade show position-fixed`;
-            notification.style.top = '20px';
-            notification.style.right = '20px';
-            notification.style.zIndex = '9999';
-            notification.innerHTML = `
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
+            notification.className = `fixed top-20 right-4 bg-dark-panel border border-neon-cyan rounded-lg p-4 ${colors[type]} z-50`;
+            notification.textContent = message;
             
             document.body.appendChild(notification);
             
@@ -541,78 +464,13 @@
             }, 3000);
         }
         
-        // Header balance functions
-        function updateHeaderBalance() {
-            // Update balance
-            fetch('/api/balance_header')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('headerBalance').textContent = `$${data.balance.toFixed(2)}`;
-                    
-                    const pnlElement = document.getElementById('headerPnl');
-                    const pnlClass = data.pnl_24h >= 0 ? 'text-success' : 'text-danger';
-                    const pnlSign = data.pnl_24h >= 0 ? '+' : '';
-                    pnlElement.className = pnlClass;
-                    pnlElement.textContent = `${pnlSign}$${data.pnl_24h.toFixed(2)} (${data.pnl_24h_percent.toFixed(1)}%)`;
-                }
-            })
-            .catch(error => console.error('Error updating header balance:', error));
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSignals();
             
-            // Update account name
-            fetch('/api/account_name')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('headerAccountName').textContent = data.account_name;
-                }
-            })
-            .catch(error => console.error('Error updating account name:', error));
-        }
-        
-        function updateStatusLights() {
-            // Get system status
-            fetch('/api/system_status')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.status) {
-                    const status = data.status;
-                    
-                    // Update ByBit API status
-                    const bybitApiDot = document.getElementById('statusBybitApi');
-                    bybitApiDot.className = `status-dot status-${status.bybit_api.status}`;
-                    bybitApiDot.title = `ByBit API: ${status.bybit_api.message}`;
-                    
-                    // Update Database status
-                    const databaseDot = document.getElementById('statusDatabase');
-                    databaseDot.className = `status-dot status-${status.database.status}`;
-                    databaseDot.title = `Database: ${status.database.message}`;
-                    
-                    // Update Dyno status
-                    const dynoDot = document.getElementById('statusDyno');
-                    dynoDot.className = `status-dot status-${status.dyno.status}`;
-                    dynoDot.title = `Dyno: ${status.dyno.message}`;
-                    
-                    // Update DNS status
-                    const dnsDot = document.getElementById('statusDns');
-                    if (dnsDot && status.dns) {
-                        dnsDot.className = `status-dot status-${status.dns.status}`;
-                        dnsDot.title = `DNS: ${status.dns.message}`;
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Status lights update error:', error);
-                // Set all to unknown on error
-                ['statusBybitApi', 'statusDatabase', 'statusDyno', 'statusDns'].forEach(id => {
-                    const dot = document.getElementById(id);
-                    if (dot) {
-                        dot.className = 'status-dot status-unknown';
-                        dot.title = 'Status unknown - connection error';
-                    }
-                });
-            });
-        }
+            // Auto-refresh every 30 seconds
+            setInterval(loadSignals, 30000);
+        });
     </script>
 </body>
 </html>

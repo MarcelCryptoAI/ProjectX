@@ -1,218 +1,391 @@
-<!-- Shared Header Template -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="/">
-            <i class="fas fa-robot me-2"></i>ByBit AI Trading Bot
-        </a>
-        
-        <!-- Mobile Toggle Button -->
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        
-        <!-- Navigation Items -->
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav me-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="/" id="nav-dashboard">
-                        <i class="fas fa-tachometer-alt me-1"></i>Dashboard
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/coin_status" id="nav-coin-status">
-                        <i class="fas fa-coins me-1"></i>Coin Status
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/signals" id="nav-signals">
-                        <i class="fas fa-chart-line me-1"></i>Signals
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/config" id="nav-config">
-                        <i class="fas fa-cog me-1"></i>Settings
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/analytics" id="nav-analytics">
-                        <i class="fas fa-chart-bar me-1"></i>Analytics
-                    </a>
-                </li>
-            </ul>
-            
-            <!-- Right Side: Status Indicators & Account Info -->
-            <div class="d-flex align-items-center gap-3">
-                <!-- Status Indicators -->
-                <div class="d-flex align-items-center gap-3 me-3">
-                    <div class="status-indicator" title="ByBit API">
-                        <span class="status-dot" id="statusBybitApi"></span>
-                        <small class="status-label">API</small>
-                    </div>
-                    <div class="status-indicator" title="Database">
-                        <span class="status-dot" id="statusDatabase"></span>
-                        <small class="status-label">DB</small>
-                    </div>
-                    <div class="status-indicator" title="Trading System">
-                        <span class="status-dot" id="statusDyno"></span>
-                        <small class="status-label">Trade</small>
-                    </div>
-                    <div class="status-indicator" title="Network Connection">
-                        <span class="status-dot" id="statusDns"></span>
-                        <small class="status-label">Net</small>
-                    </div>
-                </div>
-                
-                <!-- Account Information -->
-                <div class="account-info text-end me-3">
-                    <div class="account-balance fw-bold text-light">
-                        Balance: <span id="headerBalance" class="text-success">$0.00</span>
-                    </div>
-                    <div class="account-pnl small">
-                        24h P&L: <span id="headerPnl" class="text-success">+$0.00 (0%)</span>
-                    </div>
-                    <div class="account-name small text-muted">
-                        <span id="headerAccountName">Loading...</span>
-                    </div>
-                </div>
-                
-                <!-- User Avatar -->
-                <div class="user-avatar">
-                    <div class="avatar bg-primary rounded-circle d-flex align-items-center justify-content-center" 
-                         style="width: 40px; height: 40px;">
-                        <i class="fas fa-user text-white"></i>
-                    </div>
-                </div>
+<!-- Modern AI Trading Bot Navigation Header -->
+<nav class="modern-nav">
+    <div class="nav-container">
+        <!-- Logo/Brand -->
+        <div class="nav-brand">
+            <div class="brand-icon">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div class="brand-text">
+                <div class="brand-title">A.R.I.E</div>
+                <div class="brand-subtitle">AI Trading Bot</div>
             </div>
         </div>
+        
+        <!-- Navigation Links -->
+        <div class="nav-links">
+            <a href="/" class="nav-link" id="nav-dashboard">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="/coin_status" class="nav-link" id="nav-coin-status">
+                <i class="fas fa-coins"></i>
+                <span>Coin Analysis</span>
+            </a>
+            <a href="/signals" class="nav-link" id="nav-signals">
+                <i class="fas fa-chart-line"></i>
+                <span>Trading Signals</span>
+            </a>
+            <a href="/analytics" class="nav-link" id="nav-analytics">
+                <i class="fas fa-chart-bar"></i>
+                <span>Analytics</span>
+            </a>
+            <a href="/config" class="nav-link" id="nav-config">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
+            </a>
+        </div>
+        
+        <!-- Right Side Info -->
+        <div class="nav-info">
+            <!-- System Status -->
+            <div class="status-indicators">
+                <div class="status-item" title="ByBit API Connection">
+                    <div class="status-dot" id="statusBybitApi"></div>
+                    <span class="status-label">API</span>
+                </div>
+                <div class="status-item" title="Database Connection">
+                    <div class="status-dot" id="statusDatabase"></div>
+                    <span class="status-label">DB</span>
+                </div>
+                <div class="status-item" title="Trading System">
+                    <div class="status-dot" id="statusDyno"></div>
+                    <span class="status-label">AI</span>
+                </div>
+            </div>
+            
+            <!-- Account Balance -->
+            <div class="account-info">
+                <div class="balance-display">
+                    <div class="balance-label">Total Balance</div>
+                    <div class="balance-amount" id="headerBalance">$0.00</div>
+                </div>
+                <div class="pnl-display">
+                    <div class="pnl-label">24h P&L</div>
+                    <div class="pnl-amount" id="headerPnl">+$0.00 (0.0%)</div>
+                </div>
+            </div>
+            
+            <!-- Account Name -->
+            <div class="account-name">
+                <i class="fas fa-user-circle"></i>
+                <span id="headerAccountName">Loading...</span>
+            </div>
+        </div>
+        
+        <!-- Mobile Toggle -->
+        <div class="mobile-toggle" onclick="toggleMobileNav()">
+            <i class="fas fa-bars"></i>
+        </div>
+    </div>
+    
+    <!-- Mobile Navigation -->
+    <div class="mobile-nav" id="mobileNav">
+        <a href="/" class="mobile-nav-link">
+            <i class="fas fa-tachometer-alt"></i>Dashboard
+        </a>
+        <a href="/coin_status" class="mobile-nav-link">
+            <i class="fas fa-coins"></i>Coin Analysis
+        </a>
+        <a href="/signals" class="mobile-nav-link">
+            <i class="fas fa-chart-line"></i>Trading Signals
+        </a>
+        <a href="/analytics" class="mobile-nav-link">
+            <i class="fas fa-chart-bar"></i>Analytics
+        </a>
+        <a href="/config" class="mobile-nav-link">
+            <i class="fas fa-cog"></i>Settings
+        </a>
     </div>
 </nav>
 
-<!-- Header Styles -->
 <style>
-    .navbar-brand {
+    .modern-nav {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f1a 100%);
+        border-bottom: 2px solid #00d9ff;
+        box-shadow: 0 4px 20px rgba(0, 217, 255, 0.2);
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+    }
+    
+    .nav-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 20px;
+        height: 70px;
+    }
+    
+    .nav-brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #fff;
+        text-decoration: none;
+    }
+    
+    .brand-icon {
+        width: 45px;
+        height: 45px;
+        background: linear-gradient(135deg, #00d9ff, #ffd700);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #0a0a0f;
+        font-size: 20px;
+        box-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+    }
+    
+    .brand-title {
+        font-size: 24px;
         font-weight: 700;
-        font-size: 1.3rem;
+        letter-spacing: 2px;
+        color: #ffd700;
+        text-shadow: 0 0 10px #ffd700;
+    }
+    
+    .brand-subtitle {
+        font-size: 12px;
+        color: #00d9ff;
+        font-weight: 500;
+        margin-top: -2px;
+    }
+    
+    .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
     
     .nav-link {
-        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 8px;
         transition: all 0.3s ease;
+        font-weight: 500;
+        font-size: 14px;
+        position: relative;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid transparent;
     }
     
     .nav-link:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-        border-radius: 4px;
+        color: #00d9ff;
+        background: rgba(0, 217, 255, 0.1);
+        border-color: rgba(0, 217, 255, 0.3);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 217, 255, 0.2);
     }
     
     .nav-link.active {
-        background-color: rgba(255, 255, 255, 0.2);
-        border-radius: 4px;
-        color: #fff !important;
+        color: #ffd700;
+        background: rgba(255, 215, 0, 0.1);
+        border-color: rgba(255, 215, 0, 0.3);
+        box-shadow: 0 4px 12px rgba(255, 215, 0, 0.2);
     }
     
-    .status-indicator {
+    .nav-link i {
+        font-size: 16px;
+        width: 20px;
+        text-align: center;
+    }
+    
+    .nav-info {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+    
+    .status-indicators {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .status-item {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 2px;
-        text-align: center;
+        gap: 4px;
     }
     
     .status-dot {
         width: 10px;
         height: 10px;
         border-radius: 50%;
-        display: inline-block;
         transition: all 0.3s ease;
-        box-shadow: 0 0 3px rgba(0,0,0,0.3);
     }
     
     .status-label {
+        font-size: 10px;
         color: rgba(255, 255, 255, 0.7);
-        font-size: 0.7rem;
-        font-weight: 500;
+        font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
     
-    .status-online {
-        background-color: #28a745;
-        box-shadow: 0 0 8px rgba(40, 167, 69, 0.6);
+    .status-online, .status-active {
+        background: #00ff88;
+        box-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
     }
     
-    .status-offline {
-        background-color: #dc3545;
-        box-shadow: 0 0 8px rgba(220, 53, 69, 0.6);
+    .status-offline, .status-inactive {
+        background: #ff0080;
+        box-shadow: 0 0 8px rgba(255, 0, 128, 0.6);
     }
     
     .status-unknown {
-        background-color: #6c757d;
+        background: #6c757d;
         box-shadow: 0 0 8px rgba(108, 117, 125, 0.6);
     }
     
-    .status-active {
-        background-color: #28a745;
-        box-shadow: 0 0 8px rgba(40, 167, 69, 0.6);
-    }
-    
-    .status-inactive {
-        background-color: #dc3545;
-        box-shadow: 0 0 8px rgba(220, 53, 69, 0.6);
-    }
-    
     .account-info {
-        min-width: 180px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        text-align: right;
     }
     
-    .account-balance {
-        font-size: 0.95rem;
-        white-space: nowrap;
+    .balance-display, .pnl-display {
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
     
-    .account-pnl {
-        font-size: 0.8rem;
-        opacity: 0.9;
-        white-space: nowrap;
+    .balance-label, .pnl-label {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.6);
+        font-weight: 500;
+    }
+    
+    .balance-amount {
+        font-size: 16px;
+        font-weight: 700;
+        color: #00d9ff;
+        text-shadow: 0 0 5px rgba(0, 217, 255, 0.5);
+    }
+    
+    .pnl-amount {
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .pnl-amount.profit {
+        color: #00ff88;
+        text-shadow: 0 0 5px rgba(0, 255, 136, 0.5);
+    }
+    
+    .pnl-amount.loss {
+        color: #ff0080;
+        text-shadow: 0 0 5px rgba(255, 0, 128, 0.5);
     }
     
     .account-name {
-        font-size: 0.75rem;
-        opacity: 0.7;
-        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 13px;
+        font-weight: 500;
     }
     
-    .user-avatar {
-        flex-shrink: 0;
+    .account-name i {
+        color: #ffd700;
+        font-size: 18px;
     }
     
-    /* Mobile responsiveness */
-    @media (max-width: 768px) {
+    .mobile-toggle {
+        display: none;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        padding: 8px;
+        color: #fff;
+        cursor: pointer;
+        font-size: 18px;
+    }
+    
+    .mobile-nav {
+        display: none;
+        background: rgba(26, 26, 46, 0.95);
+        border-top: 1px solid rgba(0, 217, 255, 0.3);
+        padding: 20px;
+    }
+    
+    .mobile-nav-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .mobile-nav-link:hover {
+        background: rgba(0, 217, 255, 0.1);
+        color: #00d9ff;
+    }
+    
+    /* Mobile Responsive */
+    @media (max-width: 1024px) {
+        .nav-links {
+            gap: 4px;
+        }
+        
+        .nav-link span {
+            display: none;
+        }
+        
+        .nav-link {
+            padding: 10px;
+            min-width: 40px;
+            justify-content: center;
+        }
+        
         .account-info {
-            min-width: auto;
-            text-align: left !important;
-            margin-top: 10px;
+            display: none;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .nav-links, .status-indicators, .account-info, .account-name {
+            display: none;
         }
         
-        .d-flex.align-items-center.gap-3 {
-            flex-direction: column;
-            align-items: flex-start !important;
-            gap: 10px !important;
+        .mobile-toggle {
+            display: block;
         }
         
-        .status-indicator {
-            flex-direction: row;
-            gap: 5px;
+        .nav-container {
+            padding: 0 16px;
         }
-        
-        .status-label {
-            font-size: 0.8rem;
-        }
+    }
+    
+    .mobile-nav.active {
+        display: block;
     }
 </style>
 
-<!-- Header JavaScript -->
 <script>
-    // Set active navigation item based on current page
+    // Mobile navigation toggle
+    function toggleMobileNav() {
+        const mobileNav = document.getElementById('mobileNav');
+        mobileNav.classList.toggle('active');
+    }
+    
+    // Set active navigation
     document.addEventListener('DOMContentLoaded', function() {
         const currentPath = window.location.pathname;
         const navLinks = document.querySelectorAll('.nav-link');
@@ -238,37 +411,84 @@
                 document.getElementById('nav-analytics')?.classList.add('active');
                 break;
         }
+        
+        // Initialize data loading
+        updateHeaderBalance();
+        updateHeaderStatus();
+        
+        // Set up periodic updates
+        setInterval(updateHeaderBalance, 10000); // Every 10 seconds
+        setInterval(updateHeaderStatus, 15000);  // Every 15 seconds
     });
     
-    // Header balance and status update functions
-    function updateHeaderBalance(balance, pnl, pnlPercent, accountName) {
-        const balanceEl = document.getElementById('headerBalance');
-        const pnlEl = document.getElementById('headerPnl');
-        const accountEl = document.getElementById('headerAccountName');
-        
-        if (balanceEl) balanceEl.textContent = `$${balance}`;
-        if (accountEl) accountEl.textContent = accountName || 'ByBit Account';
-        
-        if (pnlEl) {
-            const pnlClass = pnl >= 0 ? 'text-success' : 'text-danger';
-            const pnlSign = pnl >= 0 ? '+' : '';
-            pnlEl.textContent = `${pnlSign}$${pnl} (${pnlPercent}%)`;
-            pnlEl.className = `small ${pnlClass}`;
-        }
+    // Update header balance
+    function updateHeaderBalance() {
+        fetch('/api/balance_header')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const balanceEl = document.getElementById('headerBalance');
+                    const pnlEl = document.getElementById('headerPnl');
+                    
+                    if (balanceEl) {
+                        balanceEl.textContent = `$${data.balance.toFixed(2)}`;
+                    }
+                    
+                    if (pnlEl) {
+                        const pnl = data.pnl_24h || 0;
+                        const pnlPercent = data.pnl_24h_percent || 0;
+                        const pnlSign = pnl >= 0 ? '+' : '';
+                        const pnlClass = pnl >= 0 ? 'profit' : 'loss';
+                        
+                        pnlEl.textContent = `${pnlSign}$${Math.abs(pnl).toFixed(2)} (${pnlSign}${Math.abs(pnlPercent).toFixed(1)}%)`;
+                        pnlEl.className = `pnl-amount ${pnlClass}`;
+                    }
+                }
+            })
+            .catch(error => console.error('Error updating balance:', error));
+            
+        // Update account name
+        fetch('/api/account_name')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const accountEl = document.getElementById('headerAccountName');
+                    if (accountEl) {
+                        accountEl.textContent = data.account_name || 'ByBit Account';
+                    }
+                }
+            })
+            .catch(error => console.error('Error updating account name:', error));
     }
     
-    function updateHeaderStatus(component, status) {
-        const statusDot = document.getElementById(`status${component}`);
-        if (statusDot) {
-            statusDot.className = `status-dot status-${status}`;
-        }
+    // Update header status indicators
+    function updateHeaderStatus() {
+        fetch('/api/system_status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.bybit_api) {
+                    updateStatusDot('statusBybitApi', data.bybit_api.status);
+                }
+                if (data.database) {
+                    updateStatusDot('statusDatabase', data.database.status);
+                }
+                if (data.dyno) {
+                    updateStatusDot('statusDyno', data.dyno.status);
+                }
+            })
+            .catch(error => {
+                console.error('Error updating status:', error);
+                // Set all to unknown on error
+                ['statusBybitApi', 'statusDatabase', 'statusDyno'].forEach(id => {
+                    updateStatusDot(id, 'unknown');
+                });
+            });
     }
     
-    // Initialize header updates if functions exist
-    if (typeof updateSystemStatus === 'function') {
-        updateSystemStatus();
-    }
-    if (typeof loadAccountInfo === 'function') {
-        loadAccountInfo();
+    function updateStatusDot(elementId, status) {
+        const dot = document.getElementById(elementId);
+        if (dot) {
+            dot.className = `status-dot status-${status}`;
+        }
     }
 </script>

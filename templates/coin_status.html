@@ -13,7 +13,7 @@
                 extend: {
                     colors: {
                         'neon-cyan': '#00D9FF',
-                        'neon-purple': '#A100FF',
+                        'neon-yellow': '#FFD700',
                         'neon-pink': '#FF00C1',
                         'neon-green': '#00FF88',
                         'neon-yellow': '#FFD700',
@@ -93,8 +93,8 @@
                     90deg,
                     transparent,
                     transparent 2px,
-                    rgba(161, 0, 255, 0.03) 2px,
-                    rgba(161, 0, 255, 0.03) 4px
+                    rgba(255, 215, 0, 0.03) 2px,
+                    rgba(255, 215, 0, 0.03) 4px
                 );
             pointer-events: none;
             z-index: 1;
@@ -227,7 +227,7 @@
         
         .cyber-button {
             position: relative;
-            background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(161, 0, 255, 0.1));
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(255, 215, 0, 0.1));
             border: 1px solid rgba(0, 217, 255, 0.5);
             color: #00D9FF;
             font-family: 'Orbitron', sans-serif;
@@ -239,14 +239,14 @@
         }
         
         .cyber-button:hover {
-            background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(161, 0, 255, 0.2));
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(255, 215, 0, 0.2));
             border-color: #00D9FF;
             box-shadow: 0 0 20px rgba(0, 217, 255, 0.5), inset 0 0 20px rgba(0, 217, 255, 0.1);
             transform: translateY(-2px);
         }
         
         .cyber-button.active {
-            background: linear-gradient(135deg, rgba(0, 217, 255, 0.3), rgba(161, 0, 255, 0.3));
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.3), rgba(255, 215, 0, 0.3));
             border-color: #00D9FF;
             box-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
         }
@@ -262,16 +262,16 @@
         }
         
         ::-webkit-scrollbar-thumb {
-            background: linear-gradient(to bottom, #00D9FF, #A100FF);
+            background: linear-gradient(to bottom, #00D9FF, #FFD700);
             border-radius: 4px;
         }
         
         ::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(to bottom, #00D9FF, #FF00C1);
+            background: linear-gradient(to bottom, #00D9FF, #FFD700);
         }
     </style>
 </head>
-<body class="bg-dark-bg text-white font-mono min-h-screen relative">
+<body class="bg-dark-bg text-white font-sans min-h-screen relative">
     <!-- Scan Line Effect -->
     <div class="scan-line"></div>
     
@@ -300,11 +300,11 @@
             </div>
             <div class="glass-card rounded-xl p-6">
                 <h3 class="text-sm font-medium text-gray-400 mb-2">AI THRESHOLD</h3>
-                <div class="text-3xl font-cyber font-bold text-neon-purple" id="aiThreshold">75%</div>
+                <div class="text-3xl font-bold text-neon-yellow" id="aiThreshold">75%</div>
             </div>
             <div class="glass-card rounded-xl p-6">
                 <h3 class="text-sm font-medium text-gray-400 mb-2">LAST UPDATE</h3>
-                <div class="text-sm font-mono text-neon-yellow" id="lastUpdate">--:--:--</div>
+                <div class="text-sm font-sans text-neon-yellow" id="lastUpdate">--:--:--</div>
             </div>
         </div>
         
@@ -464,7 +464,7 @@
                                 </div>
                                 <div>
                                     <span class="text-gray-400">Time:</span>
-                                    <span class="font-mono text-xs text-gray-500">${coin.time_since}</span>
+                                    <span class="font-sans text-xs text-gray-500">${coin.time_since}</span>
                                 </div>
                             </div>
                             

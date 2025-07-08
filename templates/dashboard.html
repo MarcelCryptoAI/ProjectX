@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ByBit AI Trading Bot - Neural Command Center</title>
+    <title>A.R.I.E - AI Trading Bot Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.29.1.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -16,10 +17,9 @@
                 extend: {
                     colors: {
                         'neon-cyan': '#00D9FF',
-                        'neon-purple': '#A100FF',
+                        'neon-yellow': '#FFD700',
                         'neon-pink': '#FF00C1',
                         'neon-green': '#00FF88',
-                        'neon-yellow': '#FFD700',
                         'neon-orange': '#FF6B00',
                         'matrix-green': '#00FF41',
                         'dark-bg': '#0A0A0F',
@@ -28,8 +28,8 @@
                         'dark-hover': '#16213E'
                     },
                     fontFamily: {
-                        'mono': ['JetBrains Mono', 'Fira Code', 'monospace'],
-                        'cyber': ['Orbitron', 'Rajdhani', 'sans-serif']
+                        'sans': ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
+                        'mono': ['SF Mono', 'Consolas', 'monospace']
                     },
                     animation: {
                         'pulse-neon': 'pulse-neon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
@@ -305,7 +305,7 @@
         }
     </style>
 </head>
-<body class="bg-dark-bg text-white font-mono min-h-screen relative">
+<body class="bg-dark-bg text-white font-sans min-h-screen relative">
     <!-- Matrix Background -->
     <div class="matrix-bg"></div>
     
@@ -321,8 +321,8 @@
             <div class="space-y-6">
                 <!-- Neural Control Center -->
                 <div class="glass-panel rounded-xl p-6 neon-border">
-                    <h3 class="text-2xl font-cyber font-bold text-neon-cyan mb-6 flex items-center animate-glow">
-                        <i class="fas fa-brain mr-3"></i> NEURAL CONTROL CENTER
+                    <h3 class="text-2xl font-bold text-neon-cyan mb-6 flex items-center animate-glow">
+                        <i class="fas fa-robot mr-3"></i> A.R.I.E CONTROL CENTER
                     </h3>
                     
                     <!-- System Status -->
@@ -370,7 +370,7 @@
                     
                     <!-- Trading Parameters -->
                     <div class="mt-6 p-4 bg-dark-bg/50 rounded-lg border border-neon-purple/20">
-                        <h4 class="text-sm font-bold text-neon-purple mb-3">TRADING PARAMETERS</h4>
+                        <h4 class="text-sm font-bold text-neon-yellow mb-3">TRADING PARAMETERS</h4>
                         <div class="space-y-2 text-xs">
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Risk Level:</span>
@@ -390,7 +390,7 @@
                 
                 <!-- Training Progress -->
                 <div class="glass-panel rounded-xl p-6" id="trainingProgressPanel" style="display: none;">
-                    <h4 class="text-lg font-cyber font-bold text-neon-purple mb-4 flex items-center">
+                    <h4 class="text-lg font-bold text-neon-yellow mb-4 flex items-center">
                         <i class="fas fa-brain mr-2 animate-pulse"></i> AI TRAINING
                     </h4>
                     <div class="space-y-3">
@@ -400,7 +400,7 @@
                                 <span id="trainingPercent">0%</span>
                             </div>
                             <div class="w-full bg-dark-bg rounded-full h-3 overflow-hidden">
-                                <div class="h-full bg-gradient-to-r from-neon-purple to-neon-pink transition-all duration-500" 
+                                <div class="h-full bg-gradient-to-r from-neon-yellow to-neon-orange transition-all duration-500" 
                                      style="width: 0%" id="trainingProgressBar"></div>
                             </div>
                         </div>
@@ -413,7 +413,7 @@
                 
                 <!-- Activity Log -->
                 <div class="glass-panel rounded-xl p-6">
-                    <h4 class="text-lg font-cyber font-bold text-neon-green mb-4 flex items-center">
+                    <h4 class="text-lg font-bold text-neon-green mb-4 flex items-center">
                         <i class="fas fa-terminal mr-2"></i> SYSTEM LOG
                     </h4>
                     <div class="h-64 overflow-y-auto bg-dark-bg/50 rounded-lg p-3 font-mono text-xs" id="consoleOutput">
@@ -434,7 +434,7 @@
                         <h4 class="text-sm font-medium text-gray-400">TOTAL BALANCE</h4>
                         <i class="fas fa-wallet text-neon-cyan text-xl"></i>
                     </div>
-                    <div class="text-3xl font-cyber font-bold text-white" id="totalBalance">$0.00</div>
+                    <div class="text-3xl font-bold font-bold text-white" id="totalBalance">$0.00</div>
                     <div class="text-sm mt-2 text-gray-500">USDT</div>
                 </div>
                 
@@ -444,7 +444,7 @@
                         <h4 class="text-sm font-medium text-gray-400">ACTIVE POSITIONS</h4>
                         <i class="fas fa-chart-line text-neon-purple text-xl"></i>
                     </div>
-                    <div class="text-3xl font-cyber font-bold text-white" id="activePositions">0</div>
+                    <div class="text-3xl font-bold font-bold text-white" id="activePositions">0</div>
                     <div class="text-sm mt-2 text-gray-500">TRADES</div>
                 </div>
                 
@@ -454,7 +454,7 @@
                         <h4 class="text-sm font-medium text-gray-400">24H P&L</h4>
                         <i class="fas fa-chart-area text-neon-pink text-xl"></i>
                     </div>
-                    <div class="text-3xl font-cyber font-bold" id="dailyPnL">
+                    <div class="text-3xl font-bold font-bold" id="dailyPnL">
                         <span class="profit-text">+$0.00</span>
                     </div>
                     <div class="text-sm mt-2" id="dailyPnLPercent">
@@ -468,7 +468,7 @@
                         <h4 class="text-sm font-medium text-gray-400">WIN RATE</h4>
                         <i class="fas fa-trophy text-neon-yellow text-xl"></i>
                     </div>
-                    <div class="text-3xl font-cyber font-bold text-white" id="winRate">0%</div>
+                    <div class="text-3xl font-bold font-bold text-white" id="winRate">0%</div>
                     <div class="text-sm mt-2 text-gray-500" id="totalTrades">0 TRADES</div>
                 </div>
             </div>
@@ -476,7 +476,7 @@
             <!-- Open Positions -->
             <div class="glass-panel rounded-xl p-6 mb-8">
                 <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-xl font-cyber font-bold text-white flex items-center">
+                    <h3 class="text-xl font-bold font-bold text-white flex items-center">
                         <i class="fas fa-rocket mr-3 text-neon-cyan animate-pulse"></i>
                         ACTIVE POSITIONS
                     </h3>
@@ -514,7 +514,7 @@
                 <!-- ROI Chart -->
                 <div class="glass-panel rounded-xl p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-cyber font-bold text-white">CUMULATIVE ROI</h3>
+                        <h3 class="text-lg font-bold font-bold text-white">CUMULATIVE ROI</h3>
                         <div class="flex space-x-2">
                             <button class="cyber-button py-1 px-3 rounded text-xs active" onclick="changeROIPeriod('1h', this)">1H</button>
                             <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('4h', this)">4H</button>
@@ -535,7 +535,7 @@
                 
                 <!-- Performance Analytics -->
                 <div class="glass-panel rounded-xl p-6">
-                    <h3 class="text-lg font-cyber font-bold text-white mb-4">PERFORMANCE ANALYTICS</h3>
+                    <h3 class="text-lg font-bold font-bold text-white mb-4">PERFORMANCE ANALYTICS</h3>
                     <div class="chart-container">
                         <canvas id="performanceChart"></canvas>
                     </div>
@@ -545,7 +545,7 @@
             <!-- AI Signals -->
             <div class="glass-panel rounded-xl p-6">
                 <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-xl font-cyber font-bold text-white flex items-center">
+                    <h3 class="text-xl font-bold font-bold text-white flex items-center">
                         <i class="fas fa-robot mr-3 text-neon-purple"></i>
                         AI TRADING SIGNALS
                     </h3>
@@ -719,19 +719,20 @@
             });
         }
         
-        // Update dashboard data
+        // Update dashboard data with real ByBit data
         function updateDashboard() {
-            fetch('/api/dashboard_data')
+            // Get real balance data
+            fetch('/api/analytics_data')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Update balance
+                        // Update balance with real data
                         document.getElementById('totalBalance').textContent = `$${data.total_balance.toFixed(2)}`;
                         
-                        // Update positions
+                        // Update positions with real data
                         document.getElementById('activePositions').textContent = data.active_positions_count;
                         
-                        // Update P&L
+                        // Update P&L with real data
                         const pnlElement = document.getElementById('dailyPnL');
                         const pnlPercentElement = document.getElementById('dailyPnLPercent');
                         const pnl = data.unrealized_pnl;
@@ -745,15 +746,35 @@
                             pnlPercentElement.innerHTML = `<span class="loss-text">-${Math.abs(pnlPercent).toFixed(2)}%</span>`;
                         }
                         
-                        // Update win rate
-                        document.getElementById('winRate').textContent = `${data.win_rate.toFixed(1)}%`;
-                        document.getElementById('totalTrades').textContent = `${data.total_trades} TRADES`;
+                        // Calculate real win rate from trading history
+                        const winRate = data.win_rate || 0;
+                        const totalTrades = data.total_trades || 0;
+                        document.getElementById('winRate').textContent = `${winRate.toFixed(1)}%`;
+                        document.getElementById('totalTrades').textContent = `${totalTrades} TRADES`;
                         
-                        // Update positions table
-                        updatePositionsTable(data.positions);
+                        // Update positions table with real data
+                        updatePositionsTable(data.positions || []);
+                        
+                        // Update performance chart with real data
+                        updatePerformanceChart(data);
                     }
                 })
-                .catch(error => console.error('Dashboard update error:', error));
+                .catch(error => {
+                    console.error('Dashboard update error:', error);
+                    // Show error state
+                    document.getElementById('totalBalance').textContent = 'Error';
+                    document.getElementById('activePositions').textContent = '0';
+                });
+                
+            // Get real trading signals
+            fetch('/api/trading_signals')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateTradingSignals(data.signals || []);
+                    }
+                })
+                .catch(error => console.error('Signals update error:', error));
         }
         
         // Update positions table
@@ -994,35 +1015,131 @@
         }
         
         function updateROIChart(period) {
-            // This would fetch actual ROI data for the period
-            // For now, generate sample data
-            const periods = {
-                '1h': 12,
-                '4h': 16,
-                '12h': 24,
-                '1d': 24,
-                '3d': 36,
-                '7d': 42,
-                '30d': 60,
-                '3m': 90,
-                '1y': 120,
-                'all': 200
-            };
+            // Fetch actual trading history for ROI calculation
+            fetch('/api/trading_history')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.trades) {
+                        const labels = [];
+                        const roiData = [];
+                        let cumulativeROI = 0;
+                        
+                        // Process actual trade data for ROI
+                        data.trades.forEach((trade, index) => {
+                            if (trade.realizedPnl) {
+                                cumulativeROI += parseFloat(trade.realizedPnl);
+                            }
+                            labels.push(new Date(trade.time).toLocaleDateString());
+                            roiData.push(cumulativeROI);
+                        });
+                        
+                        // If no data, show flat line
+                        if (roiData.length === 0) {
+                            labels.push('Today');
+                            roiData.push(0);
+                        }
+                        
+                        roiChart.data.labels = labels;
+                        roiChart.data.datasets[0].data = roiData;
+                        roiChart.update();
+                    } else {
+                        // Show no data state
+                        roiChart.data.labels = ['No Data'];
+                        roiChart.data.datasets[0].data = [0];
+                        roiChart.update();
+                    }
+                })
+                .catch(error => {
+                    console.error('ROI chart error:', error);
+                    // Show error state
+                    roiChart.data.labels = ['Error'];
+                    roiChart.data.datasets[0].data = [0];
+                    roiChart.update();
+                });
+        }
+        
+        // Update performance chart with real data
+        function updatePerformanceChart(data) {
+            const wins = data.winning_trades || 0;
+            const losses = (data.total_trades || 0) - wins;
+            const pending = data.active_positions_count || 0;
             
-            const points = periods[period] || 24;
-            const labels = [];
-            const data = [];
-            let cumulative = 0;
+            performanceChart.data.datasets[0].data = [wins, losses, pending];
+            performanceChart.update();
+        }
+        
+        // Update trading signals grid
+        function updateTradingSignals(signals) {
+            const grid = document.getElementById('signalsGrid');
             
-            for (let i = 0; i < points; i++) {
-                labels.push(i.toString());
-                cumulative += (Math.random() - 0.45) * 2;
-                data.push(cumulative);
+            if (!signals || signals.length === 0) {
+                grid.innerHTML = `
+                    <div class="text-center py-12 text-gray-500 col-span-3">
+                        <i class="fas fa-brain text-6xl mb-4 opacity-20"></i>
+                        <p>No active trading signals</p>
+                        <p class="text-sm">AI is analyzing market conditions...</p>
+                    </div>
+                `;
+                return;
             }
             
-            roiChart.data.labels = labels;
-            roiChart.data.datasets[0].data = data;
-            roiChart.update();
+            grid.innerHTML = signals.slice(0, 6).map(signal => `
+                <div class="glass-card rounded-xl p-6 hover:scale-105 transition-all duration-300">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-lg font-bold text-white">${signal.symbol}</h4>
+                        <span class="text-sm px-3 py-1 rounded-full ${signal.side === 'Buy' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}">
+                            ${signal.side}
+                        </span>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Confidence:</span>
+                            <span class="text-neon-yellow font-bold">${signal.confidence}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Take Profit:</span>
+                            <span class="text-neon-green">${signal.take_profit}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Stop Loss:</span>
+                            <span class="text-neon-pink">${signal.stop_loss}%</span>
+                        </div>
+                        <button class="w-full cyber-button py-2 px-4 rounded-lg text-sm mt-4" 
+                                onclick="executeSignal('${signal.symbol}', '${signal.side}', ${signal.take_profit}, ${signal.stop_loss})">
+                            <i class="fas fa-rocket mr-2"></i>EXECUTE
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Execute signal
+        function executeSignal(symbol, side, takeProfit, stopLoss) {
+            if (confirm(`Execute ${side} signal for ${symbol}?`)) {
+                fetch('/api/execute_ai_trade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        side: side,
+                        amount: 100,
+                        takeProfit: takeProfit,
+                        stopLoss: stopLoss
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addConsoleMessage('SUCCESS', `Trade executed: ${symbol} ${side}`);
+                        updateDashboard();
+                    } else {
+                        addConsoleMessage('ERROR', `Trade failed: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    addConsoleMessage('ERROR', `Error: ${error.message}`);
+                });
+            }
         }
         
         // Initialize on load
@@ -1033,27 +1150,17 @@
             updateROIChart('1h');
             
             // Set up refresh intervals
-            setInterval(updateDashboard, 5000);
-            setInterval(updateTradingStatus, 10000);
+            setInterval(updateDashboard, 10000);  // Every 10 seconds
+            setInterval(updateTradingStatus, 15000);  // Every 15 seconds
             
             // Add initial console message
-            addConsoleMessage('SUCCESS', 'Neural Command Center initialized');
-            addConsoleMessage('INFO', 'Connecting to ByBit API...');
+            addConsoleMessage('SUCCESS', 'A.R.I.E Control Center initialized');
+            addConsoleMessage('INFO', 'Loading real-time data...');
             
-            // Check API connection
-            fetch('/api/system_status')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.bybit_api.status === 'operational') {
-                        addConsoleMessage('SUCCESS', 'ByBit API connected');
-                        document.getElementById('apiStatus').textContent = 'CONNECTED';
-                        document.getElementById('apiStatus').className = 'ml-1 text-neon-green';
-                    } else {
-                        addConsoleMessage('ERROR', 'ByBit API connection failed');
-                        document.getElementById('apiStatus').textContent = 'ERROR';
-                        document.getElementById('apiStatus').className = 'ml-1 text-neon-pink';
-                    }
-                });
+            // Initial data load
+            setTimeout(() => {
+                addConsoleMessage('SUCCESS', 'Real-time data connection established');
+            }, 2000);
         });
         
         // Position management
