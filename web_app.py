@@ -604,26 +604,33 @@ def get_bybit_balance():
         if response and response.get('retCode') == 0:
             balance_info = response['result']['list'][0]
 
-            # Extract belangrijke waarden
-            total_wallet_balance = float(balance_info.get('totalWalletBalance', 0))
-            available_balance = float(balance_info.get('totalAvailableBalance', 0))
-            used_margin = float(balance_info.get('totalUsedMargin', 0))
+            # Extract belangrijke waarden (veilige float conversie)
+            total_wallet_balance = float(balance_info.get('totalWalletBalance', 0) or 0)
+            available_balance = float(balance_info.get('totalAvailableBalance', 0) or 0)
+            used_margin = float(balance_info.get('totalInitialMargin', 0) or 0)  # Use totalInitialMargin
+            total_equity = float(balance_info.get('totalEquity', 0) or 0)
 
-            # Coin-specifieke balance
+            # Coin-specifieke balance (veilige conversie voor lege strings)
             coin_balances = {}
             for coin in balance_info.get('coin', []):
                 coin_name = coin['coin']
+                # Veilige conversie - lege strings worden 0
+                def safe_float(value):
+                    return float(value) if value and value != '' else 0.0
+                
                 coin_balances[coin_name] = {
-                    'wallet_balance': float(coin.get('walletBalance', 0)),
-                    'available': float(coin.get('availableToWithdraw', 0)),
-                    'locked': float(coin.get('locked', 0)),
-                    'equity': float(coin.get('equity', 0))
+                    'wallet_balance': safe_float(coin.get('walletBalance', 0)),
+                    'available': safe_float(coin.get('availableToWithdraw', 0)),
+                    'locked': safe_float(coin.get('locked', 0)),
+                    'equity': safe_float(coin.get('equity', 0)),
+                    'usd_value': safe_float(coin.get('usdValue', 0))
                 }
 
             return {
                 'success': True,
                 'total_wallet_balance': total_wallet_balance,
                 'available_balance': available_balance,
+                'total_equity': total_equity,
                 'used_margin': used_margin,
                 'coin_balances': coin_balances,
                 'account_type': 'UNIFIED'
