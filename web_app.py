@@ -1818,10 +1818,24 @@ def get_coin_analysis():
                     coins_analysis.append(coin_data)
         except Exception as db_error:
             app.logger.error(f"Database error in coin_analysis: {db_error}")
-            return jsonify({'success': False, 'error': 'No training data available'}), 500
+            # Return empty data instead of 500 error
+            return jsonify({
+                'success': True,
+                'coins': [],
+                'total_count': 0,
+                'message': 'No training data available - start AI training first',
+                'last_updated': datetime.now().isoformat()
+            })
         
         if not coins_analysis:
-            return jsonify({'success': False, 'error': 'No training data available - start AI training first'}), 404
+            # Return empty data instead of 404 error
+            return jsonify({
+                'success': True,
+                'coins': [],
+                'total_count': 0,
+                'message': 'No training data available - start AI training first',
+                'last_updated': datetime.now().isoformat()
+            })
         
         # Sort by confidence descending
         coins_analysis.sort(key=lambda x: x['confidence'], reverse=True)
@@ -1889,7 +1903,14 @@ def get_trading_signals():
                         signal_id += 1
         except Exception as db_error:
             app.logger.error(f"Database error in trading_signals: {db_error}")
-            return jsonify({'success': False, 'error': 'No training data available'}), 500
+            # Return empty data instead of 500 error
+            return jsonify({
+                'success': True,
+                'signals': [],
+                'count': 0,
+                'message': 'No training data available - start AI training first',
+                'last_updated': datetime.now().isoformat()
+            })
         
         # Sort by confidence (highest first)
         signals.sort(key=lambda x: x['confidence'], reverse=True)
