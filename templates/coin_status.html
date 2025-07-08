@@ -422,17 +422,19 @@
                 })
                 .catch(error => {
                     console.error('Error loading coin data:', error);
-                    document.getElementById('coinsGrid').innerHTML = `
-                        <div class="col-span-full text-center py-16">
-                            <i class="fas fa-exclamation-triangle text-6xl text-neon-pink mb-4"></i>
-                            <p class="text-gray-400">Failed to load coin analysis data</p>
-                        </div>
+                    document.getElementById('coinsTableBody').innerHTML = `
+                        <tr>
+                            <td colspan="9" class="text-center py-16">
+                                <i class="fas fa-exclamation-triangle text-4xl text-neon-pink mb-4"></i>
+                                <div class="text-gray-400">Failed to load coin analysis data</div>
+                            </td>
+                        </tr>
                     `;
                 });
         }
         
         function displayCoins() {
-            const grid = document.getElementById('coinsGrid');
+            const tableBody = document.getElementById('coinsTableBody');
             let filteredCoins = [...allCoins];
             
             // Apply filter
@@ -452,65 +454,79 @@
                 );
             }
             
-            grid.innerHTML = filteredCoins.map(coin => `
-                <div class="glass-card rounded-xl p-6 hover:scale-105 transition-all duration-300">
-                    <div class="relative">
-                        <div class="analysis-badge ${coin.analysis.toLowerCase() === 'bullish' ? 'analysis-bullish' : 
-                                                     coin.analysis.toLowerCase() === 'bearish' ? 'analysis-bearish' : 
-                                                     'analysis-neutral'}">
+            if (filteredCoins.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="text-center py-12">
+                            <i class="fas fa-search text-4xl text-gray-600 mb-4"></i>
+                            <div class="text-gray-400">No coins match your filter criteria</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tableBody.innerHTML = filteredCoins.map(coin => `
+                <tr class="border-b border-dark-border hover:bg-dark-panel/30 transition-colors">
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-3">
+                            <div class="font-bold text-white">${coin.symbol}</div>
+                            <div class="text-xs text-gray-400">${coin.accuracy}%</div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs rounded-full ${coin.analysis.toLowerCase() === 'bullish' ? 'bg-green-900/50 text-green-400' : 
+                                                                      coin.analysis.toLowerCase() === 'bearish' ? 'bg-red-900/50 text-red-400' : 
+                                                                      'bg-yellow-900/50 text-yellow-400'}">
                             ${coin.analysis}
-                        </div>
-                        
-                        <div class="mb-4">
-                            <h3 class="text-xl font-cyber font-bold text-white mb-1">${coin.symbol}</h3>
-                            <div class="flex items-center gap-2">
-                                <span class="status-badge ${coin.status_class}">
-                                    <i class="fas fa-circle text-xs"></i>
-                                    ${coin.status}
-                                </span>
-                                <span class="text-xs text-gray-400">Accuracy: ${coin.accuracy}%</span>
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                            <div class="text-neon-cyan font-bold">${coin.confidence}%</div>
+                            <div class="w-16 h-2 bg-dark-bg rounded-full overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-neon-yellow to-neon-cyan transition-all duration-300" 
+                                     style="width: ${coin.confidence}%"></div>
                             </div>
                         </div>
-                        
-                        <div class="space-y-3">
-                            <div>
-                                <div class="flex justify-between text-sm mb-1">
-                                    <span class="text-gray-400">Confidence</span>
-                                    <span class="text-neon-cyan font-bold">${coin.confidence}%</span>
-                                </div>
-                                <div class="confidence-bar">
-                                    <div class="confidence-fill" style="width: ${coin.confidence}%"></div>
-                                </div>
-                            </div>
-                            
-                            <div class="grid grid-cols-2 gap-3 text-sm">
-                                <div>
-                                    <span class="text-gray-400">Direction:</span>
-                                    <span class="font-bold ${coin.direction === 'Buy' ? 'text-neon-green' : 'text-neon-pink'}">
-                                        ${coin.direction}
-                                    </span>
-                                </div>
-                                <div>
-                                    <span class="text-gray-400">TP:</span>
-                                    <span class="font-bold text-neon-yellow">${coin.takeProfit}%</span>
-                                </div>
-                                <div>
-                                    <span class="text-gray-400">SL:</span>
-                                    <span class="font-bold text-neon-orange">${coin.stopLoss}%</span>
-                                </div>
-                                <div>
-                                    <span class="text-gray-400">Time:</span>
-                                    <span class="font-sans text-xs text-gray-500">${coin.time_since}</span>
-                                </div>
-                            </div>
-                            
-                            <button class="w-full cyber-button py-2 px-4 rounded-lg text-sm mt-4" 
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs rounded-full ${coin.status_class}">
+                            <i class="fas fa-circle text-xs mr-1"></i>
+                            ${coin.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-neon-green font-bold">${coin.accuracy}%</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs rounded-full ${coin.direction === 'Buy' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}">
+                            <i class="fas fa-arrow-${coin.direction === 'Buy' ? 'up' : 'down'} mr-1"></i>
+                            ${coin.direction}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-xs">
+                            <div class="text-neon-green">TP: ${coin.takeProfit}%</div>
+                            <div class="text-neon-pink">SL: ${coin.stopLoss}%</div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-xs text-gray-400">${coin.time_since}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex gap-2">
+                            <button class="cyber-button py-1 px-3 rounded text-xs" 
                                     onclick="executeTrade('${coin.symbol}', '${coin.direction}', ${coin.takeProfit}, ${coin.stopLoss})">
-                                <i class="fas fa-rocket mr-2"></i>EXECUTE TRADE
+                                <i class="fas fa-rocket mr-1"></i>TRADE
+                            </button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" 
+                                    onclick="showCoinDetails('${coin.symbol}')">
+                                <i class="fas fa-info-circle mr-1"></i>DETAILS
                             </button>
                         </div>
-                    </div>
-                </div>
+                    </td>
+                </tr>
             `).join('');
         }
         
@@ -534,14 +550,133 @@
         }
         
         function refreshData() {
-            const grid = document.getElementById('coinsGrid');
-            grid.innerHTML = `
-                <div class="col-span-full text-center py-16">
-                    <i class="fas fa-spinner fa-spin text-6xl text-neon-cyan mb-4"></i>
-                    <p class="text-gray-400">Refreshing AI analysis data...</p>
-                </div>
+            const tableBody = document.getElementById('coinsTableBody');
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="text-center py-16">
+                        <i class="fas fa-spinner fa-spin text-4xl text-neon-cyan mb-4"></i>
+                        <div class="text-gray-400">Refreshing AI analysis data...</div>
+                    </td>
+                </tr>
             `;
             loadCoinData();
+        }
+        
+        // Table sorting functionality
+        let sortColumn = 'confidence';
+        let sortDirection = 'desc';
+        
+        function sortTable(column) {
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'desc';
+            }
+            
+            allCoins.sort((a, b) => {
+                let aVal = a[column];
+                let bVal = b[column];
+                
+                // Convert to numbers for numeric columns
+                if (column === 'confidence' || column === 'accuracy') {
+                    aVal = parseFloat(aVal);
+                    bVal = parseFloat(bVal);
+                }
+                
+                if (sortDirection === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+            
+            displayCoins();
+        }
+        
+        // Show coin details modal
+        function showCoinDetails(symbol) {
+            const coin = allCoins.find(c => c.symbol === symbol);
+            if (!coin) return;
+            
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="glass-card rounded-xl p-6 max-w-md w-full mx-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-white">${coin.symbol} Analysis</h3>
+                        <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-white">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <div class="text-sm text-gray-400">Analysis</div>
+                                <div class="font-bold text-${coin.analysis.toLowerCase() === 'bullish' ? 'green' : coin.analysis.toLowerCase() === 'bearish' ? 'red' : 'yellow'}-400">
+                                    ${coin.analysis}
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-400">Confidence</div>
+                                <div class="font-bold text-neon-cyan">${coin.confidence}%</div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <div class="text-sm text-gray-400">Accuracy</div>
+                                <div class="font-bold text-neon-green">${coin.accuracy}%</div>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-400">Status</div>
+                                <div class="font-bold text-white">${coin.status}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="border-t border-gray-700 pt-4">
+                            <div class="text-sm text-gray-400 mb-2">Trade Parameters</div>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <div class="text-xs text-gray-500">Direction</div>
+                                    <div class="font-bold text-${coin.direction === 'Buy' ? 'green' : 'red'}-400">${coin.direction}</div>
+                                </div>
+                                <div>
+                                    <div class="text-xs text-gray-500">Take Profit</div>
+                                    <div class="font-bold text-neon-green">${coin.takeProfit}%</div>
+                                </div>
+                                <div>
+                                    <div class="text-xs text-gray-500">Stop Loss</div>
+                                    <div class="font-bold text-neon-pink">${coin.stopLoss}%</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="border-t border-gray-700 pt-4">
+                            <div class="text-sm text-gray-400 mb-2">AI Reasoning</div>
+                            <div class="text-sm text-gray-300 bg-dark-bg/50 p-3 rounded">
+                                Based on technical analysis with ${coin.accuracy}% accuracy. 
+                                Confidence score of ${coin.confidence}% indicates ${coin.confidence > 75 ? 'strong' : coin.confidence > 50 ? 'moderate' : 'weak'} signal strength.
+                                ${coin.analysis === 'Bullish' ? 'Upward momentum detected.' : coin.analysis === 'Bearish' ? 'Downward momentum detected.' : 'Mixed signals detected.'}
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-2 pt-4">
+                            <button class="flex-1 cyber-button py-2 px-4 rounded-lg text-sm" 
+                                    onclick="executeTrade('${coin.symbol}', '${coin.direction}', ${coin.takeProfit}, ${coin.stopLoss}); this.closest('.fixed').remove();">
+                                <i class="fas fa-rocket mr-2"></i>EXECUTE TRADE
+                            </button>
+                            <button class="flex-1 bg-gray-700 text-white py-2 px-4 rounded-lg text-sm hover:bg-gray-600 transition-colors" 
+                                    onclick="this.closest('.fixed').remove()">
+                                CLOSE
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
         }
         
         function executeTrade(symbol, side, takeProfit, stopLoss) {
