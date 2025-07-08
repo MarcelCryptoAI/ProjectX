@@ -1865,9 +1865,11 @@ def get_coin_analysis():
         try:
             # Get recent training session data
             latest_session = ai_worker.database.get_latest_training_session()
+            app.logger.info(f"Latest session: {latest_session}")
             
             if latest_session:
                 training_results = ai_worker.database.get_training_results(latest_session['session_id'])
+                app.logger.info(f"Found {len(training_results)} training results")
                 
                 for result in training_results:
                     # Calculate tijd sinds aanbeveling
@@ -1925,12 +1927,14 @@ def get_coin_analysis():
                     coins_analysis.append(coin_data)
         except Exception as db_error:
             app.logger.error(f"Database error in coin_analysis: {db_error}")
+            import traceback
+            app.logger.error(f"Traceback: {traceback.format_exc()}")
             # Return empty data instead of 500 error
             return jsonify({
                 'success': True,
                 'coins': [],
                 'total_count': 0,
-                'message': 'No training data available - start AI training first',
+                'message': f'Database error: {str(db_error)}',
                 'last_updated': datetime.now().isoformat()
             })
         
@@ -1940,7 +1944,7 @@ def get_coin_analysis():
                 'success': True,
                 'coins': [],
                 'total_count': 0,
-                'message': 'No training data available - start AI training first',
+                'message': 'No training data available - please run AI training on this server',
                 'last_updated': datetime.now().isoformat()
             })
         
@@ -1974,9 +1978,11 @@ def get_trading_signals():
         try:
             # Get recent training session data
             latest_session = ai_worker.database.get_latest_training_session()
+            app.logger.info(f"Trading signals - Latest session: {latest_session}")
             
             if latest_session:
                 training_results = ai_worker.database.get_training_results(latest_session['session_id'])
+                app.logger.info(f"Trading signals - Found {len(training_results)} training results")
                 
                 signal_id = 0
                 for result in training_results:
@@ -2015,7 +2021,22 @@ def get_trading_signals():
                 'success': True,
                 'signals': [],
                 'count': 0,
-                'message': 'No training data available - start AI training first',
+                'message': 'No training data available - please run AI training on this server',
+                'last_updated': datetime.now().isoformat()
+            })
+        
+        # Check if we have any signals
+        if not signals:
+            message = 'No training data available - please run AI training on this server'
+            if latest_session and training_results:
+                message = f'No trading signals above confidence threshold ({ai_confidence_threshold}%)'
+            
+            return jsonify({
+                'success': True,
+                'signals': [],
+                'count': 0,
+                'message': message,
+                'ai_threshold': ai_confidence_threshold,
                 'last_updated': datetime.now().isoformat()
             })
         
