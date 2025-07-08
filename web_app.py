@@ -1454,18 +1454,23 @@ def start_training():
 @app.route('/api/enable_trading', methods=['POST'])
 def enable_trading():
     try:
+        ensure_components_initialized()
         global ai_worker_instance
-        ai_worker = ai_worker_instance or get_ai_worker()
-        if ai_worker and ai_worker.trade_executor:
-            ai_worker.trade_executor.enable_trading()
+        ai_worker = ai_worker_instance or get_ai_worker(socketio=socketio, bybit_session=bybit_session)
+        
+        if ai_worker and ai_worker.bybit_session:
+            # Start the AI worker if not already running
+            if not ai_worker.is_running:
+                ai_worker.start()
+            
             return jsonify({
                 'success': True,
-                'message': 'Live trading enabled!'
+                'message': 'Live trading enabled! AI Worker is now running.'
             })
         else:
             return jsonify({
                 'success': False,
-                'message': 'Trade executor not available'
+                'message': 'ByBit session not available - check API credentials'
             })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1474,17 +1479,21 @@ def enable_trading():
 def disable_trading():
     try:
         ensure_components_initialized()
-        ai_worker = get_ai_worker(socketio=socketio, bybit_session=bybit_session)
-        if ai_worker and ai_worker.trade_executor:
-            ai_worker.trade_executor.disable_trading()
+        global ai_worker_instance
+        ai_worker = ai_worker_instance or get_ai_worker(socketio=socketio, bybit_session=bybit_session)
+        
+        if ai_worker:
+            # Stop the AI worker to disable trading
+            ai_worker.stop()
+            
             return jsonify({
                 'success': True,
-                'message': 'Live trading disabled!'
+                'message': 'Live trading disabled! AI Worker has been stopped.'
             })
         else:
             return jsonify({
                 'success': False,
-                'message': 'Trade executor not available'
+                'message': 'AI Worker not available'
             })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1495,23 +1504,45 @@ def get_trading_status():
         ensure_components_initialized()
         global ai_worker_instance
         ai_worker = ai_worker_instance or get_ai_worker(socketio=socketio, bybit_session=bybit_session)
-        if ai_worker and ai_worker.trade_executor:
-            status = ai_worker.trade_executor.get_trading_status()
+        
+        if ai_worker and ai_worker.bybit_session:
+            # Get active positions count (this represents active trades)
+            active_positions = ai_worker.get_active_positions_count()
+            
+            # Trading is enabled if AI worker is running and has bybit session
+            trading_enabled = ai_worker.is_running and ai_worker.bybit_session is not None
+            
             return jsonify({
                 'success': True,
-                'status': status
+                'status': {
+                    'enabled': trading_enabled,
+                    'active_orders': active_positions,
+                    'worker_running': ai_worker.is_running,
+                    'max_trades': ai_worker.max_concurrent_trades
+                }
             })
         else:
             return jsonify({
-                'success': False,
+                'success': True,
                 'status': {
                     'enabled': False,
                     'active_orders': 0,
-                    'orders': []
+                    'worker_running': False,
+                    'max_trades': 0
                 }
             })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"Trading status error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'status': {
+                'enabled': False,
+                'active_orders': 0,
+                'worker_running': False,
+                'max_trades': 0
+            }
+        }), 500
 
 @app.route('/api/start_worker', methods=['POST'])
 def start_worker():
