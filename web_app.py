@@ -48,10 +48,17 @@ try:
     def create_proxy_ssl_context():
         context = ssl.create_default_context()
         
-        # Stack Overflow fix: Set SECLEVEL to 1 for legacy compatibility
-        context.set_ciphers('DEFAULT:@SECLEVEL=1')
+        # Stack Overflow fix: Complete SSL bypass for problematic environments
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
         
-        # Stack Overflow fix: Load system certificates
+        # Set SECLEVEL to 0 for maximum compatibility (Stack Overflow solution)
+        try:
+            context.set_ciphers('DEFAULT:@SECLEVEL=0')
+        except:
+            context.set_ciphers('DEFAULT')
+        
+        # Load system certificates if available
         try:
             import certifi
             context.load_verify_locations(certifi.where())
@@ -59,11 +66,12 @@ try:
         except Exception as cert_error:
             print(f"⚠️ Certificate loading failed: {cert_error}")
         
-        # Use broader TLS range for proxy compatibility
-        context.minimum_version = ssl.TLSVersion.TLSv1
-        context.maximum_version = ssl.TLSVersion.TLSv1_3
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
+        # Use widest TLS range for maximum compatibility
+        try:
+            context.minimum_version = ssl.TLSVersion.TLSv1
+            context.maximum_version = ssl.TLSVersion.TLSv1_3
+        except:
+            pass  # Ignore if TLS version setting fails
         return context
     
     # Apply the enhanced SSL context globally

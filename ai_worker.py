@@ -338,7 +338,7 @@ class AIWorker:
             klines = self.bybit_session.get_kline(
                 category="linear",
                 symbol=symbol,
-                interval="1h",
+                interval="1",  # Use 1-minute interval instead of 1h
                 limit=100
             )
             

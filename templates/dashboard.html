@@ -20,7 +20,7 @@
         .order-card { border-left: 4px solid #28a745; }
         .navbar-brand { font-weight: bold; }
         .sidebar { min-height: 100vh; background: #f8f9fa; }
-        .main-content { padding: 20px; padding-bottom: 370px; }
+        .main-content { padding: 20px; }
         .real-time-price { font-size: 1.5em; font-weight: bold; color: #007bff; }
     </style>
 </head>
@@ -254,33 +254,6 @@
                     
                 </div>
 
-                <!-- Console Fixed at Bottom -->
-                <div class="fixed-bottom" style="height: 350px; background: #1a1a1a; border-top: 2px solid #007bff; z-index: 1000;">
-                    <div class="container-fluid h-100">
-                        <div class="row h-100">
-                            <div class="col-12">
-                                <div class="d-flex justify-content-between align-items-center p-2" style="background: #2a2a2a; color: white;">
-                                    <div>
-                                        <i class="fas fa-terminal"></i>
-                                        <strong>Live Console</strong>
-                                        <span class="ms-2 badge bg-success" id="consoleStatus">Connected</span>
-                                    </div>
-                                    <div>
-                                        <button class="btn btn-sm btn-outline-light" onclick="toggleConsole()">
-                                            <i class="fas fa-chevron-down" id="consoleToggleIcon"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-light ms-1" onclick="clearLiveConsole()">
-                                            <i class="fas fa-broom"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div id="liveConsole" style="height: calc(100% - 50px); overflow-y: auto; background: #1a1a1a; color: #00ff00; font-family: 'Courier New', monospace; font-size: 13px; padding: 10px; line-height: 1.4; scroll-behavior: smooth; max-height: 300px;">
-                                    <!-- Live console output -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -307,9 +280,6 @@
             handleTradeUpdate(data);
         });
         
-        socket.on('console_log', function(data) {
-            addConsoleLog(data);
-        });
         
         socket.on('worker_status', function(data) {
             updateWorkerStatus(data);
@@ -496,208 +466,10 @@
             }, 3000);
         }
         
-        // Enhanced Console functions with detailed logging
-        function addConsoleLog(logData) {
-            const console = document.getElementById('liveConsole');
-            const logLine = document.createElement('div');
-            logLine.className = 'console-line';
-            logLine.style.cssText = 'margin-bottom: 4px; padding: 4px 8px; border-radius: 3px; font-size: 12px; line-height: 1.4;';
-            
-            const levelColors = {
-                'INFO': { bg: '#1a4c96', text: '#87ceeb', icon: 'ℹ️' },
-                'SUCCESS': { bg: '#155724', text: '#d4edda', icon: '✅' },
-                'WARNING': { bg: '#856404', text: '#fff3cd', icon: '⚠️' },
-                'ERROR': { bg: '#721c24', text: '#f8d7da', icon: '❌' },
-                'DEBUG': { bg: '#2d2d30', text: '#cccccc', icon: '🔍' },
-                'TRADE': { bg: '#0f5132', text: '#d1e7dd', icon: '💰' },
-                'SIGNAL': { bg: '#664d03', text: '#fff3cd', icon: '🎯' }
-            };
-            
-            const levelStyle = levelColors[logData.level] || levelColors['INFO'];
-            logLine.style.backgroundColor = levelStyle.bg;
-            logLine.style.color = levelStyle.text;
-            
-            // Enhanced timestamp with milliseconds
-            const now = new Date();
-            const timestamp = logData.timestamp || now.toLocaleTimeString() + '.' + now.getMilliseconds().toString().padStart(3, '0');
-            
-            // Add stack trace for errors if available
-            let stackTrace = '';
-            if (logData.level === 'ERROR' && logData.stack) {
-                stackTrace = `\n    at ${logData.stack}`;
-            }
-            
-            // Enhanced message formatting
-            let formattedMessage = logData.message || '';
-            
-            // Detect and format JSON objects
-            try {
-                if (typeof logData.data === 'object') {
-                    formattedMessage += '\n' + JSON.stringify(logData.data, null, 2);
-                }
-            } catch (e) {
-                // Not JSON, continue
-            }
-            
-            // Enhanced log line with more browser-like formatting
-            logLine.innerHTML = `
-                <div style="display: flex; align-items: flex-start; gap: 8px;">
-                    <span style="color: #888; font-family: monospace; font-size: 11px; min-width: 90px;">${timestamp}</span>
-                    <span style="font-size: 14px; min-width: 20px;">${levelStyle.icon}</span>
-                    <span style="font-weight: bold; color: ${levelStyle.text}; min-width: 60px;">[${logData.level}]</span>
-                    <span style="flex: 1; word-wrap: break-word; white-space: pre-wrap;">${formattedMessage}${stackTrace}</span>
-                    ${logData.source ? `<span style="color: #888; font-size: 10px; font-style: italic;">${logData.source}</span>` : ''}
-                </div>
-            `;
-            
-            // Add collapsible details for complex objects
-            if (logData.details) {
-                const detailsDiv = document.createElement('div');
-                detailsDiv.style.cssText = 'margin-left: 120px; margin-top: 4px; font-size: 11px; color: #aaa; cursor: pointer;';
-                detailsDiv.innerHTML = `<span style="color: #666;">▶ Show details...</span>`;
-                detailsDiv.onclick = function() {
-                    const details = this.querySelector('.details-content');
-                    if (details) {
-                        details.style.display = details.style.display === 'none' ? 'block' : 'none';
-                        this.querySelector('span').textContent = details.style.display === 'none' ? '▶ Show details...' : '▼ Hide details...';
-                    }
-                };
-                
-                const detailsContent = document.createElement('div');
-                detailsContent.className = 'details-content';
-                detailsContent.style.cssText = 'display: none; margin-top: 4px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 3px; font-family: monospace;';
-                detailsContent.textContent = JSON.stringify(logData.details, null, 2);
-                
-                detailsDiv.appendChild(detailsContent);
-                logLine.appendChild(detailsDiv);
-            }
-            
-            // Add NEW logs at the BOTTOM for natural scrolling behavior
-            console.appendChild(logLine);
-            
-            // Auto-scroll to bottom for new entries (only if user is already near bottom)
-            const isNearBottom = console.scrollTop + console.clientHeight >= console.scrollHeight - 50;
-            if (isNearBottom) {
-                console.scrollTop = console.scrollHeight;
-            }
-            
-            // Limit console lines to keep it performant (remove old entries from top)
-            if (console.children.length > 500) {
-                console.removeChild(console.firstChild);
-            }
-        }
         
-        // Enhanced logging functions for different types
-        function logInfo(message, data = null, source = null) {
-            addConsoleLog({
-                timestamp: new Date().toLocaleTimeString() + '.' + new Date().getMilliseconds().toString().padStart(3, '0'),
-                level: 'INFO',
-                message: message,
-                data: data,
-                source: source
-            });
-        }
         
-        function logSuccess(message, data = null, source = null) {
-            addConsoleLog({
-                timestamp: new Date().toLocaleTimeString() + '.' + new Date().getMilliseconds().toString().padStart(3, '0'),
-                level: 'SUCCESS',
-                message: message,
-                data: data,
-                source: source
-            });
-        }
-        
-        function logError(message, error = null, source = null) {
-            addConsoleLog({
-                timestamp: new Date().toLocaleTimeString() + '.' + new Date().getMilliseconds().toString().padStart(3, '0'),
-                level: 'ERROR',
-                message: message,
-                data: error,
-                stack: error?.stack,
-                source: source
-            });
-        }
-        
-        function logTrade(message, tradeData = null) {
-            addConsoleLog({
-                timestamp: new Date().toLocaleTimeString() + '.' + new Date().getMilliseconds().toString().padStart(3, '0'),
-                level: 'TRADE',
-                message: message,
-                details: tradeData,
-                source: 'TradeExecutor'
-            });
-        }
-        
-        function logSignal(message, signalData = null) {
-            addConsoleLog({
-                timestamp: new Date().toLocaleTimeString() + '.' + new Date().getMilliseconds().toString().padStart(3, '0'),
-                level: 'SIGNAL',
-                message: message,
-                details: signalData,
-                source: 'AIWorker'
-            });
-        }
-        
-        function clearConsole() {
-            document.getElementById('console').innerHTML = '';
-        }
-        
-        function clearLiveConsole() {
-            document.getElementById('liveConsole').innerHTML = '';
-        }
-        
-        function toggleConsole() {
-            const consoleContainer = document.querySelector('.fixed-bottom');
-            const consoleContent = document.getElementById('liveConsole');
-            const icon = document.getElementById('consoleToggleIcon');
-            
-            if (consoleContainer.style.height === '50px') {
-                // Expand console
-                consoleContainer.style.height = '350px';
-                consoleContent.style.display = 'block';
-                icon.className = 'fas fa-chevron-down';
-            } else {
-                // Minimize console
-                consoleContainer.style.height = '50px';
-                consoleContent.style.display = 'none';
-                icon.className = 'fas fa-chevron-up';
-            }
-        }
-        
-        function updateWorkerStatus(status) {
-            const statusBadge = document.getElementById('workerStatus');
-            const consoleBadge = document.getElementById('consoleStatus');
-            
-            // Check if elements exist before updating
-            if (!statusBadge || !consoleBadge) {
-                console.warn('Worker status elements not found');
-                return;
-            }
-            
-            if (status && status.worker_running) {
-                statusBadge.textContent = status.training_in_progress ? 'Training' : 'Active';
-                statusBadge.className = 'badge bg-success';
-                consoleBadge.textContent = 'Connected';
-                consoleBadge.className = 'ms-2 badge bg-success';
-            } else {
-                statusBadge.textContent = 'Inactive';
-                statusBadge.className = 'badge bg-danger';
-                consoleBadge.textContent = 'Disconnected';
-                consoleBadge.className = 'ms-2 badge bg-danger';
-            }
-        }
         
         function handleTradingSignal(signal) {
-            logSignal(`🎯 Trading Signal Generated: ${signal.side} ${signal.symbol}`, {
-                symbol: signal.symbol,
-                side: signal.side,
-                confidence: signal.confidence,
-                price: signal.price,
-                timestamp: signal.timestamp,
-                strategy: signal.strategy || 'AI Analysis'
-            });
-            
             showNotification(`New signal: ${signal.side} ${signal.symbol} (${signal.confidence}%)`, 'info');
         }
         
@@ -734,15 +506,11 @@
                         }
                     });
                     
-                    logSuccess(`📈 Loaded ${data.count} trading symbols successfully`, {
-                        count: data.count,
-                        popular_symbols: popularSymbols,
-                        total_available: data.symbols.length
-                    }, 'SymbolLoader');
+                    console.log(`Loaded ${data.count} trading symbols successfully`);
                 }
             })
             .catch(error => {
-                logError(`❌ Failed to load trading symbols`, error, 'SymbolLoader');
+                console.error(`Failed to load trading symbols`, error);
             });
         }
         
@@ -834,77 +602,25 @@
         
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
-            // Enhanced console initialization
-            logInfo('🚀 ByBit AI Trading Bot Dashboard Initialized', {
-                timestamp: new Date().toISOString(),
-                version: '2.0',
-                browser: navigator.userAgent.split(' ')[0],
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-            }, 'Dashboard');
+            console.log('ByBit AI Trading Bot Dashboard Initialized');
             
-            logInfo('📊 Loading market data and symbols...', null, 'DataLoader');
             loadAllSymbols();
-            
-            logInfo('📈 Initializing price charts...', null, 'ChartEngine');
             updatePriceChart();
-            
-            logInfo('💼 Fetching current positions...', null, 'PositionManager');
             updatePositions();
-            
-            logInfo('📜 Loading trading history...', null, 'HistoryLoader');
             updateTradingHistory();
             
-            // Load existing console logs from server
-            fetch('/api/console_logs')
-            .then(response => response.json())
-            .then(logs => {
-                if (logs && logs.length > 0) {
-                    logSuccess(`📥 Loaded ${logs.length} previous console entries`, { count: logs.length }, 'ConsoleLoader');
-                    logs.forEach(log => addConsoleLog(log));
-                } else {
-                    logInfo('🆕 No previous console logs found, starting fresh', null, 'ConsoleLoader');
-                }
-            })
-            .catch(error => {
-                logError('❌ Failed to load console logs', error, 'ConsoleLoader');
-            });
-            
-            // Enhanced refresh cycle with detailed logging
+            // Refresh cycle
             setInterval(() => {
-                const refreshStart = performance.now();
-                
-                logInfo('🔄 Starting data refresh cycle...', { cycle: 'auto-refresh' }, 'RefreshManager');
-                
                 Promise.all([
                     updatePositions(),
                     updateTradingHistory(),
                     updateSystemStatus()
                 ]).then(() => {
-                    const refreshTime = (performance.now() - refreshStart).toFixed(2);
-                    logSuccess(`✅ Data refresh completed in ${refreshTime}ms`, { 
-                        duration: refreshTime,
-                        timestamp: new Date().toISOString()
-                    }, 'RefreshManager');
+                    console.log('Data refresh completed');
                 }).catch(error => {
-                    logError('❌ Data refresh failed', error, 'RefreshManager');
+                    console.error('Data refresh failed', error);
                 });
-                
-                if (isTrading) {
-                    logInfo('⚡ Additional trading updates...', { trading: true }, 'TradingManager');
-                }
             }, 10000); // Refresh every 10 seconds
-            
-            // Log console capabilities
-            logInfo('🛠️ Enhanced console features available:', {
-                features: [
-                    'Detailed timestamps with milliseconds',
-                    'Colored log levels with icons',
-                    'Collapsible object details',
-                    'Source tracking',
-                    'Stack trace for errors',
-                    'JSON object formatting'
-                ]
-            }, 'ConsoleEngine');
         });
 
         // Initialize status on page load
