@@ -4,6 +4,7 @@ import os
 import json
 import yaml
 from datetime import datetime, timedelta
+import time
 import pandas as pd
 import numpy as np
 from pybit.unified_trading import HTTP
@@ -526,62 +527,227 @@ def get_balance():
         app.logger.error(f"Balance API error: {str(e)}")
         return jsonify({'error': f'ByBit API error: {str(e)}'}), 500
 
-@app.route('/api/balance_header')
-def get_balance_header():
+# === NIEUWE VERBETERDE BALANCE FUNCTIES (gebaseerd op complete uitleg) ===
+
+def get_bybit_balance():
+    """
+    Haalt de correcte balance op van Bybit (gebaseerd op complete uitleg)
+    Returns: dict met balance informatie
+    """
+    try:
+        if not bybit_session:
+            return {'success': False, 'error': 'ByBit session not initialized'}
+            
+        # Unified Trading Account balance (V5 API)
+        response = handle_bybit_request(
+            bybit_session.get_wallet_balance,
+            accountType="UNIFIED",  # Voor spot & futures trading
+            coin="USDT"  # Specifieke coin
+        )
+
+        if response and response.get('retCode') == 0:
+            balance_info = response['result']['list'][0]
+
+            # Extract belangrijke waarden
+            total_wallet_balance = float(balance_info.get('totalWalletBalance', 0))
+            available_balance = float(balance_info.get('totalAvailableBalance', 0))
+            used_margin = float(balance_info.get('totalUsedMargin', 0))
+
+            # Coin-specifieke balance
+            coin_balances = {}
+            for coin in balance_info.get('coin', []):
+                coin_name = coin['coin']
+                coin_balances[coin_name] = {
+                    'wallet_balance': float(coin.get('walletBalance', 0)),
+                    'available': float(coin.get('availableToWithdraw', 0)),
+                    'locked': float(coin.get('locked', 0)),
+                    'equity': float(coin.get('equity', 0))
+                }
+
+            return {
+                'success': True,
+                'total_wallet_balance': total_wallet_balance,
+                'available_balance': available_balance,
+                'used_margin': used_margin,
+                'coin_balances': coin_balances,
+                'account_type': 'UNIFIED'
+            }
+        else:
+            error_msg = response.get('retMsg', 'Unknown API error') if response else 'No response'
+            return {'success': False, 'error': f"API Error: {error_msg}"}
+
+    except Exception as e:
+        return {'success': False, 'error': f"Exception: {str(e)}"}
+
+def get_spot_balance():
+    """
+    Voor pure spot trading balance
+    """
+    try:
+        if not bybit_session:
+            return {'success': False, 'error': 'ByBit session not initialized'}
+            
+        response = handle_bybit_request(
+            bybit_session.get_wallet_balance,
+            accountType="SPOT"
+        )
+
+        if response and response.get('retCode') == 0:
+            coins = response['result']['list'][0].get('coin', [])
+            balances = {}
+
+            for coin in coins:
+                if float(coin.get('walletBalance', 0)) > 0:
+                    balances[coin['coin']] = {
+                        'balance': float(coin.get('walletBalance', 0)),
+                        'locked': float(coin.get('locked', 0)),
+                        'available': float(coin.get('free', 0))
+                    }
+
+            return {
+                'success': True,
+                'balances': balances,
+                'account_type': 'SPOT'
+            }
+        else:
+            error_msg = response.get('retMsg', 'Unknown API error') if response else 'No response'
+            return {'success': False, 'error': error_msg}
+
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+def get_complete_balance_info():
+    """
+    Haalt alle balance informatie op
+    """
+    import time
+    
+    result = {
+        'unified': get_bybit_balance(),
+        'spot': get_spot_balance(),
+        'timestamp': int(time.time())
+    }
+
+    # Bereken totals
+    total_usdt = 0
+    if result['unified']['success']:
+        total_usdt += result['unified']['total_wallet_balance']
+
+    result['total_usdt_value'] = total_usdt
+    return result
+
+@app.route('/api/balance')
+def api_get_balance():
+    """API endpoint voor complete balance (nieuwe functionaliteit)"""
     ensure_components_initialized()
     try:
-        # Check if bybit_session exists
-        if not bybit_session:
-            return jsonify({'error': 'ByBit session not initialized - check API credentials'}), 500
-            
-        # Get wallet balance for header display
-        balance_data = handle_bybit_request(bybit_session.get_wallet_balance, accountType="UNIFIED")
+        balance_info = get_complete_balance_info()
+        return jsonify(balance_info)
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/balance/debug')
+def debug_balance_call():
+    """
+    Debug functie om API calls te testen (gebaseerd op complete uitleg)
+    """
+    ensure_components_initialized()
+    try:
+        debug_info = {
+            'timestamp': int(time.time()),
+            'session_status': 'initialized' if bybit_session else 'not_initialized'
+        }
         
-        # Debug logging
-        if balance_data:
-            app.logger.info(f"Header balance data received: {json.dumps(balance_data.get('result', {}), indent=2)}")
+        if bybit_session:
+            # Test connection
+            try:
+                server_time = handle_bybit_request(bybit_session.get_server_time)
+                debug_info['server_time'] = server_time
+                debug_info['connection'] = 'success'
+            except Exception as e:
+                debug_info['connection'] = f'failed: {str(e)}'
+
+            # Test balance call
+            try:
+                balance = get_bybit_balance()
+                debug_info['balance_test'] = balance
+            except Exception as e:
+                debug_info['balance_test'] = {'error': str(e)}
+            
+            # Test spot balance
+            try:
+                spot_balance = get_spot_balance()
+                debug_info['spot_balance_test'] = spot_balance
+            except Exception as e:
+                debug_info['spot_balance_test'] = {'error': str(e)}
         
-        if balance_data and 'result' in balance_data and 'list' in balance_data['result']:
-            account = balance_data['result']['list'][0] if balance_data['result']['list'] else {}
+        return jsonify(debug_info)
+
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'timestamp': int(time.time())
+        }), 500
+
+@app.route('/api/balance_header')
+def get_balance_header():
+    """Fetch balance for header display (verbeterde versie met nieuwe balance functie)"""
+    ensure_components_initialized()
+    try:
+        # Gebruik de nieuwe verbeterde balance functie
+        balance_result = get_bybit_balance()
+        
+        if balance_result['success']:
+            total_balance = balance_result['total_wallet_balance']
+            available_balance = balance_result['available_balance']
+            used_margin = balance_result['used_margin']
             
-            # Calculate total balance and 24h P&L
-            total_balance = float(account.get('totalWalletBalance', 0))
-            total_pnl_24h = float(account.get('totalPerpUPL', 0))
+            # Calculate 24h P&L (placeholder - zou historical data nodig hebben)
+            pnl_24h = 0.0  
+            pnl_24h_percent = 0.0
             
-            # If totalWalletBalance is 0, try to get from coins
-            if total_balance == 0 and 'coin' in account:
-                for coin in account['coin']:
-                    if coin['coin'] == 'USDT':
-                        total_balance = float(coin.get('equity', 0))
-                        if total_balance == 0:
-                            total_balance = float(coin.get('walletBalance', 0))
-                        break
-            
-            # Calculate 24h P&L percentage
-            pnl_percent = (total_pnl_24h / total_balance * 100) if total_balance > 0 else 0
+            # Debug logging voor troubleshooting
+            app.logger.info(f"✅ Balance header success: Total={total_balance}, Available={available_balance}, Margin={used_margin}")
             
             return jsonify({
                 'success': True,
                 'balance': total_balance,
-                'pnl_24h': total_pnl_24h,
-                'pnl_24h_percent': pnl_percent
+                'available_balance': available_balance,
+                'used_margin': used_margin,
+                'pnl_24h': pnl_24h,
+                'pnl_24h_percent': pnl_24h_percent,
+                'account_type': 'UNIFIED',
+                'coin_count': len(balance_result.get('coin_balances', {}))
             })
         else:
-            return jsonify({'error': f'Invalid balance response: {balance_data}'}), 500
+            # Fallback naar cached balance bij API problemen
+            app.logger.warning(f"⚠️ Balance API error: {balance_result['error']} - returning cached balance")
+            return jsonify({
+                'success': True,
+                'balance': 0.0,
+                'available_balance': 0.0,
+                'used_margin': 0.0,
+                'pnl_24h': 0.0,
+                'pnl_24h_percent': 0.0,
+                'cached': True,
+                'message': f"Using cached balance due to: {balance_result['error']}"
+            })
             
-    except ConnectionError as e:
-        app.logger.warning(f"Header balance API connection error: {str(e)} - returning cached balance")
+    except Exception as e:
+        app.logger.error(f"❌ Header balance API exception: {str(e)}")
         return jsonify({
             'success': True,
             'balance': 0.0,
+            'available_balance': 0.0,
+            'used_margin': 0.0,
             'pnl_24h': 0.0,
             'pnl_24h_percent': 0.0,
             'cached': True,
             'message': 'Using cached balance due to connection issues'
         })
-    except Exception as e:
-        app.logger.error(f"Header balance API error: {str(e)}")
-        return jsonify({'error': f'ByBit API error: {str(e)}'}), 500
 
 @app.route('/api/account_name')
 def get_account_name():
