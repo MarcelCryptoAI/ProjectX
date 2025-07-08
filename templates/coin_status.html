@@ -37,72 +37,10 @@
         }
         .profit { color: #28a745; }
         .loss { color: #dc3545; }
-        .status-indicator { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            gap: 2px;
-        }
-        .status-dot { 
-            width: 8px; 
-            height: 8px; 
-            border-radius: 50%; 
-            display: inline-block;
-            transition: all 0.3s ease;
-        }
-        .status-online { background-color: #28a745; box-shadow: 0 0 5px #28a745; }
-        .status-offline { background-color: #dc3545; box-shadow: 0 0 5px #dc3545; }
-        .status-unknown { background-color: #6c757d; }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="#">
-                <i class="fas fa-robot"></i> ByBit AI Trading Bot
-            </a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="/">Dashboard</a>
-                <a class="nav-link active" href="/coin_status">Coin Status</a>
-                <a class="nav-link" href="/signals">Signals</a>
-                <a class="nav-link" href="/config">Settings</a>
-                <a class="nav-link" href="/analytics">Analytics</a>
-                <div class="nav-link text-light">
-                    <div class="d-flex align-items-center">
-                        <!-- Status Lampjes -->
-                        <div class="me-3">
-                            <div class="d-flex align-items-center gap-2">
-                                <div class="status-indicator" title="ByBit API">
-                                    <span class="status-dot" id="statusBybitApi"></span>
-                                    <small>API</small>
-                                </div>
-                                <div class="status-indicator" title="Database">
-                                    <span class="status-dot" id="statusDatabase"></span>
-                                    <small>DB</small>
-                                </div>
-                                <div class="status-indicator" title="Dyno">
-                                    <span class="status-dot" id="statusDyno"></span>
-                                    <small>Dyno</small>
-                                </div>
-                                <div class="status-indicator" title="DNS">
-                                    <span class="status-dot" id="statusDns"></span>
-                                    <small>DNS</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="text-end me-3">
-                            <div class="fw-bold">Balance: <span id="headerBalance">$0.00</span></div>
-                            <div class="small">24h P&L: <span id="headerPnl" class="profit">+$0.00 (0%)</span></div>
-                            <div class="small text-muted">Account: <span id="headerAccountName">Loading...</span></div>
-                        </div>
-                        <div class="avatar bg-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-                            <i class="fas fa-user text-white"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </nav>
+    {% include 'includes/header.html' %}
 
     <div class="container-fluid mt-3">
         <div class="row">

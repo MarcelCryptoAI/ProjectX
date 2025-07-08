@@ -55,7 +55,6 @@
             padding: 20px;
             text-align: center;
         }
-        .navbar-brand { font-weight: bold; }
         .action-buttons {
             display: flex;
             gap: 10px;
@@ -95,32 +94,7 @@
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="#">
-                <i class="fas fa-robot"></i> ByBit AI Trading Bot
-            </a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="/">Dashboard</a>
-                <a class="nav-link" href="/coin_status">Coin Status</a>
-                <a class="nav-link active" href="/signals">Signals</a>
-                <a class="nav-link" href="/config">Settings</a>
-                <a class="nav-link" href="/analytics">Analytics</a>
-                <div class="nav-link text-light">
-                    <div class="d-flex align-items-center">
-                        <div class="text-end me-3">
-                            <div class="fw-bold">Balance: <span id="headerBalance">$0.00</span></div>
-                            <div class="small">24h P&L: <span id="headerPnl" class="profit">+$0.00 (0%)</span></div>
-                            <div class="small text-muted">Account: <span id="headerAccountName">Loading...</span></div>
-                        </div>
-                        <div class="avatar bg-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-                            <i class="fas fa-user text-white"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </nav>
+    {% include 'includes/header.html' %}
 
     <div class="container-fluid mt-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -234,6 +208,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadSettings();
             loadSignals();
+            updateHeaderBalance();
+            updateStatusLights();
             
             // Update confidence filter display
             document.getElementById('confidenceFilter').addEventListener('input', function() {
@@ -242,6 +218,12 @@
             
             // Refresh signals every 30 seconds
             setInterval(loadSignals, 30000);
+            
+            // Update header and status every 30 seconds
+            setInterval(() => {
+                updateHeaderBalance();
+                updateStatusLights();
+            }, 30000);
         });
         
         function loadSettings() {
@@ -557,6 +539,79 @@
             setTimeout(() => {
                 notification.remove();
             }, 3000);
+        }
+        
+        // Header balance functions
+        function updateHeaderBalance() {
+            // Update balance
+            fetch('/api/balance_header')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('headerBalance').textContent = `$${data.balance.toFixed(2)}`;
+                    
+                    const pnlElement = document.getElementById('headerPnl');
+                    const pnlClass = data.pnl_24h >= 0 ? 'text-success' : 'text-danger';
+                    const pnlSign = data.pnl_24h >= 0 ? '+' : '';
+                    pnlElement.className = pnlClass;
+                    pnlElement.textContent = `${pnlSign}$${data.pnl_24h.toFixed(2)} (${data.pnl_24h_percent.toFixed(1)}%)`;
+                }
+            })
+            .catch(error => console.error('Error updating header balance:', error));
+            
+            // Update account name
+            fetch('/api/account_name')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('headerAccountName').textContent = data.account_name;
+                }
+            })
+            .catch(error => console.error('Error updating account name:', error));
+        }
+        
+        function updateStatusLights() {
+            // Get system status
+            fetch('/api/system_status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.status) {
+                    const status = data.status;
+                    
+                    // Update ByBit API status
+                    const bybitApiDot = document.getElementById('statusBybitApi');
+                    bybitApiDot.className = `status-dot status-${status.bybit_api.status}`;
+                    bybitApiDot.title = `ByBit API: ${status.bybit_api.message}`;
+                    
+                    // Update Database status
+                    const databaseDot = document.getElementById('statusDatabase');
+                    databaseDot.className = `status-dot status-${status.database.status}`;
+                    databaseDot.title = `Database: ${status.database.message}`;
+                    
+                    // Update Dyno status
+                    const dynoDot = document.getElementById('statusDyno');
+                    dynoDot.className = `status-dot status-${status.dyno.status}`;
+                    dynoDot.title = `Dyno: ${status.dyno.message}`;
+                    
+                    // Update DNS status
+                    const dnsDot = document.getElementById('statusDns');
+                    if (dnsDot && status.dns) {
+                        dnsDot.className = `status-dot status-${status.dns.status}`;
+                        dnsDot.title = `DNS: ${status.dns.message}`;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Status lights update error:', error);
+                // Set all to unknown on error
+                ['statusBybitApi', 'statusDatabase', 'statusDyno', 'statusDns'].forEach(id => {
+                    const dot = document.getElementById(id);
+                    if (dot) {
+                        dot.className = 'status-dot status-unknown';
+                        dot.title = 'Status unknown - connection error';
+                    }
+                });
+            });
         }
     </script>
 </body>

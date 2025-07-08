@@ -547,7 +547,10 @@ class AIWorker:
             if not self.bybit_session:
                 return 0
             
-            positions = self.bybit_session.get_positions(category="linear")
+            positions = self.bybit_session.get_positions(
+                category="linear",
+                settleCoin="USDT"
+            )
             if positions and 'result' in positions and 'list' in positions['result']:
                 active_count = 0
                 for pos in positions['result']['list']:

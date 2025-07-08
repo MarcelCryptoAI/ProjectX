@@ -1098,7 +1098,10 @@ def get_stats():
         stats = trade_logger.get_trade_statistics()
         
         # Get current positions for additional stats
-        positions = bybit_session.get_positions(category="linear")
+        positions = bybit_session.get_positions(
+            category="linear",
+            settleCoin="USDT"
+        )
         active_positions = []
         
         if positions and 'result' in positions and 'list' in positions['result']:
@@ -1724,7 +1727,10 @@ def get_analytics_data():
     try:
         # Get real data for analytics
         balance = bybit_session.get_wallet_balance(accountType="UNIFIED")
-        positions = bybit_session.get_positions(category="linear")
+        positions = bybit_session.get_positions(
+            category="linear",
+            settleCoin="USDT"
+        )
         history = bybit_session.get_executions(category="linear", limit=100)
         
         # Process balance data
@@ -2084,7 +2090,10 @@ def update_trade_stats():
     
     try:
         # Get current positions
-        positions = bybit_session.get_positions(category="linear")
+        positions = bybit_session.get_positions(
+            category="linear",
+            settleCoin="USDT"
+        )
         trade_stats['current_positions'] = positions['result']['list']
         
         # Get balance
