@@ -1,519 +1,547 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coin Status - ByBit AI Trading Bot</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.plot.ly/plotly-2.29.1.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Coin Analysis - ByBit AI Trading Bot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'neon-cyan': '#00D9FF',
+                        'neon-purple': '#A100FF',
+                        'neon-pink': '#FF00C1',
+                        'neon-green': '#00FF88',
+                        'neon-yellow': '#FFD700',
+                        'neon-orange': '#FF6B00',
+                        'matrix-green': '#00FF41',
+                        'dark-bg': '#0A0A0F',
+                        'dark-panel': '#0F0F1A',
+                        'dark-border': '#1A1A2E',
+                        'dark-hover': '#16213E'
+                    },
+                    fontFamily: {
+                        'mono': ['JetBrains Mono', 'Fira Code', 'monospace'],
+                        'cyber': ['Orbitron', 'Rajdhani', 'sans-serif']
+                    },
+                    animation: {
+                        'pulse-neon': 'pulse-neon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'scan-line': 'scan-line 8s linear infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                        'float': 'float 6s ease-in-out infinite',
+                        'matrix': 'matrix 20s linear infinite',
+                        'fade-in': 'fade-in 0.5s ease-out'
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        .card { margin-bottom: 20px; }
-        .bullish { color: #28a745; }
-        .bearish { color: #dc3545; }
-        .neutral { color: #6c757d; }
-        .confidence-high { background-color: #28a745; }
-        .confidence-medium { background-color: #ffc107; }
-        .confidence-low { background-color: #dc3545; }
-        .table-responsive { max-height: 70vh; overflow-y: auto; }
-        .status-low { background-color: #dc3545; color: white; }
-        .status-signal { background-color: #28a745; color: white; }
-        .status-closed { background-color: #6c757d; color: white; }
-        .trade-button { min-width: 80px; }
-        .filter-controls { margin-bottom: 20px; }
-        .coin-status-table td { vertical-align: middle; }
-        .confidence-bar {
-            height: 20px;
-            border-radius: 10px;
+        @keyframes pulse-neon {
+            0%, 100% { opacity: 1; filter: brightness(1) drop-shadow(0 0 20px currentColor); }
+            50% { opacity: 0.8; filter: brightness(1.2) drop-shadow(0 0 40px currentColor); }
+        }
+        @keyframes scan-line {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+        }
+        @keyframes glow {
+            from { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+            to { text-shadow: 0 0 20px currentColor, 0 0 30px currentColor, 0 0 40px currentColor; }
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            33% { transform: translateY(-10px) rotate(1deg); }
+            66% { transform: translateY(5px) rotate(-1deg); }
+        }
+        @keyframes matrix {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(100%); }
+        }
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        body {
+            background: #0A0A0F;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 217, 255, 0.03) 2px,
+                    rgba(0, 217, 255, 0.03) 4px
+                ),
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(161, 0, 255, 0.03) 2px,
+                    rgba(161, 0, 255, 0.03) 4px
+                );
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .scan-line {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(to bottom, transparent, rgba(0, 217, 255, 0.8), transparent);
+            animation: scan-line 8s linear infinite;
+            pointer-events: none;
+            z-index: 9999;
+        }
+        
+        .glass-card {
+            background: rgba(15, 15, 26, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 0 40px rgba(0, 217, 255, 0.1);
             position: relative;
             overflow: hidden;
-            background-color: #e9ecef;
+            animation: fade-in 0.5s ease-out;
         }
+        
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent 30%,
+                rgba(0, 217, 255, 0.1) 50%,
+                transparent 70%
+            );
+            transform: rotate(45deg);
+            transition: all 0.5s;
+            opacity: 0;
+        }
+        
+        .glass-card:hover::before {
+            opacity: 1;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .neon-text {
+            text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+            letter-spacing: 0.05em;
+        }
+        
+        .confidence-bar {
+            position: relative;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 9999px;
+            overflow: hidden;
+            height: 8px;
+        }
+        
         .confidence-fill {
             height: 100%;
-            transition: width 0.3s ease;
+            background: linear-gradient(90deg, #FF00C1, #A100FF, #00D9FF);
+            box-shadow: 0 0 10px currentColor;
+            transition: width 0.5s ease-out;
         }
-        .profit { color: #28a745; }
-        .loss { color: #dc3545; }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .status-high {
+            background: rgba(0, 255, 136, 0.2);
+            border: 1px solid #00FF88;
+            color: #00FF88;
+        }
+        
+        .status-medium {
+            background: rgba(255, 215, 0, 0.2);
+            border: 1px solid #FFD700;
+            color: #FFD700;
+        }
+        
+        .status-low {
+            background: rgba(255, 0, 193, 0.2);
+            border: 1px solid #FF00C1;
+            color: #FF00C1;
+        }
+        
+        .analysis-badge {
+            position: absolute;
+            top: -1px;
+            right: -1px;
+            padding: 6px 16px;
+            font-size: 0.875rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            border-radius: 0 8px 0 16px;
+            letter-spacing: 0.1em;
+        }
+        
+        .analysis-bullish {
+            background: linear-gradient(135deg, #00FF88, #00D9FF);
+            color: #0A0A0F;
+        }
+        
+        .analysis-bearish {
+            background: linear-gradient(135deg, #FF00C1, #FF6B00);
+            color: #FFFFFF;
+        }
+        
+        .analysis-neutral {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #0A0A0F;
+        }
+        
+        .cyber-button {
+            position: relative;
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(161, 0, 255, 0.1));
+            border: 1px solid rgba(0, 217, 255, 0.5);
+            color: #00D9FF;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.3s;
+            overflow: hidden;
+        }
+        
+        .cyber-button:hover {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(161, 0, 255, 0.2));
+            border-color: #00D9FF;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.5), inset 0 0 20px rgba(0, 217, 255, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .cyber-button.active {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.3), rgba(161, 0, 255, 0.3));
+            border-color: #00D9FF;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(to bottom, #00D9FF, #A100FF);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(to bottom, #00D9FF, #FF00C1);
+        }
     </style>
 </head>
-<body>
+<body class="bg-dark-bg text-white font-mono min-h-screen relative">
+    <!-- Scan Line Effect -->
+    <div class="scan-line"></div>
+    
+    <!-- Include shared header -->
     {% include 'includes/header.html' %}
-
-    <div class="container-fluid mt-3">
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h4><i class="fas fa-coins"></i> AI Coin Analysis</h4>
-                        <div>
-                            <button class="btn btn-primary btn-sm" onclick="refreshAnalysis()">
-                                <i class="fas fa-sync"></i> Refresh Analysis
-                            </button>
-                            <button class="btn btn-success btn-sm" onclick="startAutoRefresh()">
-                                <i class="fas fa-play"></i> Auto Refresh
-                            </button>
-                            <button class="btn btn-danger btn-sm" onclick="stopAutoRefresh()">
-                                <i class="fas fa-stop"></i> Stop Auto
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <!-- Filter Controls -->
-                        <div class="filter-controls row">
-                            <div class="col-md-3">
-                                <label for="analysisFilter">Analysis:</label>
-                                <select id="analysisFilter" class="form-select" onchange="filterTable()">
-                                    <option value="all">All</option>
-                                    <option value="bullish">Bullish Only</option>
-                                    <option value="bearish">Bearish Only</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="confidenceFilter">Min Confidence:</label>
-                                <input type="range" class="form-range" id="confidenceFilter" min="0" max="100" value="0" onchange="filterTable()">
-                                <span id="confidenceValue">0%</span>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="statusFilter">Status:</label>
-                                <select id="statusFilter" class="form-select" onchange="filterTable()">
-                                    <option value="all">All</option>
-                                    <option value="signal">Signal</option>
-                                    <option value="te-lage-score">Te lage score</option>
-                                    <option value="closed">Closed</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="searchBox">Search:</label>
-                                <input type="text" class="form-control" id="searchBox" placeholder="Search symbol..." onkeyup="filterTable()">
-                            </div>
-                        </div>
-
-                        <!-- Coin Status Table -->
-                        <div class="table-responsive">
-                            <table class="table table-hover coin-status-table">
-                                <thead class="table-dark sticky-top">
-                                    <tr>
-                                        <th>Symbol</th>
-                                        <th>AI Analysis</th>
-                                        <th>Direction</th>
-                                        <th>Take Profit</th>
-                                        <th>Stop Loss</th>
-                                        <th>Confidence</th>
-                                        <th>Tijd Sinds</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="coinTableBody">
-                                    <!-- Table rows will be populated here -->
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div id="loadingMessage" class="text-center text-muted mt-3">
-                            <i class="fas fa-spinner fa-spin"></i> Loading coin analysis data...
-                        </div>
-                    </div>
+    
+    <!-- Main Content -->
+    <div class="container mx-auto px-6 py-8 relative z-10">
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-cyber font-bold text-neon-cyan mb-2 animate-glow">
+                <i class="fas fa-coins mr-3"></i>AI COIN ANALYSIS
+            </h1>
+            <p class="text-gray-400">Real-time AI analysis and trading recommendations for all monitored cryptocurrencies</p>
+        </div>
+        
+        <!-- Stats Summary -->
+        <div class="grid grid-cols-4 gap-6 mb-8">
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">TOTAL COINS</h3>
+                <div class="text-3xl font-cyber font-bold text-white" id="totalCoins">0</div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">HIGH CONFIDENCE</h3>
+                <div class="text-3xl font-cyber font-bold text-neon-green" id="highConfidence">0</div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">AI THRESHOLD</h3>
+                <div class="text-3xl font-cyber font-bold text-neon-purple" id="aiThreshold">75%</div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">LAST UPDATE</h3>
+                <div class="text-sm font-mono text-neon-yellow" id="lastUpdate">--:--:--</div>
+            </div>
+        </div>
+        
+        <!-- Filter Controls -->
+        <div class="glass-card rounded-xl p-6 mb-8">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div class="flex items-center gap-4">
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm active" onclick="filterCoins('all')" data-filter="all">
+                        <i class="fas fa-th mr-2"></i>ALL COINS
+                    </button>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="filterCoins('bullish')" data-filter="bullish">
+                        <i class="fas fa-arrow-up mr-2"></i>BULLISH
+                    </button>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="filterCoins('bearish')" data-filter="bearish">
+                        <i class="fas fa-arrow-down mr-2"></i>BEARISH
+                    </button>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="filterCoins('high')" data-filter="high">
+                        <i class="fas fa-star mr-2"></i>HIGH CONFIDENCE
+                    </button>
+                </div>
+                <div class="flex items-center gap-4">
+                    <input type="text" id="searchInput" placeholder="Search symbol..." 
+                           class="bg-dark-bg/50 border border-neon-cyan/30 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-neon-cyan"
+                           onkeyup="searchCoins()">
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="refreshData()">
+                        <i class="fas fa-sync-alt mr-2"></i>REFRESH
+                    </button>
                 </div>
             </div>
         </div>
-
-        <!-- Summary Cards -->
-        <div class="row mt-3">
-            <div class="col-md-3">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <h5>Total Analyzed</h5>
-                        <h3 id="totalCoins">0</h3>
-                    </div>
-                </div>
+        
+        <!-- Coins Grid -->
+        <div id="coinsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- Loading state -->
+            <div class="col-span-full text-center py-16">
+                <i class="fas fa-spinner fa-spin text-6xl text-neon-cyan mb-4"></i>
+                <p class="text-gray-400">Loading AI analysis data...</p>
             </div>
-            <div class="col-md-3">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <h5 class="bullish">Bullish</h5>
-                        <h3 id="bullishCount" class="bullish">0</h3>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <h5 class="bearish">Bearish</h5>
-                        <h3 id="bearishCount" class="bearish">0</h3>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <h5>Avg Confidence</h5>
-                        <h3 id="avgConfidence">0%</h3>
-                    </div>
-                </div>
-            </div>
+        </div>
+        
+        <!-- No Data Message -->
+        <div id="noDataMessage" class="text-center py-16 hidden">
+            <i class="fas fa-brain text-6xl text-gray-600 mb-4"></i>
+            <p class="text-xl text-gray-400 mb-2">No training data available</p>
+            <p class="text-gray-500">Start AI training to see coin analysis</p>
         </div>
     </div>
-
-    <!-- Trade Modal -->
-    <div class="modal fade" id="tradeModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Execute Trade</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div id="tradeDetails">
-                        <!-- Trade details will be populated here -->
-                    </div>
-                    <div class="form-group mt-3">
-                        <label for="tradeAmount">Trade Amount (USDT):</label>
-                        <input type="number" class="form-control" id="tradeAmount" value="100" min="10" step="10">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="executeTrade()">Execute Trade</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
     <script>
-        // Initialize Socket.IO
-        const socket = io();
+        let allCoins = [];
+        let currentFilter = 'all';
         
-        // Global variables
-        let coinData = [];
-        let autoRefreshInterval = null;
-        let currentTradeData = null;
-        
-        // Socket event handlers
-        socket.on('connect', function() {
-            console.log('Connected to server');
-        });
-        
-        socket.on('coin_analysis_update', function(data) {
-            updateCoinData(data);
-        });
-        
-        // Initialize page
-        document.addEventListener('DOMContentLoaded', function() {
-            loadCoinAnalysis();
-            updateHeaderBalance();
-            updateStatusLights();
-            
-            // Update confidence slider display
-            document.getElementById('confidenceFilter').addEventListener('input', function() {
-                document.getElementById('confidenceValue').textContent = this.value + '%';
-            });
-            
-            // Update header and status every 30 seconds
-            setInterval(() => {
-                updateHeaderBalance();
-                updateStatusLights();
-            }, 30000);
-        });
-        
-        function loadCoinAnalysis() {
-            document.getElementById('loadingMessage').style.display = 'block';
-            
+        function loadCoinData() {
             fetch('/api/coin_analysis')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    updateCoinData(data.coins);
-                } else {
-                    showNotification('Failed to load coin analysis', 'error');
-                }
-                document.getElementById('loadingMessage').style.display = 'none';
-            })
-            .catch(error => {
-                console.error('Error loading coin analysis:', error);
-                showNotification('Error loading coin analysis', 'error');
-                document.getElementById('loadingMessage').style.display = 'none';
-            });
-        }
-        
-        function updateCoinData(coins) {
-            coinData = coins;
-            renderTable();
-            updateSummary();
-        }
-        
-        function renderTable() {
-            const tbody = document.getElementById('coinTableBody');
-            tbody.innerHTML = '';
-            
-            const filteredData = filterData();
-            
-            filteredData.forEach(coin => {
-                const row = document.createElement('tr');
-                
-                const analysisClass = coin.analysis.toLowerCase();
-                const confidenceClass = coin.confidence >= 80 ? 'confidence-high' : 
-                                      coin.confidence >= 60 ? 'confidence-medium' : 'confidence-low';
-                
-                row.innerHTML = `
-                    <td><strong>${coin.symbol}</strong></td>
-                    <td><span class="${analysisClass}">${coin.analysis}</span></td>
-                    <td><span class="badge bg-${coin.direction === 'Buy' ? 'success' : 'danger'}">${coin.direction}</span></td>
-                    <td class="text-success">${coin.takeProfit}%</td>
-                    <td class="text-danger">${coin.stopLoss}%</td>
-                    <td>
-                        <div class="confidence-bar">
-                            <div class="confidence-fill ${confidenceClass}" style="width: ${coin.confidence}%"></div>
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        allCoins = data.coins || [];
+                        document.getElementById('totalCoins').textContent = data.total_count || 0;
+                        document.getElementById('aiThreshold').textContent = `${data.ai_threshold || 75}%`;
+                        
+                        const highCount = allCoins.filter(coin => coin.confidence >= (data.ai_threshold || 75)).length;
+                        document.getElementById('highConfidence').textContent = highCount;
+                        
+                        const now = new Date();
+                        document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
+                        
+                        if (allCoins.length === 0) {
+                            document.getElementById('coinsGrid').classList.add('hidden');
+                            document.getElementById('noDataMessage').classList.remove('hidden');
+                        } else {
+                            document.getElementById('coinsGrid').classList.remove('hidden');
+                            document.getElementById('noDataMessage').classList.add('hidden');
+                            displayCoins();
+                        }
+                    } else {
+                        console.error('Failed to load coin data:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading coin data:', error);
+                    document.getElementById('coinsGrid').innerHTML = `
+                        <div class="col-span-full text-center py-16">
+                            <i class="fas fa-exclamation-triangle text-6xl text-neon-pink mb-4"></i>
+                            <p class="text-gray-400">Failed to load coin analysis data</p>
                         </div>
-                        <small>${coin.confidence}%</small>
-                    </td>
-                    <td><small class="text-muted">${coin.time_since || 'N/A'}</small></td>
-                    <td><span class="badge ${coin.status_class || 'status-low'}">${coin.status}</span></td>
-                    <td>
-                        <button class="btn btn-sm btn-primary trade-button" onclick="openTradeModal('${coin.symbol}', '${coin.direction}', ${coin.takeProfit}, ${coin.stopLoss}, ${coin.confidence})">
-                            <i class="fas fa-chart-line"></i> Trade
-                        </button>
-                    </td>
-                `;
-                
-                tbody.appendChild(row);
-            });
-            
-            if (filteredData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No coins match the current filters</td></tr>';
-            }
-        }
-        
-        function filterData() {
-            const analysisFilter = document.getElementById('analysisFilter').value;
-            const confidenceFilter = parseInt(document.getElementById('confidenceFilter').value);
-            const statusFilter = document.getElementById('statusFilter').value;
-            const searchTerm = document.getElementById('searchBox').value.toLowerCase();
-            
-            return coinData.filter(coin => {
-                // Analysis filter
-                if (analysisFilter !== 'all' && coin.analysis.toLowerCase() !== analysisFilter) {
-                    return false;
-                }
-                
-                // Confidence filter
-                if (coin.confidence < confidenceFilter) {
-                    return false;
-                }
-                
-                // Status filter
-                if (statusFilter !== 'all') {
-                    const coinStatusLower = coin.status.toLowerCase().replace(' ', '-');
-                    if (coinStatusLower !== statusFilter) {
-                        return false;
-                    }
-                }
-                
-                // Search filter
-                if (searchTerm && !coin.symbol.toLowerCase().includes(searchTerm)) {
-                    return false;
-                }
-                
-                return true;
-            });
-        }
-        
-        function filterTable() {
-            renderTable();
-        }
-        
-        function updateSummary() {
-            const totalCoins = coinData.length;
-            const bullishCount = coinData.filter(c => c.analysis === 'Bullish').length;
-            const bearishCount = coinData.filter(c => c.analysis === 'Bearish').length;
-            const avgConfidence = totalCoins > 0 ? 
-                Math.round(coinData.reduce((sum, c) => sum + c.confidence, 0) / totalCoins) : 0;
-            
-            document.getElementById('totalCoins').textContent = totalCoins;
-            document.getElementById('bullishCount').textContent = bullishCount;
-            document.getElementById('bearishCount').textContent = bearishCount;
-            document.getElementById('avgConfidence').textContent = avgConfidence + '%';
-        }
-        
-        function refreshAnalysis() {
-            loadCoinAnalysis();
-            showNotification('Refreshing coin analysis...', 'info');
-        }
-        
-        function startAutoRefresh() {
-            if (autoRefreshInterval) {
-                return; // Already running
-            }
-            
-            autoRefreshInterval = setInterval(() => {
-                loadCoinAnalysis();
-            }, 30000); // Refresh every 30 seconds
-            
-            showNotification('Auto refresh started (every 30s)', 'success');
-        }
-        
-        function stopAutoRefresh() {
-            if (autoRefreshInterval) {
-                clearInterval(autoRefreshInterval);
-                autoRefreshInterval = null;
-                showNotification('Auto refresh stopped', 'info');
-            }
-        }
-        
-        function openTradeModal(symbol, direction, takeProfit, stopLoss, confidence) {
-            currentTradeData = {
-                symbol: symbol,
-                direction: direction,
-                takeProfit: takeProfit,
-                stopLoss: stopLoss,
-                confidence: confidence
-            };
-            
-            const tradeDetails = document.getElementById('tradeDetails');
-            tradeDetails.innerHTML = `
-                <p><strong>Symbol:</strong> ${symbol}</p>
-                <p><strong>Direction:</strong> <span class="badge bg-${direction === 'Buy' ? 'success' : 'danger'}">${direction}</span></p>
-                <p><strong>Take Profit:</strong> <span class="text-success">${takeProfit}%</span></p>
-                <p><strong>Stop Loss:</strong> <span class="text-danger">${stopLoss}%</span></p>
-                <p><strong>AI Confidence:</strong> ${confidence}%</p>
-            `;
-            
-            const modal = new bootstrap.Modal(document.getElementById('tradeModal'));
-            modal.show();
-        }
-        
-        function executeTrade() {
-            if (!currentTradeData) return;
-            
-            const amount = parseFloat(document.getElementById('tradeAmount').value);
-            
-            const tradePayload = {
-                symbol: currentTradeData.symbol,
-                side: currentTradeData.direction,
-                amount: amount,
-                takeProfit: currentTradeData.takeProfit,
-                stopLoss: currentTradeData.stopLoss
-            };
-            
-            fetch('/api/execute_ai_trade', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(tradePayload)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showNotification(`Trade executed successfully for ${currentTradeData.symbol}`, 'success');
-                    // Close modal
-                    bootstrap.Modal.getInstance(document.getElementById('tradeModal')).hide();
-                    // Refresh data
-                    loadCoinAnalysis();
-                } else {
-                    showNotification(`Trade failed: ${data.message}`, 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Trade execution error:', error);
-                showNotification('Error executing trade', 'error');
-            });
-        }
-        
-        function showNotification(message, type) {
-            const notification = document.createElement('div');
-            notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
-            notification.style.top = '20px';
-            notification.style.right = '20px';
-            notification.style.zIndex = '9999';
-            notification.innerHTML = `
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-            
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.remove();
-            }, 5000);
-        }
-        
-        // Header balance functions
-        function updateHeaderBalance() {
-            // Update balance
-            fetch('/api/balance_header')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('headerBalance').textContent = `$${data.balance.toFixed(2)}`;
-                    
-                    const pnlElement = document.getElementById('headerPnl');
-                    const pnlClass = data.pnl_24h >= 0 ? 'profit' : 'loss';
-                    const pnlSign = data.pnl_24h >= 0 ? '+' : '';
-                    pnlElement.className = pnlClass;
-                    pnlElement.textContent = `${pnlSign}$${data.pnl_24h.toFixed(2)} (${data.pnl_24h_percent.toFixed(1)}%)`;
-                }
-            })
-            .catch(error => console.error('Error updating header balance:', error));
-            
-            // Update account name
-            fetch('/api/account_name')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('headerAccountName').textContent = data.account_name;
-                }
-            })
-            .catch(error => console.error('Error updating account name:', error));
-        }
-        
-        function updateStatusLights() {
-            // Get system status
-            fetch('/api/system_status')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.status) {
-                    const status = data.status;
-                    
-                    // Update ByBit API status
-                    const bybitApiDot = document.getElementById('statusBybitApi');
-                    bybitApiDot.className = `status-dot status-${status.bybit_api.status}`;
-                    bybitApiDot.title = `ByBit API: ${status.bybit_api.message}`;
-                    
-                    // Update Database status
-                    const databaseDot = document.getElementById('statusDatabase');
-                    databaseDot.className = `status-dot status-${status.database.status}`;
-                    databaseDot.title = `Database: ${status.database.message}`;
-                    
-                    // Update Dyno status
-                    const dynoDot = document.getElementById('statusDyno');
-                    dynoDot.className = `status-dot status-${status.dyno.status}`;
-                    dynoDot.title = `Dyno: ${status.dyno.message}`;
-                    
-                    // Update DNS status
-                    const dnsDot = document.getElementById('statusDns');
-                    if (dnsDot && status.dns) {
-                        dnsDot.className = `status-dot status-${status.dns.status}`;
-                        dnsDot.title = `DNS: ${status.dns.message}`;
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Status lights update error:', error);
-                // Set all to unknown on error
-                ['statusBybitApi', 'statusDatabase', 'statusDyno', 'statusDns'].forEach(id => {
-                    const dot = document.getElementById(id);
-                    if (dot) {
-                        dot.className = 'status-dot status-unknown';
-                        dot.title = 'Status unknown - connection error';
-                    }
+                    `;
                 });
-            });
         }
+        
+        function displayCoins() {
+            const grid = document.getElementById('coinsGrid');
+            let filteredCoins = [...allCoins];
+            
+            // Apply filter
+            if (currentFilter === 'bullish') {
+                filteredCoins = filteredCoins.filter(coin => coin.analysis === 'Bullish');
+            } else if (currentFilter === 'bearish') {
+                filteredCoins = filteredCoins.filter(coin => coin.analysis === 'Bearish');
+            } else if (currentFilter === 'high') {
+                filteredCoins = filteredCoins.filter(coin => coin.status === 'high');
+            }
+            
+            // Apply search
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            if (searchTerm) {
+                filteredCoins = filteredCoins.filter(coin => 
+                    coin.symbol.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            grid.innerHTML = filteredCoins.map(coin => `
+                <div class="glass-card rounded-xl p-6 hover:scale-105 transition-all duration-300">
+                    <div class="relative">
+                        <div class="analysis-badge ${coin.analysis.toLowerCase() === 'bullish' ? 'analysis-bullish' : 
+                                                     coin.analysis.toLowerCase() === 'bearish' ? 'analysis-bearish' : 
+                                                     'analysis-neutral'}">
+                            ${coin.analysis}
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h3 class="text-xl font-cyber font-bold text-white mb-1">${coin.symbol}</h3>
+                            <div class="flex items-center gap-2">
+                                <span class="status-badge ${coin.status_class}">
+                                    <i class="fas fa-circle text-xs"></i>
+                                    ${coin.status}
+                                </span>
+                                <span class="text-xs text-gray-400">Accuracy: ${coin.accuracy}%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-gray-400">Confidence</span>
+                                    <span class="text-neon-cyan font-bold">${coin.confidence}%</span>
+                                </div>
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill" style="width: ${coin.confidence}%"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-3 text-sm">
+                                <div>
+                                    <span class="text-gray-400">Direction:</span>
+                                    <span class="font-bold ${coin.direction === 'Buy' ? 'text-neon-green' : 'text-neon-pink'}">
+                                        ${coin.direction}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-400">TP:</span>
+                                    <span class="font-bold text-neon-yellow">${coin.takeProfit}%</span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-400">SL:</span>
+                                    <span class="font-bold text-neon-orange">${coin.stopLoss}%</span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-400">Time:</span>
+                                    <span class="font-mono text-xs text-gray-500">${coin.time_since}</span>
+                                </div>
+                            </div>
+                            
+                            <button class="w-full cyber-button py-2 px-4 rounded-lg text-sm mt-4" 
+                                    onclick="executeTrade('${coin.symbol}', '${coin.direction}', ${coin.takeProfit}, ${coin.stopLoss})">
+                                <i class="fas fa-rocket mr-2"></i>EXECUTE TRADE
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function filterCoins(filter) {
+            currentFilter = filter;
+            
+            // Update button states
+            document.querySelectorAll('[data-filter]').forEach(btn => {
+                if (btn.dataset.filter === filter) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            displayCoins();
+        }
+        
+        function searchCoins() {
+            displayCoins();
+        }
+        
+        function refreshData() {
+            const grid = document.getElementById('coinsGrid');
+            grid.innerHTML = `
+                <div class="col-span-full text-center py-16">
+                    <i class="fas fa-spinner fa-spin text-6xl text-neon-cyan mb-4"></i>
+                    <p class="text-gray-400">Refreshing AI analysis data...</p>
+                </div>
+            `;
+            loadCoinData();
+        }
+        
+        function executeTrade(symbol, side, takeProfit, stopLoss) {
+            if (confirm(`Execute ${side} trade for ${symbol}?\n\nTake Profit: ${takeProfit}%\nStop Loss: ${stopLoss}%`)) {
+                fetch('/api/execute_ai_trade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        side: side,
+                        amount: 100,
+                        takeProfit: takeProfit,
+                        stopLoss: stopLoss
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`Trade executed successfully!\n\n${data.message}`);
+                    } else {
+                        alert(`Trade execution failed:\n\n${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    alert(`Error executing trade:\n\n${error.message}`);
+                });
+            }
+        }
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCoinData();
+            
+            // Auto-refresh every 30 seconds
+            setInterval(loadCoinData, 30000);
+        });
     </script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ByBit AI Trading Bot Dashboard</title>
+    <title>ByBit AI Trading Bot - Neural Command Center</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.29.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
@@ -15,997 +15,1081 @@
             theme: {
                 extend: {
                     colors: {
-                        'neon-blue': '#00f0ff',
-                        'neon-purple': '#bf00ff',
-                        'neon-green': '#00ff41',
-                        'neon-pink': '#ff0080',
-                        'neon-yellow': '#ffff00',
-                        'cyber-dark': '#0a0a0f',
-                        'cyber-gray': '#1a1a2e',
-                        'cyber-light': '#16213e'
+                        'neon-cyan': '#00D9FF',
+                        'neon-purple': '#A100FF',
+                        'neon-pink': '#FF00C1',
+                        'neon-green': '#00FF88',
+                        'neon-yellow': '#FFD700',
+                        'neon-orange': '#FF6B00',
+                        'matrix-green': '#00FF41',
+                        'dark-bg': '#0A0A0F',
+                        'dark-panel': '#0F0F1A',
+                        'dark-border': '#1A1A2E',
+                        'dark-hover': '#16213E'
                     },
                     fontFamily: {
-                        'cyber': ['Orbitron', 'monospace']
-                    },
-                    boxShadow: {
-                        'neon-blue': '0 0 20px #00f0ff, 0 0 40px #00f0ff, 0 0 80px #00f0ff',
-                        'neon-purple': '0 0 20px #bf00ff, 0 0 40px #bf00ff, 0 0 80px #bf00ff',
-                        'neon-green': '0 0 20px #00ff41, 0 0 40px #00ff41, 0 0 80px #00ff41',
-                        'neon-pink': '0 0 20px #ff0080, 0 0 40px #ff0080, 0 0 80px #ff0080'
+                        'mono': ['JetBrains Mono', 'Fira Code', 'monospace'],
+                        'cyber': ['Orbitron', 'Rajdhani', 'sans-serif']
                     },
                     animation: {
                         'pulse-neon': 'pulse-neon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'scan-line': 'scan-line 8s linear infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
                         'float': 'float 6s ease-in-out infinite',
-                        'glow': 'glow 2s ease-in-out infinite alternate'
+                        'matrix': 'matrix 20s linear infinite'
+                    },
+                    backdropBlur: {
+                        xs: '2px',
                     }
                 }
             }
         }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         @keyframes pulse-neon {
-            0%, 100% { box-shadow: 0 0 20px currentColor, 0 0 40px currentColor; }
-            50% { box-shadow: 0 0 30px currentColor, 0 0 60px currentColor, 0 0 90px currentColor; }
+            0%, 100% { opacity: 1; filter: brightness(1) drop-shadow(0 0 20px currentColor); }
+            50% { opacity: 0.8; filter: brightness(1.2) drop-shadow(0 0 40px currentColor); }
         }
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
+        @keyframes scan-line {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
         }
         @keyframes glow {
-            from { text-shadow: 0 0 20px currentColor; }
-            to { text-shadow: 0 0 30px currentColor, 0 0 40px currentColor; }
+            from { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+            to { text-shadow: 0 0 20px currentColor, 0 0 30px currentColor, 0 0 40px currentColor; }
         }
-        .glass-effect {
-            background: rgba(26, 26, 46, 0.3);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(0, 240, 255, 0.2);
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            33% { transform: translateY(-10px) rotate(1deg); }
+            66% { transform: translateY(5px) rotate(-1deg); }
         }
+        @keyframes matrix {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(100%); }
+        }
+        
+        body {
+            background: #0A0A0F;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 217, 255, 0.03) 2px,
+                    rgba(0, 217, 255, 0.03) 4px
+                ),
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(161, 0, 255, 0.03) 2px,
+                    rgba(161, 0, 255, 0.03) 4px
+                );
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .scan-line {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(to bottom, transparent, rgba(0, 217, 255, 0.8), transparent);
+            animation: scan-line 8s linear infinite;
+            pointer-events: none;
+            z-index: 9999;
+        }
+        
+        .glass-panel {
+            background: rgba(15, 15, 26, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 0 40px rgba(0, 217, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .glass-panel::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent 30%,
+                rgba(0, 217, 255, 0.1) 50%,
+                transparent 70%
+            );
+            transform: rotate(45deg);
+            transition: all 0.5s;
+            opacity: 0;
+        }
+        
+        .glass-panel:hover::before {
+            opacity: 1;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .neon-text {
+            text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+            letter-spacing: 0.05em;
+        }
+        
         .neon-border {
-            border: 2px solid;
-            border-image: linear-gradient(45deg, #00f0ff, #bf00ff, #00ff41, #ff0080) 1;
+            position: relative;
+            border: 2px solid transparent;
+            background: linear-gradient(#0F0F1A, #0F0F1A) padding-box,
+                        linear-gradient(45deg, #00D9FF, #A100FF, #FF00C1, #00FF88) border-box;
         }
-        .profit { color: #00ff41; }
-        .loss { color: #ff0080; }
-        .chart-container { height: 400px; }
-        .status-dot {
-            width: 8px;
-            height: 8px;
+        
+        .neon-border::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #00D9FF, #A100FF, #FF00C1, #00FF88);
+            z-index: -1;
+            filter: blur(10px);
+            opacity: 0.5;
+            animation: float 4s ease-in-out infinite;
+        }
+        
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 0;
+            opacity: 0.05;
+        }
+        
+        .matrix-bg::before {
+            content: '101010110101001010101101010010101011010100101010110101001010101101010010101011010100';
+            position: absolute;
+            top: -100%;
+            left: 0;
+            width: 100%;
+            height: 200%;
+            color: #00FF41;
+            font-family: 'Fira Code', monospace;
+            font-size: 20px;
+            line-height: 1.2;
+            animation: matrix 20s linear infinite;
+            word-break: break-all;
+        }
+        
+        .cyber-button {
+            position: relative;
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(161, 0, 255, 0.1));
+            border: 1px solid rgba(0, 217, 255, 0.5);
+            color: #00D9FF;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.3s;
+            overflow: hidden;
+        }
+        
+        .cyber-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: radial-gradient(circle, rgba(0, 217, 255, 0.5), transparent);
+            transform: translate(-50%, -50%);
+            transition: width 0.5s, height 0.5s;
+        }
+        
+        .cyber-button:hover {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(161, 0, 255, 0.2));
+            border-color: #00D9FF;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.5), inset 0 0 20px rgba(0, 217, 255, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .cyber-button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .cyber-button:active {
+            transform: translateY(0);
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 6px;
+            margin-right: 8px;
+            position: relative;
         }
-        .status-online { background-color: #00ff41; box-shadow: 0 0 10px #00ff41; }
-        .status-offline { background-color: #ff0080; box-shadow: 0 0 10px #ff0080; }
-        .status-unknown { background-color: #ffff00; box-shadow: 0 0 10px #ffff00; }
+        
+        .status-indicator.online {
+            background: #00FF88;
+            box-shadow: 0 0 10px #00FF88, 0 0 20px #00FF88;
+        }
+        
+        .status-indicator.offline {
+            background: #FF00C1;
+            box-shadow: 0 0 10px #FF00C1, 0 0 20px #FF00C1;
+        }
+        
+        .status-indicator.processing {
+            background: #FFD700;
+            box-shadow: 0 0 10px #FFD700, 0 0 20px #FFD700;
+            animation: pulse-neon 1s infinite;
+        }
+        
+        .profit-text { color: #00FF88; text-shadow: 0 0 10px #00FF88; }
+        .loss-text { color: #FF00C1; text-shadow: 0 0 10px #FF00C1; }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            background: rgba(10, 10, 15, 0.8);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .trading-view-widget {
+            background: rgba(15, 15, 26, 0.9);
+            border: 1px solid rgba(0, 217, 255, 0.3);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(to bottom, #00D9FF, #A100FF);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(to bottom, #00D9FF, #FF00C1);
+        }
     </style>
 </head>
-<body class="bg-cyber-dark text-white font-cyber min-h-screen">
+<body class="bg-dark-bg text-white font-mono min-h-screen relative">
+    <!-- Matrix Background -->
+    <div class="matrix-bg"></div>
+    
+    <!-- Scan Line Effect -->
+    <div class="scan-line"></div>
+    
     <!-- Include shared header -->
     {% include 'includes/header.html' %}
 
-    <div class="flex min-h-screen">
+    <div class="flex min-h-screen relative z-10">
         <!-- AI Control Sidebar -->
-        <div class="w-80 bg-gradient-to-b from-cyber-gray to-cyber-dark p-6 border-r border-neon-blue/30">
+        <div class="w-96 bg-gradient-to-b from-dark-panel to-dark-bg p-6 border-r border-dark-border">
             <div class="space-y-6">
-                <!-- AI Trading Control Center -->
-                <div class="glass-effect rounded-xl p-6 border border-neon-blue/30">
-                    <h3 class="text-xl font-bold text-neon-blue mb-6 animate-glow flex items-center">
-                        <i class="fas fa-robot mr-3"></i> AI CONTROL CENTER
+                <!-- Neural Control Center -->
+                <div class="glass-panel rounded-xl p-6 neon-border">
+                    <h3 class="text-2xl font-cyber font-bold text-neon-cyan mb-6 flex items-center animate-glow">
+                        <i class="fas fa-brain mr-3"></i> NEURAL CONTROL CENTER
                     </h3>
                     
+                    <!-- System Status -->
+                    <div class="mb-6 p-4 bg-dark-bg/50 rounded-lg border border-neon-cyan/20">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-gray-400 text-sm">SYSTEM STATUS</span>
+                            <span id="systemStatus" class="flex items-center">
+                                <span class="status-indicator offline" id="statusDot"></span>
+                                <span class="text-sm font-medium" id="statusText">OFFLINE</span>
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                                <span class="text-gray-500">API:</span>
+                                <span id="apiStatus" class="ml-1 text-neon-green">CONNECTED</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">AI:</span>
+                                <span id="aiStatus" class="ml-1 text-neon-yellow">TRAINING</span>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Control Buttons -->
-                    <div class="space-y-4 mb-6">
-                        <button class="w-full bg-gradient-to-r from-neon-green/20 to-neon-green/40 hover:from-neon-green/40 hover:to-neon-green/60 border border-neon-green text-neon-green font-bold py-3 px-6 rounded-lg transition-all duration-300 hover:shadow-neon-green" onclick="startEverything()" id="startBtn">
-                            <i class="fas fa-play mr-2"></i> START ALL
-                        </button>
-                        <button class="w-full bg-gradient-to-r from-neon-pink/20 to-neon-pink/40 hover:from-neon-pink/40 hover:to-neon-pink/60 border border-neon-pink text-neon-pink font-bold py-3 px-6 rounded-lg transition-all duration-300 hover:shadow-neon-pink" onclick="stopEverything()" id="stopBtn">
-                            <i class="fas fa-stop mr-2"></i> STOP ALL
-                        </button>
-                    </div>
-
-                    <!-- Status Indicators -->
                     <div class="space-y-3">
-                        <div class="flex justify-between items-center">
-                            <span class="text-cyan-300">System Status:</span>
-                            <span id="systemStatus" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300">STOPPED</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-cyan-300">Training:</span>
-                            <span id="trainingIndicator" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300">STOPPED</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-cyan-300">Trading:</span>
-                            <span id="tradingIndicator" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300">STOPPED</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-cyan-300">Signals:</span>
-                            <span id="signalsIndicator" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300">STOPPED</span>
+                        <button class="w-full cyber-button py-3 px-6 rounded-lg flex items-center justify-center group" onclick="startEverything()" id="startBtn">
+                            <i class="fas fa-power-off mr-3 text-lg group-hover:animate-pulse"></i>
+                            <span class="font-bold">INITIALIZE SYSTEM</span>
+                        </button>
+                        
+                        <button class="w-full cyber-button py-3 px-6 rounded-lg flex items-center justify-center group" onclick="stopEverything()" id="stopBtn">
+                            <i class="fas fa-stop-circle mr-3 text-lg"></i>
+                            <span class="font-bold">EMERGENCY STOP</span>
+                        </button>
+                        
+                        <div class="grid grid-cols-2 gap-3">
+                            <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="startTraining()">
+                                <i class="fas fa-graduation-cap mr-2"></i> TRAIN AI
+                            </button>
+                            <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="enableTrading()">
+                                <i class="fas fa-chart-line mr-2"></i> LIVE TRADE
+                            </button>
                         </div>
                     </div>
-
-                    <!-- Database Stats -->
-                    <div class="mt-6 pt-4 border-t border-neon-blue/20">
-                        <div class="text-sm text-cyan-400">
-                            <div class="font-bold text-neon-blue">Database Records:</div>
-                            <div id="dbRecordCount" class="text-gray-300">Loading...</div>
+                    
+                    <!-- Trading Parameters -->
+                    <div class="mt-6 p-4 bg-dark-bg/50 rounded-lg border border-neon-purple/20">
+                        <h4 class="text-sm font-bold text-neon-purple mb-3">TRADING PARAMETERS</h4>
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Risk Level:</span>
+                                <span class="text-neon-green">MODERATE</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Max Positions:</span>
+                                <span id="maxPositions">5</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">AI Confidence:</span>
+                                <span class="text-neon-yellow">75%</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Quick Actions -->
-                <div class="glass-effect rounded-xl p-6 border border-neon-purple/30">
-                    <h4 class="text-lg font-bold text-neon-purple mb-4 flex items-center">
-                        <i class="fas fa-lightning-bolt mr-2"></i> QUICK ACTIONS
+                
+                <!-- Training Progress -->
+                <div class="glass-panel rounded-xl p-6" id="trainingProgressPanel" style="display: none;">
+                    <h4 class="text-lg font-cyber font-bold text-neon-purple mb-4 flex items-center">
+                        <i class="fas fa-brain mr-2 animate-pulse"></i> AI TRAINING
                     </h4>
                     <div class="space-y-3">
-                        <button class="w-full bg-gradient-to-r from-neon-blue/20 to-neon-blue/30 hover:from-neon-blue/30 hover:to-neon-blue/50 border border-neon-blue text-neon-blue py-2 px-4 rounded-lg transition-all duration-300 text-sm" onclick="refreshData()">
-                            <i class="fas fa-sync mr-2"></i> Refresh Data
-                        </button>
-                        <button class="w-full bg-gradient-to-r from-neon-yellow/20 to-neon-yellow/30 hover:from-neon-yellow/30 hover:to-neon-yellow/50 border border-neon-yellow text-neon-yellow py-2 px-4 rounded-lg transition-all duration-300 text-sm" onclick="closeAllPositions()">
-                            <i class="fas fa-times mr-2"></i> Close All Positions
-                        </button>
-                        <button class="w-full bg-gradient-to-r from-neon-purple/20 to-neon-purple/30 hover:from-neon-purple/30 hover:to-neon-purple/50 border border-neon-purple text-neon-purple py-2 px-4 rounded-lg transition-all duration-300 text-sm" onclick="testCryptoPanic()">
-                            <i class="fas fa-newspaper mr-2"></i> Test CryptoPanic
-                        </button>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>Progress</span>
+                                <span id="trainingPercent">0%</span>
+                            </div>
+                            <div class="w-full bg-dark-bg rounded-full h-3 overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-neon-purple to-neon-pink transition-all duration-500" 
+                                     style="width: 0%" id="trainingProgressBar"></div>
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-400">
+                            <div>Symbol: <span id="currentSymbol" class="text-neon-cyan">-</span></div>
+                            <div>Batch: <span id="currentBatch" class="text-neon-yellow">0/0</span></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Activity Log -->
+                <div class="glass-panel rounded-xl p-6">
+                    <h4 class="text-lg font-cyber font-bold text-neon-green mb-4 flex items-center">
+                        <i class="fas fa-terminal mr-2"></i> SYSTEM LOG
+                    </h4>
+                    <div class="h-64 overflow-y-auto bg-dark-bg/50 rounded-lg p-3 font-mono text-xs" id="consoleOutput">
+                        <div class="text-neon-green">System initialized...</div>
+                        <div class="text-gray-400">Waiting for commands...</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Main Content -->
-        <div class="flex-1 p-6 space-y-6">
-            <!-- Status Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <!-- Trading Status -->
-                <div class="glass-effect rounded-xl p-6 border border-neon-green/30 transform hover:scale-105 transition-all duration-300">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="text-sm text-gray-400 font-medium">TRADING STATUS</h3>
-                            <div class="flex items-center mt-2">
-                                <span class="status-indicator status-inactive" id="statusIndicator"></span>
-                                <span id="tradingStatus" class="text-xl font-bold text-neon-green">Active</span>
-                            </div>
-                        </div>
-                        <i class="fas fa-chart-line text-3xl text-neon-green animate-pulse-neon"></i>
+        <!-- Main Content Area -->
+        <div class="flex-1 p-8">
+            <!-- Top Stats Grid -->
+            <div class="grid grid-cols-4 gap-6 mb-8">
+                <!-- Total Balance -->
+                <div class="glass-panel rounded-xl p-6 hover:scale-105 transition-transform">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-sm font-medium text-gray-400">TOTAL BALANCE</h4>
+                        <i class="fas fa-wallet text-neon-cyan text-xl"></i>
+                    </div>
+                    <div class="text-3xl font-cyber font-bold text-white" id="totalBalance">$0.00</div>
+                    <div class="text-sm mt-2 text-gray-500">USDT</div>
+                </div>
+                
+                <!-- Active Positions -->
+                <div class="glass-panel rounded-xl p-6 hover:scale-105 transition-transform">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-sm font-medium text-gray-400">ACTIVE POSITIONS</h4>
+                        <i class="fas fa-chart-line text-neon-purple text-xl"></i>
+                    </div>
+                    <div class="text-3xl font-cyber font-bold text-white" id="activePositions">0</div>
+                    <div class="text-sm mt-2 text-gray-500">TRADES</div>
+                </div>
+                
+                <!-- Daily P&L -->
+                <div class="glass-panel rounded-xl p-6 hover:scale-105 transition-transform">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-sm font-medium text-gray-400">24H P&L</h4>
+                        <i class="fas fa-chart-area text-neon-pink text-xl"></i>
+                    </div>
+                    <div class="text-3xl font-cyber font-bold" id="dailyPnL">
+                        <span class="profit-text">+$0.00</span>
+                    </div>
+                    <div class="text-sm mt-2" id="dailyPnLPercent">
+                        <span class="profit-text">+0.00%</span>
                     </div>
                 </div>
-
-                <!-- Total PnL -->
-                <div class="glass-effect rounded-xl p-6 border border-neon-blue/30 transform hover:scale-105 transition-all duration-300">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="text-sm text-gray-400 font-medium">TOTAL PnL</h3>
-                            <div id="totalPnl" class="text-2xl font-bold text-neon-blue mt-2">$0.00</div>
-                        </div>
-                        <i class="fas fa-dollar-sign text-3xl text-neon-blue animate-pulse-neon"></i>
-                    </div>
-                </div>
-
-                <!-- Total Trades -->
-                <div class="glass-effect rounded-xl p-6 border border-neon-purple/30 transform hover:scale-105 transition-all duration-300">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="text-sm text-gray-400 font-medium">TOTAL TRADES</h3>
-                            <div id="totalTrades" class="text-2xl font-bold text-neon-purple mt-2">0</div>
-                        </div>
-                        <i class="fas fa-exchange-alt text-3xl text-neon-purple animate-pulse-neon"></i>
-                    </div>
-                </div>
-
+                
                 <!-- Win Rate -->
-                <div class="glass-effect rounded-xl p-6 border border-neon-pink/30 transform hover:scale-105 transition-all duration-300">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="text-sm text-gray-400 font-medium">WIN RATE</h3>
-                            <div id="winRate" class="text-2xl font-bold text-neon-pink mt-2">0%</div>
-                        </div>
-                        <i class="fas fa-percentage text-3xl text-neon-pink animate-pulse-neon"></i>
+                <div class="glass-panel rounded-xl p-6 hover:scale-105 transition-transform">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-sm font-medium text-gray-400">WIN RATE</h4>
+                        <i class="fas fa-trophy text-neon-yellow text-xl"></i>
                     </div>
+                    <div class="text-3xl font-cyber font-bold text-white" id="winRate">0%</div>
+                    <div class="text-sm mt-2 text-gray-500" id="totalTrades">0 TRADES</div>
                 </div>
             </div>
-
-            <!-- Open Positions (Moved to top) -->
-            <div class="glass-effect rounded-xl border border-neon-green/30">
-                <div class="p-6 border-b border-neon-green/20">
-                    <h2 class="text-xl font-bold text-neon-green flex items-center">
-                        <i class="fas fa-coins mr-3"></i> OPEN POSITIONS
-                    </h2>
-                </div>
-                <div class="p-6">
-                    <div id="positionsContainer">
-                        <!-- Positions will be loaded here -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Training Progress Panel -->
-            <div id="trainingProgressPanel" style="display: none;" class="glass-effect rounded-xl border border-neon-purple/30">
-                <div class="p-6 border-b border-neon-purple/20 flex justify-between items-center">
-                    <h2 class="text-xl font-bold text-neon-purple flex items-center">
-                        <i class="fas fa-brain mr-3"></i> AI TRAINING PROGRESS
-                    </h2>
-                </div>
-                <div class="p-6">
-                    <!-- Progress Bar -->
-                    <div class="mb-6">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-cyan-300">Overall Progress</span>
-                            <span id="progressPercent" class="text-neon-purple font-bold">0%</span>
-                        </div>
-                        <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
-                            <div class="h-full bg-gradient-to-r from-neon-purple to-neon-pink rounded-full transition-all duration-300 animate-pulse-neon" 
-                                 id="trainingProgressBar" 
-                                 style="width: 0%;">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Training Details -->
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                        <div class="text-center">
-                            <h3 class="text-sm text-gray-400 font-medium">CURRENT SYMBOL</h3>
-                            <span class="text-xl font-bold text-neon-blue" id="currentSymbol">-</span>
-                        </div>
-                        <div class="text-center">
-                            <h3 class="text-sm text-gray-400 font-medium">BATCH PROGRESS</h3>
-                            <span class="text-xl font-bold text-neon-green" id="batchProgress">0/0</span>
-                        </div>
-                        <div class="text-center">
-                            <h3 class="text-sm text-gray-400 font-medium">SYMBOLS COMPLETED</h3>
-                            <span class="text-xl font-bold text-neon-purple" id="symbolsCompleted">0/0</span>
-                        </div>
-                        <div class="text-center">
-                            <h3 class="text-sm text-gray-400 font-medium">AVG ACCURACY</h3>
-                            <span class="text-xl font-bold text-neon-pink" id="avgAccuracy">0%</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Live Training Console -->
-            <div id="trainingConsolePanel" style="display: none;" class="glass-effect rounded-xl border border-neon-yellow/30">
-                <div class="p-6 border-b border-neon-yellow/20 flex justify-between items-center">
-                    <h3 class="text-lg font-bold text-neon-yellow flex items-center">
-                        <i class="fas fa-terminal mr-3"></i> TRAINING CONSOLE
+            
+            <!-- Open Positions -->
+            <div class="glass-panel rounded-xl p-6 mb-8">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-cyber font-bold text-white flex items-center">
+                        <i class="fas fa-rocket mr-3 text-neon-cyan animate-pulse"></i>
+                        ACTIVE POSITIONS
                     </h3>
-                    <button class="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white py-2 px-4 rounded-lg transition-all duration-300 text-sm" onclick="clearTrainingLogs()">
-                        <i class="fas fa-trash mr-2"></i> Clear
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="closeAllPositions()">
+                        <i class="fas fa-times-circle mr-2"></i> CLOSE ALL
                     </button>
                 </div>
-                <div class="p-6">
-                    <div id="trainingConsole" class="h-48 overflow-y-auto bg-black/50 text-neon-green font-mono p-4 rounded-lg border border-neon-green/30 text-sm">
-                        <!-- Training logs will appear here -->
-                    </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-dark-border text-left">
+                                <th class="pb-3 text-gray-400 font-medium">Symbol</th>
+                                <th class="pb-3 text-gray-400 font-medium">Side</th>
+                                <th class="pb-3 text-gray-400 font-medium">Size</th>
+                                <th class="pb-3 text-gray-400 font-medium">Entry</th>
+                                <th class="pb-3 text-gray-400 font-medium">Current</th>
+                                <th class="pb-3 text-gray-400 font-medium">P&L</th>
+                                <th class="pb-3 text-gray-400 font-medium">ROI</th>
+                                <th class="pb-3 text-gray-400 font-medium">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positionsTable">
+                            <tr>
+                                <td colspan="8" class="text-center py-8 text-gray-500">
+                                    No active positions
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-
-            <!-- ROI Chart with Time Switcher -->
-            <div class="glass-effect rounded-xl border border-neon-blue/30">
-                <div class="p-6 border-b border-neon-blue/20">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-xl font-bold text-neon-blue flex items-center">
-                            <i class="fas fa-chart-area mr-3"></i> CUMULATIVE ROI
-                        </h2>
+            
+            <!-- Charts Row -->
+            <div class="grid grid-cols-2 gap-6 mb-8">
+                <!-- ROI Chart -->
+                <div class="glass-panel rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-cyber font-bold text-white">CUMULATIVE ROI</h3>
                         <div class="flex space-x-2">
-                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="1h">1H</button>
-                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="4h">4H</button>
-                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="12h">12H</button>
-                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300 bg-neon-blue/20" data-timeframe="1d">1D</button>
-                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="3d">3D</button>
-                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="7d">7D</button>
-                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="30d">30D</button>
-                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="3m">3M</button>
-                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="1y">1Y</button>
-                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="all">ALL</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs active" onclick="changeROIPeriod('1h', this)">1H</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('4h', this)">4H</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('12h', this)">12H</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('1d', this)">1D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('3d', this)">3D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('7d', this)">7D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('30d', this)">30D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('3m', this)">3M</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('1y', this)">1Y</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('all', this)">ALL</button>
                         </div>
                     </div>
-                </div>
-                <div class="p-6">
-                    <div id="roiChart" class="chart-container"></div>
-                </div>
-            </div>
-
-            <!-- Price Chart and Open Orders -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Price Chart -->
-                <div class="lg:col-span-2 glass-effect rounded-xl border border-neon-green/30">
-                    <div class="p-6 border-b border-neon-green/20">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-xl font-bold text-neon-green flex items-center">
-                                <i class="fas fa-chart-line mr-3"></i> PRICE CHART
-                            </h2>
-                            <select id="symbolSelect" class="bg-cyber-gray border border-neon-green/30 text-neon-green rounded-lg px-4 py-2 focus:outline-none focus:border-neon-green">
-                                <option value="BTCUSDT">BTC/USDT</option>
-                                <option value="ETHUSDT">ETH/USDT</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="p-6">
-                        <div id="priceChart" class="chart-container"></div>
+                    <div class="chart-container">
+                        <canvas id="roiChart"></canvas>
                     </div>
                 </div>
-
-                <!-- Open Orders -->
-                <div class="glass-effect rounded-xl border border-neon-purple/30">
-                    <div class="p-6 border-b border-neon-purple/20">
-                        <h2 class="text-xl font-bold text-neon-purple flex items-center">
-                            <i class="fas fa-list mr-3"></i> OPEN ORDERS
-                        </h2>
-                    </div>
-                    <div class="p-6">
-                        <div id="ordersContainer">
-                            <!-- Orders will be loaded here -->
-                        </div>
+                
+                <!-- Performance Analytics -->
+                <div class="glass-panel rounded-xl p-6">
+                    <h3 class="text-lg font-cyber font-bold text-white mb-4">PERFORMANCE ANALYTICS</h3>
+                    <div class="chart-container">
+                        <canvas id="performanceChart"></canvas>
                     </div>
                 </div>
             </div>
-
-            <!-- Recent Trades -->
-            <div class="glass-effect rounded-xl border border-neon-pink/30">
-                <div class="p-6 border-b border-neon-pink/20">
-                    <h2 class="text-xl font-bold text-neon-pink flex items-center">
-                        <i class="fas fa-history mr-3"></i> RECENT TRADES
-                    </h2>
+            
+            <!-- AI Signals -->
+            <div class="glass-panel rounded-xl p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-cyber font-bold text-white flex items-center">
+                        <i class="fas fa-robot mr-3 text-neon-purple"></i>
+                        AI TRADING SIGNALS
+                    </h3>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-400">Auto-Execute:</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" class="sr-only peer" id="autoExecute" onchange="toggleAutoExecute()">
+                            <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-neon-green"></div>
+                        </label>
+                    </div>
                 </div>
-                <div class="p-6">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead>
-                                <tr class="border-b border-neon-pink/20">
-                                    <th class="text-left py-3 text-cyan-300">Time</th>
-                                    <th class="text-left py-3 text-cyan-300">Symbol</th>
-                                    <th class="text-left py-3 text-cyan-300">Side</th>
-                                    <th class="text-left py-3 text-cyan-300">Size</th>
-                                    <th class="text-left py-3 text-cyan-300">Price</th>
-                                    <th class="text-left py-3 text-cyan-300">PnL</th>
-                                    <th class="text-left py-3 text-cyan-300">Fee</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tradesTableBody">
-                                <!-- Trades will be loaded here -->
-                            </tbody>
-                        </table>
+                <div class="grid grid-cols-3 gap-4" id="signalsGrid">
+                    <div class="text-center py-12 text-gray-500 col-span-3">
+                        <i class="fas fa-brain text-6xl mb-4 opacity-20"></i>
+                        <p>AI is analyzing market conditions...</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- WebSocket and JavaScript -->
     <script>
-        // Initialize Socket.IO
         const socket = io();
+        let roiChart, performanceChart;
+        let currentROIPeriod = '1h';
         
-        // Global variables
-        let isTrading = false;
-        let currentSymbol = 'BTCUSDT';
-        let currentTimeframe = '1d';
+        // Initialize charts
+        function initCharts() {
+            // ROI Chart
+            const roiCtx = document.getElementById('roiChart').getContext('2d');
+            roiChart = new Chart(roiCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Cumulative ROI %',
+                        data: [],
+                        borderColor: '#00D9FF',
+                        backgroundColor: 'rgba(0, 217, 255, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#00D9FF',
+                        pointBorderColor: '#00D9FF',
+                        pointHoverBackgroundColor: '#FF00C1',
+                        pointHoverBorderColor: '#FF00C1',
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#00D9FF',
+                            bodyColor: '#FFFFFF',
+                            borderColor: '#00D9FF',
+                            borderWidth: 1,
+                            cornerRadius: 4,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return `ROI: ${context.parsed.y.toFixed(2)}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                borderColor: 'rgba(0, 217, 255, 0.3)'
+                            },
+                            ticks: {
+                                color: '#888',
+                                font: {
+                                    family: 'JetBrains Mono'
+                                }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                borderColor: 'rgba(0, 217, 255, 0.3)'
+                            },
+                            ticks: {
+                                color: '#888',
+                                font: {
+                                    family: 'JetBrains Mono'
+                                },
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Performance Chart
+            const perfCtx = document.getElementById('performanceChart').getContext('2d');
+            performanceChart = new Chart(perfCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Wins', 'Losses', 'Pending'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: [
+                            'rgba(0, 255, 136, 0.5)',
+                            'rgba(255, 0, 193, 0.5)',
+                            'rgba(255, 215, 0, 0.5)'
+                        ],
+                        borderColor: [
+                            '#00FF88',
+                            '#FF00C1',
+                            '#FFD700'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#00D9FF',
+                            bodyColor: '#FFFFFF',
+                            borderColor: '#00D9FF',
+                            borderWidth: 1,
+                            cornerRadius: 4
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                borderColor: 'rgba(0, 217, 255, 0.3)'
+                            },
+                            ticks: {
+                                color: '#888',
+                                font: {
+                                    family: 'Orbitron',
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                borderColor: 'rgba(0, 217, 255, 0.3)'
+                            },
+                            ticks: {
+                                color: '#888',
+                                font: {
+                                    family: 'JetBrains Mono'
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update dashboard data
+        function updateDashboard() {
+            fetch('/api/dashboard_data')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update balance
+                        document.getElementById('totalBalance').textContent = `$${data.total_balance.toFixed(2)}`;
+                        
+                        // Update positions
+                        document.getElementById('activePositions').textContent = data.active_positions_count;
+                        
+                        // Update P&L
+                        const pnlElement = document.getElementById('dailyPnL');
+                        const pnlPercentElement = document.getElementById('dailyPnLPercent');
+                        const pnl = data.unrealized_pnl;
+                        const pnlPercent = data.total_balance > 0 ? (pnl / data.total_balance * 100) : 0;
+                        
+                        if (pnl >= 0) {
+                            pnlElement.innerHTML = `<span class="profit-text">+$${Math.abs(pnl).toFixed(2)}</span>`;
+                            pnlPercentElement.innerHTML = `<span class="profit-text">+${Math.abs(pnlPercent).toFixed(2)}%</span>`;
+                        } else {
+                            pnlElement.innerHTML = `<span class="loss-text">-$${Math.abs(pnl).toFixed(2)}</span>`;
+                            pnlPercentElement.innerHTML = `<span class="loss-text">-${Math.abs(pnlPercent).toFixed(2)}%</span>`;
+                        }
+                        
+                        // Update win rate
+                        document.getElementById('winRate').textContent = `${data.win_rate.toFixed(1)}%`;
+                        document.getElementById('totalTrades').textContent = `${data.total_trades} TRADES`;
+                        
+                        // Update positions table
+                        updatePositionsTable(data.positions);
+                    }
+                })
+                .catch(error => console.error('Dashboard update error:', error));
+        }
+        
+        // Update positions table
+        function updatePositionsTable(positions) {
+            const tbody = document.getElementById('positionsTable');
+            
+            if (!positions || positions.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center py-8 text-gray-500">
+                            No active positions
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = positions.map(pos => {
+                const pnl = parseFloat(pos.unrealisedPnl || 0);
+                const pnlPercent = parseFloat(pos.percentage || 0);
+                const pnlClass = pnl >= 0 ? 'profit-text' : 'loss-text';
+                
+                return `
+                    <tr class="border-b border-dark-border hover:bg-dark-hover transition-colors">
+                        <td class="py-3 font-medium">${pos.symbol}</td>
+                        <td class="py-3">
+                            <span class="px-2 py-1 rounded text-xs font-bold ${pos.side === 'Buy' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}">
+                                ${pos.side}
+                            </span>
+                        </td>
+                        <td class="py-3">${pos.size}</td>
+                        <td class="py-3">$${parseFloat(pos.avgPrice).toFixed(4)}</td>
+                        <td class="py-3">$${parseFloat(pos.markPrice).toFixed(4)}</td>
+                        <td class="py-3 ${pnlClass}">
+                            ${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}
+                        </td>
+                        <td class="py-3 ${pnlClass}">
+                            ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%
+                        </td>
+                        <td class="py-3">
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="closePosition('${pos.symbol}')">
+                                Close
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // Update trading status
+        function updateTradingStatus() {
+            fetch('/api/trading_status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.status) {
+                        const statusDot = document.getElementById('statusDot');
+                        const statusText = document.getElementById('statusText');
+                        
+                        if (data.status.worker_running) {
+                            statusDot.className = 'status-indicator online';
+                            statusText.textContent = 'ONLINE';
+                            statusText.className = 'text-sm font-medium text-neon-green';
+                            
+                            // Start the worker if not already running
+                            if (!data.status.enabled) {
+                                fetch('/api/start_worker', { method: 'POST' })
+                                    .then(response => response.json())
+                                    .then(result => {
+                                        if (result.success) {
+                                            addConsoleMessage('SUCCESS', 'AI Worker activated');
+                                        }
+                                    });
+                            }
+                        } else {
+                            statusDot.className = 'status-indicator offline';
+                            statusText.textContent = 'OFFLINE';
+                            statusText.className = 'text-sm font-medium text-neon-pink';
+                        }
+                        
+                        document.getElementById('maxPositions').textContent = data.status.max_trades || 5;
+                    }
+                })
+                .catch(error => console.error('Trading status error:', error));
+        }
         
         // Socket event handlers
-        socket.on('connect', function() {
-            console.log('Connected to server');
+        socket.on('console_log', function(data) {
+            addConsoleMessage(data.level, data.message);
         });
         
-        socket.on('stats_update', function(data) {
-            updateStats(data);
-        });
-        
-        socket.on('trade_update', function(data) {
-            handleTradeUpdate(data);
-        });
-        
-        socket.on('worker_status', function(data) {
-            updateWorkerStatus(data);
-        });
-        
-        socket.on('trading_signal', function(data) {
-            handleTradingSignal(data);
-        });
-
-        // Socket event handlers for real-time training updates
         socket.on('training_progress', function(data) {
-            updateTrainingProgress();
-            if (data.message) {
-                appendTrainingLog(data.level || 'INFO', data.message);
-            }
+            updateTrainingProgress(data.progress);
         });
-
+        
         socket.on('training_log', function(data) {
-            appendTrainingLog(data.level, data.message);
+            addConsoleMessage(data.level, data.message);
         });
         
-        // Event listeners
-        document.getElementById('symbolSelect').addEventListener('change', function() {
-            currentSymbol = this.value;
-            updatePriceChart();
-        });
-
-        // Time frame buttons
-        document.querySelectorAll('.time-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('bg-neon-blue/20'));
-                this.classList.add('bg-neon-blue/20');
-                currentTimeframe = this.dataset.timeframe;
-                updateROIChart();
-            });
+        socket.on('position_update', function(data) {
+            updateDashboard();
         });
         
-        // System control functions
-        function updateTradingStatus() {
-            const statusIndicator = document.getElementById('statusIndicator');
-            const statusText = document.getElementById('tradingStatus');
+        // Console message handler
+        function addConsoleMessage(level, message) {
+            const consoleOutput = document.getElementById('consoleOutput');
+            const timestamp = new Date().toLocaleTimeString();
             
-            if (isTrading) {
-                statusIndicator.className = 'status-indicator status-online';
-                statusText.textContent = 'Active';
-                statusText.className = 'text-xl font-bold text-neon-green';
-            } else {
-                statusIndicator.className = 'status-indicator status-offline';
-                statusText.textContent = 'Inactive';
-                statusText.className = 'text-xl font-bold text-neon-pink';
+            let colorClass = 'text-gray-400';
+            let prefix = '>';
+            
+            switch(level) {
+                case 'SUCCESS':
+                    colorClass = 'text-neon-green';
+                    prefix = '✓';
+                    break;
+                case 'ERROR':
+                    colorClass = 'text-neon-pink';
+                    prefix = '✗';
+                    break;
+                case 'WARNING':
+                    colorClass = 'text-neon-yellow';
+                    prefix = '!';
+                    break;
+                case 'INFO':
+                    colorClass = 'text-neon-cyan';
+                    prefix = 'i';
+                    break;
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = colorClass;
+            messageDiv.innerHTML = `<span class="text-gray-600">[${timestamp}]</span> <span class="font-bold">${prefix}</span> ${message}`;
+            
+            consoleOutput.appendChild(messageDiv);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            
+            // Keep only last 100 messages
+            while (consoleOutput.children.length > 100) {
+                consoleOutput.removeChild(consoleOutput.firstChild);
             }
         }
         
-        function updateStats(stats) {
-            document.getElementById('totalPnl').textContent = `$${stats.total_pnl.toFixed(2)}`;
-            document.getElementById('totalTrades').textContent = stats.total_trades;
+        // Training progress handler
+        function updateTrainingProgress(progress) {
+            const panel = document.getElementById('trainingProgressPanel');
+            panel.style.display = 'block';
             
-            const winRate = stats.total_trades > 0 ? (stats.winning_trades / stats.total_trades * 100).toFixed(1) : 0;
-            document.getElementById('winRate').textContent = `${winRate}%`;
+            document.getElementById('trainingPercent').textContent = `${progress.overall_progress.toFixed(1)}%`;
+            document.getElementById('trainingProgressBar').style.width = `${progress.overall_progress}%`;
+            document.getElementById('currentSymbol').textContent = progress.current_symbol || '-';
+            document.getElementById('currentBatch').textContent = `${progress.current_batch}/${progress.total_batches}`;
             
-            // Update PnL color
-            const pnlElement = document.getElementById('totalPnl');
-            pnlElement.className = stats.total_pnl >= 0 ? 'text-2xl font-bold text-neon-green mt-2' : 'text-2xl font-bold text-neon-pink mt-2';
-        }
-
-        function updateROIChart() {
-            // Create sample ROI data starting from today
-            const now = new Date();
-            const data = [];
-            let cumulativeROI = 0;
-            
-            // Generate data based on timeframe
-            let periods, interval;
-            switch(currentTimeframe) {
-                case '1h': periods = 60; interval = 1; break;
-                case '4h': periods = 96; interval = 15; break;
-                case '12h': periods = 144; interval = 30; break;
-                case '1d': periods = 24; interval = 60; break;
-                case '3d': periods = 72; interval = 60; break;
-                case '7d': periods = 168; interval = 60; break;
-                case '30d': periods = 720; interval = 60; break;
-                case '3m': periods = 2160; interval = 60; break;
-                case '1y': periods = 8760; interval = 60; break;
-                case 'all': periods = 17520; interval = 60; break;
-                default: periods = 24; interval = 60;
+            if (progress.overall_progress >= 100) {
+                setTimeout(() => {
+                    panel.style.display = 'none';
+                }, 5000);
             }
-            
-            for (let i = periods; i >= 0; i--) {
-                const time = new Date(now.getTime() - (i * interval * 60 * 1000));
-                const change = (Math.random() - 0.5) * 2; // Random change between -1 and 1
-                cumulativeROI += change;
-                data.push({
-                    x: time,
-                    y: cumulativeROI
+        }
+        
+        // Control functions
+        function startEverything() {
+            fetch('/api/start_all', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addConsoleMessage('SUCCESS', 'System initialization complete');
+                        updateTradingStatus();
+                    } else {
+                        addConsoleMessage('ERROR', data.message || 'Failed to start system');
+                    }
+                })
+                .catch(error => {
+                    addConsoleMessage('ERROR', `System error: ${error.message}`);
                 });
+        }
+        
+        function stopEverything() {
+            fetch('/api/stop_all', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addConsoleMessage('WARNING', 'System shutdown complete');
+                        updateTradingStatus();
+                    }
+                })
+                .catch(error => {
+                    addConsoleMessage('ERROR', `Shutdown error: ${error.message}`);
+                });
+        }
+        
+        function startTraining() {
+            fetch('/api/start_training', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addConsoleMessage('SUCCESS', 'AI training initiated');
+                    } else {
+                        addConsoleMessage('ERROR', data.message || 'Failed to start training');
+                    }
+                })
+                .catch(error => {
+                    addConsoleMessage('ERROR', `Training error: ${error.message}`);
+                });
+        }
+        
+        function enableTrading() {
+            fetch('/api/enable_trading', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addConsoleMessage('SUCCESS', 'Live trading enabled - REAL MONEY MODE');
+                    } else {
+                        addConsoleMessage('ERROR', data.message || 'Failed to enable trading');
+                    }
+                })
+                .catch(error => {
+                    addConsoleMessage('ERROR', `Trading error: ${error.message}`);
+                });
+        }
+        
+        // ROI period change
+        function changeROIPeriod(period, button) {
+            currentROIPeriod = period;
+            
+            // Update button states
+            document.querySelectorAll('.cyber-button').forEach(btn => {
+                if (btn.textContent.toLowerCase() === period.toLowerCase() || 
+                    (period === 'all' && btn.textContent === 'ALL')) {
+                    btn.classList.add('active');
+                } else if (btn.parentElement.classList.contains('flex') && 
+                          btn.parentElement.classList.contains('space-x-2')) {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            // Update chart data
+            updateROIChart(period);
+        }
+        
+        function updateROIChart(period) {
+            // This would fetch actual ROI data for the period
+            // For now, generate sample data
+            const periods = {
+                '1h': 12,
+                '4h': 16,
+                '12h': 24,
+                '1d': 24,
+                '3d': 36,
+                '7d': 42,
+                '30d': 60,
+                '3m': 90,
+                '1y': 120,
+                'all': 200
+            };
+            
+            const points = periods[period] || 24;
+            const labels = [];
+            const data = [];
+            let cumulative = 0;
+            
+            for (let i = 0; i < points; i++) {
+                labels.push(i.toString());
+                cumulative += (Math.random() - 0.45) * 2;
+                data.push(cumulative);
             }
             
-            const trace = {
-                x: data.map(d => d.x),
-                y: data.map(d => d.y),
-                type: 'scatter',
-                mode: 'lines',
-                line: {
-                    color: '#00f0ff',
-                    width: 3,
-                    shape: 'spline'
-                },
-                fill: 'tonexty',
-                fillcolor: 'rgba(0, 240, 255, 0.1)',
-                name: 'Cumulative ROI'
-            };
-            
-            const layout = {
-                title: {
-                    text: `Cumulative ROI (${currentTimeframe.toUpperCase()})`,
-                    font: { color: '#00f0ff', size: 16 }
-                },
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff' },
-                xaxis: {
-                    gridcolor: 'rgba(0, 240, 255, 0.2)',
-                    linecolor: 'rgba(0, 240, 255, 0.5)'
-                },
-                yaxis: {
-                    gridcolor: 'rgba(0, 240, 255, 0.2)',
-                    linecolor: 'rgba(0, 240, 255, 0.5)',
-                    ticksuffix: '%'
-                },
-                margin: { t: 50, r: 30, b: 50, l: 60 }
-            };
-            
-            Plotly.newPlot('roiChart', [trace], layout, {responsive: true, displayModeBar: false});
+            roiChart.data.labels = labels;
+            roiChart.data.datasets[0].data = data;
+            roiChart.update();
         }
         
-        function updatePriceChart() {
-            fetch(`/api/chart_data/${currentSymbol}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    console.error('Chart error:', data.error);
-                    return;
-                }
-                
-                // Apply neon styling to chart
-                if (data.layout) {
-                    data.layout.paper_bgcolor = 'rgba(0,0,0,0)';
-                    data.layout.plot_bgcolor = 'rgba(0,0,0,0)';
-                    data.layout.font = { color: '#ffffff' };
-                    data.layout.xaxis = { ...data.layout.xaxis, gridcolor: 'rgba(0, 255, 65, 0.2)' };
-                    data.layout.yaxis = { ...data.layout.yaxis, gridcolor: 'rgba(0, 255, 65, 0.2)' };
-                }
-                
-                Plotly.newPlot('priceChart', data.data, data.layout, {responsive: true, displayModeBar: false});
-            })
-            .catch(error => {
-                console.error('Chart fetch error:', error);
-            });
-        }
-        
-        function updatePositions() {
-            fetch('/api/positions')
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    console.error('Positions error:', data.error);
-                    return;
-                }
-                
-                const container = document.getElementById('positionsContainer');
-                container.innerHTML = '';
-                
-                if (data.success && data.positions && data.positions.length > 0) {
-                    data.positions.forEach(position => {
-                        const positionCard = createPositionCard(position);
-                        container.appendChild(positionCard);
-                    });
-                } else {
-                    container.innerHTML = '<p class="text-gray-400 text-center py-4">No open positions</p>';
-                }
-            });
-        }
-        
-        function createPositionCard(position) {
-            const card = document.createElement('div');
-            card.className = 'glass-effect rounded-lg p-4 border border-neon-green/30 mb-3 transform hover:scale-105 transition-all duration-300';
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            updateDashboard();
+            updateTradingStatus();
+            updateROIChart('1h');
             
-            const unrealizedPnl = position.unrealisedPnl;
-            const pnlClass = unrealizedPnl >= 0 ? 'text-neon-green' : 'text-neon-pink';
-            const pnlSign = unrealizedPnl >= 0 ? '+' : '';
+            // Set up refresh intervals
+            setInterval(updateDashboard, 5000);
+            setInterval(updateTradingStatus, 10000);
             
-            card.innerHTML = `
-                <div class="flex justify-between items-center">
-                    <div>
-                        <h3 class="text-lg font-bold text-neon-blue">${position.symbol}</h3>
-                        <p class="text-sm text-gray-400">${position.side} • ${position.size} • ${position.leverage}x</p>
-                    </div>
-                    <div class="text-right">
-                        <div class="${pnlClass} text-lg font-bold">${pnlSign}$${unrealizedPnl.toFixed(2)}</div>
-                        <p class="text-xs text-gray-400">@ ${position.markPrice}</p>
-                        <button class="mt-2 bg-gradient-to-r from-neon-pink/20 to-neon-pink/40 border border-neon-pink text-neon-pink py-1 px-3 rounded-lg text-xs hover:from-neon-pink/40 hover:to-neon-pink/60 transition-all duration-300" onclick="closePosition('${position.symbol}', '${position.side}', '${position.size}')">
-                            Close
-                        </button>
-                    </div>
-                </div>
-            `;
+            // Add initial console message
+            addConsoleMessage('SUCCESS', 'Neural Command Center initialized');
+            addConsoleMessage('INFO', 'Connecting to ByBit API...');
             
-            return card;
-        }
+            // Check API connection
+            fetch('/api/system_status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.bybit_api.status === 'operational') {
+                        addConsoleMessage('SUCCESS', 'ByBit API connected');
+                        document.getElementById('apiStatus').textContent = 'CONNECTED';
+                        document.getElementById('apiStatus').className = 'ml-1 text-neon-green';
+                    } else {
+                        addConsoleMessage('ERROR', 'ByBit API connection failed');
+                        document.getElementById('apiStatus').textContent = 'ERROR';
+                        document.getElementById('apiStatus').className = 'ml-1 text-neon-pink';
+                    }
+                });
+        });
         
-        function closePosition(symbol, side, size) {
-            if (confirm(`Close position ${symbol}?`)) {
+        // Position management
+        function closePosition(symbol) {
+            if (confirm(`Close position for ${symbol}?`)) {
                 fetch('/api/close_position', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbol, side, size })
+                    body: JSON.stringify({ symbol: symbol })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        showNotification('Position closed successfully!', 'success');
-                        updatePositions();
+                        addConsoleMessage('SUCCESS', `Position closed: ${symbol}`);
+                        updateDashboard();
                     } else {
-                        showNotification('Error closing position: ' + data.error, 'error');
+                        addConsoleMessage('ERROR', `Failed to close position: ${data.message}`);
                     }
                 });
             }
         }
         
         function closeAllPositions() {
-            if (confirm('Close all positions? This cannot be undone!')) {
-                showNotification('All positions closed!', 'success');
-            }
-        }
-        
-        function refreshData() {
-            updateStats({ total_pnl: 0, total_trades: 0, winning_trades: 0, losing_trades: 0 });
-            updatePositions();
-            updatePriceChart();
-            updateROIChart();
-            showNotification('Data refreshed!', 'info');
-        }
-        
-        function handleTradeUpdate(data) {
-            if (data.type === 'new_trade') {
-                showNotification('New trade executed!', 'success');
-                updatePositions();
-            }
-        }
-        
-        function showNotification(message, type) {
-            // Create notification with neon styling
-            const notification = document.createElement('div');
-            let colorClass = 'border-neon-blue text-neon-blue';
-            if (type === 'error') colorClass = 'border-neon-pink text-neon-pink';
-            else if (type === 'success') colorClass = 'border-neon-green text-neon-green';
-            
-            notification.className = `fixed top-4 right-4 z-50 glass-effect border ${colorClass} rounded-lg p-4 transform transition-all duration-300 translate-x-full`;
-            notification.innerHTML = `
-                <div class="flex items-center justify-between">
-                    <span>${message}</span>
-                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-gray-400 hover:text-white">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            `;
-            
-            document.body.appendChild(notification);
-            
-            // Animate in
-            setTimeout(() => {
-                notification.classList.remove('translate-x-full');
-            }, 100);
-            
-            // Auto remove
-            setTimeout(() => {
-                notification.classList.add('translate-x-full');
-                setTimeout(() => notification.remove(), 300);
-            }, 3000);
-        }
-        
-        function handleTradingSignal(signal) {
-            showNotification(`New signal: ${signal.side} ${signal.symbol} (${signal.confidence}%)`, 'info');
-        }
-        
-        function loadAllSymbols() {
-            fetch('/api/symbols')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const symbolSelect = document.getElementById('symbolSelect');
-                    symbolSelect.innerHTML = '';
-                    
-                    // Add popular symbols first
-                    const popularSymbols = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT', 'DOGEUSDT'];
-                    popularSymbols.forEach(symbol => {
-                        const option = document.createElement('option');
-                        option.value = symbol;
-                        option.textContent = symbol.replace('USDT', '/USDT');
-                        symbolSelect.appendChild(option);
+            if (confirm('Close ALL positions?')) {
+                fetch('/api/close_all_positions', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            addConsoleMessage('SUCCESS', 'All positions closed');
+                            updateDashboard();
+                        } else {
+                            addConsoleMessage('ERROR', 'Failed to close positions');
+                        }
                     });
-                    
-                    console.log(`Loaded ${data.count} trading symbols successfully`);
-                }
-            })
-            .catch(error => {
-                console.error(`Failed to load trading symbols`, error);
-            });
-        }
-        
-        function updateTradingHistory() {
-            fetch('/api/trading_history')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const tbody = document.getElementById('tradesTableBody');
-                    tbody.innerHTML = '';
-                    
-                    if (data.trades && data.trades.length > 0) {
-                        data.trades.slice(0, 10).forEach(trade => {
-                            const row = document.createElement('tr');
-                            row.className = 'border-b border-neon-pink/10 hover:bg-neon-pink/5 transition-all duration-300';
-                            const time = new Date(parseInt(trade.timestamp)).toLocaleTimeString();
-                            
-                            const sideColor = trade.side === 'Buy' ? 'text-neon-green' : 'text-neon-pink';
-                            const pnlColor = trade.fee < 0 ? 'text-neon-pink' : 'text-neon-green';
-                            
-                            row.innerHTML = `
-                                <td class="py-3 text-gray-300">${time}</td>
-                                <td class="py-3 text-neon-blue font-medium">${trade.symbol}</td>
-                                <td class="py-3"><span class="${sideColor} font-bold">${trade.side}</span></td>
-                                <td class="py-3 text-gray-300">${trade.size}</td>
-                                <td class="py-3 text-gray-300">$${trade.price.toFixed(2)}</td>
-                                <td class="py-3 ${pnlColor}">$${trade.fee.toFixed(4)}</td>
-                                <td class="py-3 text-gray-300">$${trade.fee.toFixed(4)}</td>
-                            `;
-                            
-                            tbody.appendChild(row);
-                        });
-                    } else {
-                        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-8">No trades yet</td></tr>';
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Trading history error:', error);
-            });
-        }
-
-        // Training Progress Functions
-        function updateTrainingProgress() {
-            fetch('/api/training_progress')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.progress) {
-                    const progress = data.progress;
-                    
-                    // Update progress bar
-                    const progressBar = document.getElementById('trainingProgressBar');
-                    const progressPercent = document.getElementById('progressPercent');
-                    progressBar.style.width = progress.overall_progress + '%';
-                    progressPercent.textContent = progress.overall_progress.toFixed(1) + '%';
-                    
-                    // Update training details
-                    document.getElementById('currentSymbol').textContent = progress.current_symbol || '-';
-                    document.getElementById('batchProgress').textContent = `${progress.current_batch}/${progress.total_batches}`;
-                    document.getElementById('symbolsCompleted').textContent = `${progress.completed_symbols}/${progress.total_symbols}`;
-                    
-                    // Calculate average accuracy from batch results
-                    let avgAccuracy = 0;
-                    if (progress.batch_results && progress.batch_results.length > 0) {
-                        const totalAccuracy = progress.batch_results.reduce((sum, batch) => sum + (batch.avg_accuracy || 0), 0);
-                        avgAccuracy = totalAccuracy / progress.batch_results.length;
-                    }
-                    document.getElementById('avgAccuracy').textContent = avgAccuracy.toFixed(1) + '%';
-                }
-            })
-            .catch(error => {
-                console.error('Training progress error:', error);
-            });
-        }
-
-        function appendTrainingLog(level, message) {
-            const console = document.getElementById('trainingConsole');
-            const timestamp = new Date().toLocaleTimeString();
-            const logLine = document.createElement('div');
-            logLine.className = 'mb-1';
-            
-            let color = '#00ff41'; // Default green
-            if (level === 'ERROR') color = '#ff0080';
-            else if (level === 'WARNING') color = '#ffff00';
-            else if (level === 'SUCCESS') color = '#00f0ff';
-            
-            logLine.innerHTML = `<span style="color: #888">[${timestamp}]</span> <span style="color: ${color}">[${level}]</span> ${message}`;
-            console.appendChild(logLine);
-            console.scrollTop = console.scrollHeight;
-        }
-
-        function clearTrainingLogs() {
-            document.getElementById('trainingConsole').innerHTML = '';
-        }
-
-        // CryptoPanic Test Function
-        function testCryptoPanic() {
-            const button = event.target.closest('button');
-            const originalText = button.innerHTML;
-            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Testing...';
-            button.disabled = true;
-            
-            fetch('/api/test_cryptopanic')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showNotification(`CryptoPanic Test Success: ${data.news_count} articles found`, 'success');
-                    appendTrainingLog('SUCCESS', `CryptoPanic API: ${data.news_count} articles, sentiment: ${data.avg_sentiment}`);
-                } else {
-                    showNotification(`CryptoPanic Test Failed: ${data.error}`, 'error');
-                    appendTrainingLog('ERROR', `CryptoPanic API: ${data.error}`);
-                }
-            })
-            .catch(error => {
-                showNotification('CryptoPanic Test Error: Network failed', 'error');
-                appendTrainingLog('ERROR', `CryptoPanic API: Network error - ${error.message}`);
-            })
-            .finally(() => {
-                button.innerHTML = originalText;
-                button.disabled = false;
-            });
-        }
-
-        function startEverything() {
-            if (confirm('🚀 START EVERYTHING? This will start AI training, trading, and signal generation!')) {
-                const startBtn = document.getElementById('startBtn');
-                startBtn.disabled = true;
-                startBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> STARTING...';
-                
-                fetch('/api/start_all', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showNotification('✅ ' + data.message, 'success');
-                        updateSystemStatus();
-                    } else {
-                        showNotification('❌ Failed to start: ' + data.message, 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Start all error:', error);
-                    showNotification('Error starting system', 'error');
-                })
-                .finally(() => {
-                    startBtn.disabled = false;
-                    startBtn.innerHTML = '<i class="fas fa-play mr-2"></i> START ALL';
-                });
             }
         }
-
-        function stopEverything() {
-            if (confirm('⏹️ STOP EVERYTHING? This will stop all AI operations!')) {
-                const stopBtn = document.getElementById('stopBtn');
-                stopBtn.disabled = true;
-                stopBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> STOPPING...';
-                
-                fetch('/api/stop_all', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showNotification('⏹️ ' + data.message, 'success');
-                        updateSystemStatus();
-                    } else {
-                        showNotification('❌ Failed to stop: ' + data.message, 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Stop all error:', error);
-                    showNotification('Error stopping system', 'error');
-                })
-                .finally(() => {
-                    stopBtn.disabled = false;
-                    stopBtn.innerHTML = '<i class="fas fa-stop mr-2"></i> STOP ALL';
-                });
-            }
-        }
-
-        function updateSystemStatus() {
-            // Get worker status
-            fetch('/api/worker_stats')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.stats) {
-                    const stats = data.stats;
-                    
-                    // Update main system status
-                    const systemStatus = document.getElementById('systemStatus');
-                    if (stats.is_running) {
-                        systemStatus.textContent = 'RUNNING';
-                        systemStatus.className = 'px-3 py-1 rounded-full text-xs font-bold bg-neon-green/20 text-neon-green border border-neon-green';
-                    } else {
-                        systemStatus.textContent = 'STOPPED';
-                        systemStatus.className = 'px-3 py-1 rounded-full text-xs font-bold bg-neon-pink/20 text-neon-pink border border-neon-pink';
-                    }
-                    
-                    // Update training indicator
-                    const trainingIndicator = document.getElementById('trainingIndicator');
-                    if (stats.training_in_progress) {
-                        trainingIndicator.textContent = 'ACTIVE';
-                        trainingIndicator.className = 'px-3 py-1 rounded-full text-xs font-bold bg-neon-yellow/20 text-neon-yellow border border-neon-yellow';
-                        // Show training progress panel when training is active
-                        document.getElementById('trainingProgressPanel').style.display = 'block';
-                        document.getElementById('trainingConsolePanel').style.display = 'block';
-                    } else {
-                        trainingIndicator.textContent = 'STOPPED';
-                        trainingIndicator.className = 'px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300';
-                        // Hide training progress panel when training is stopped
-                        document.getElementById('trainingProgressPanel').style.display = 'none';
-                        document.getElementById('trainingConsolePanel').style.display = 'none';
-                    }
-                    
-                    // Update signals indicator
-                    const signalsIndicator = document.getElementById('signalsIndicator');
-                    if (stats.is_running) {
-                        signalsIndicator.textContent = `ACTIVE (${stats.signal_count})`;
-                        signalsIndicator.className = 'px-3 py-1 rounded-full text-xs font-bold bg-neon-blue/20 text-neon-blue border border-neon-blue';
-                    } else {
-                        signalsIndicator.textContent = 'STOPPED';
-                        signalsIndicator.className = 'px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300';
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('System status error:', error);
-            });
-            
-            // Get trading status
-            fetch('/api/trading_status')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.status) {
-                    const tradingIndicator = document.getElementById('tradingIndicator');
-                    if (data.status.enabled) {
-                        tradingIndicator.textContent = `ACTIVE (${data.status.active_orders})`;
-                        tradingIndicator.className = 'px-3 py-1 rounded-full text-xs font-bold bg-neon-green/20 text-neon-green border border-neon-green';
-                        isTrading = true;
-                    } else {
-                        tradingIndicator.textContent = 'STOPPED';
-                        tradingIndicator.className = 'px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300';
-                        isTrading = false;
-                    }
-                    updateTradingStatus();
-                }
-            })
-            .catch(error => {
-                console.error('Trading status error:', error);
-            });
-        }
-
-        function updateDatabaseStats() {
-            fetch('/api/database_stats')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.stats) {
-                    const stats = data.stats;
-                    const dbRecordCount = document.getElementById('dbRecordCount');
-                    
-                    dbRecordCount.innerHTML = `
-                        <strong class="text-neon-blue">${stats.training_sessions}</strong> training sessions<br>
-                        <span class="text-xs text-gray-400">${stats.latest_session_date ? `Latest: ${new Date(stats.latest_session_date).toLocaleDateString()}` : 'No sessions yet'}</span>
-                    `;
-                }
-            })
-            .catch(error => {
-                console.error('Database stats error:', error);
-                document.getElementById('dbRecordCount').textContent = 'Error loading stats';
-            });
-        }
-        
-        // Initialize dashboard
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('ByBit AI Trading Bot Dashboard Initialized');
-            
-            loadAllSymbols();
-            updatePriceChart();
-            updatePositions();
-            updateTradingHistory();
-            updateSystemStatus();
-            updateDatabaseStats();
-            updateROIChart();
-            
-            // Refresh cycle
-            setInterval(() => {
-                Promise.all([
-                    updatePositions(),
-                    updateTradingHistory(),
-                    updateSystemStatus(),
-                    updateDatabaseStats(),
-                    updateTrainingProgress()
-                ]).then(() => {
-                    console.log('Data refresh completed');
-                }).catch(error => {
-                    console.error('Data refresh failed', error);
-                });
-            }, 10000); // Refresh every 10 seconds
-        });
     </script>
 </body>
 </html>
