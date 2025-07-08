@@ -347,24 +347,23 @@
                     </div>
                     
                     <!-- Control Buttons -->
-                    <div class="space-y-3">
-                        <button class="w-full cyber-button py-3 px-6 rounded-lg flex items-center justify-center group" onclick="startEverything()" id="startBtn">
-                            <i class="fas fa-power-off mr-3 text-lg group-hover:animate-pulse"></i>
-                            <span class="font-bold">INITIALIZE SYSTEM</span>
+                    <div class="space-y-4">
+                        <button class="w-full cyber-button py-4 px-6 rounded-lg flex items-center justify-center group" onclick="startBot()" id="startBtn" style="background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 217, 255, 0.1)); border-color: #00FF88; color: #00FF88;">
+                            <i class="fas fa-play mr-3 text-lg group-hover:animate-pulse"></i>
+                            <span class="font-bold text-lg">START BOT</span>
                         </button>
                         
-                        <button class="w-full cyber-button py-3 px-6 rounded-lg flex items-center justify-center group" onclick="stopEverything()" id="stopBtn">
-                            <i class="fas fa-stop-circle mr-3 text-lg"></i>
-                            <span class="font-bold">EMERGENCY STOP</span>
+                        <button class="w-full cyber-button py-4 px-6 rounded-lg flex items-center justify-center group" onclick="stopBot()" id="stopBtn" style="background: linear-gradient(135deg, rgba(255, 0, 193, 0.2), rgba(255, 107, 0, 0.1)); border-color: #FF00C1; color: #FF00C1;">
+                            <i class="fas fa-stop mr-3 text-lg group-hover:animate-pulse"></i>
+                            <span class="font-bold text-lg">STOP BOT</span>
                         </button>
                         
-                        <div class="grid grid-cols-2 gap-3">
-                            <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="startTraining()">
-                                <i class="fas fa-graduation-cap mr-2"></i> TRAIN AI
-                            </button>
-                            <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="enableTrading()">
-                                <i class="fas fa-chart-line mr-2"></i> LIVE TRADE
-                            </button>
+                        <div class="mt-4 p-3 bg-dark-bg/50 rounded-lg border border-neon-yellow/30">
+                            <div class="text-xs text-neon-yellow text-center">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                START: Trains AI + Starts Live Trading<br>
+                                STOP: Stops all trading activities
+                            </div>
                         </div>
                     </div>
                     
@@ -934,64 +933,74 @@
             }
         }
         
-        // Control functions
-        function startEverything() {
-            fetch('/api/start_all', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        addConsoleMessage('SUCCESS', 'System initialization complete');
-                        updateTradingStatus();
-                    } else {
-                        addConsoleMessage('ERROR', data.message || 'Failed to start system');
-                    }
-                })
-                .catch(error => {
-                    addConsoleMessage('ERROR', `System error: ${error.message}`);
-                });
-        }
-        
-        function stopEverything() {
-            fetch('/api/stop_all', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        addConsoleMessage('WARNING', 'System shutdown complete');
-                        updateTradingStatus();
-                    }
-                })
-                .catch(error => {
-                    addConsoleMessage('ERROR', `Shutdown error: ${error.message}`);
-                });
-        }
-        
-        function startTraining() {
+        // Simplified Control functions
+        function startBot() {
+            addConsoleMessage('INFO', 'Starting A.R.I.E trading bot...');
+            
+            // Disable button while starting
+            const startBtn = document.getElementById('startBtn');
+            startBtn.disabled = true;
+            startBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-3"></i><span class="font-bold text-lg">STARTING...</span>';
+            
+            // First start training
             fetch('/api/start_training', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        addConsoleMessage('SUCCESS', 'AI training initiated');
+                        addConsoleMessage('SUCCESS', 'AI training started - analyzing market data');
+                        
+                        // Then enable live trading
+                        return fetch('/api/enable_trading', { method: 'POST' });
                     } else {
-                        addConsoleMessage('ERROR', data.message || 'Failed to start training');
+                        throw new Error(data.message || 'Failed to start training');
                     }
                 })
-                .catch(error => {
-                    addConsoleMessage('ERROR', `Training error: ${error.message}`);
-                });
-        }
-        
-        function enableTrading() {
-            fetch('/api/enable_trading', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        addConsoleMessage('SUCCESS', 'Live trading enabled - REAL MONEY MODE');
+                        addConsoleMessage('SUCCESS', '🚀 BOT STARTED - Live trading enabled with real money');
+                        addConsoleMessage('WARNING', '⚠️ REAL MONEY MODE ACTIVE - Monitor positions carefully');
                     } else {
                         addConsoleMessage('ERROR', data.message || 'Failed to enable trading');
                     }
                 })
                 .catch(error => {
-                    addConsoleMessage('ERROR', `Trading error: ${error.message}`);
+                    addConsoleMessage('ERROR', `Bot startup failed: ${error.message}`);
+                })
+                .finally(() => {
+                    // Re-enable button
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = '<i class="fas fa-play mr-3 text-lg group-hover:animate-pulse"></i><span class="font-bold text-lg">START BOT</span>';
+                    updateTradingStatus();
+                });
+        }
+        
+        function stopBot() {
+            addConsoleMessage('WARNING', 'Stopping A.R.I.E trading bot...');
+            
+            // Disable button while stopping
+            const stopBtn = document.getElementById('stopBtn');
+            stopBtn.disabled = true;
+            stopBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-3"></i><span class="font-bold text-lg">STOPPING...</span>';
+            
+            fetch('/api/stop_all', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addConsoleMessage('SUCCESS', '🛑 BOT STOPPED - All trading activities halted');
+                        addConsoleMessage('INFO', 'Existing positions remain open - close manually if needed');
+                    } else {
+                        addConsoleMessage('ERROR', data.message || 'Failed to stop bot');
+                    }
+                })
+                .catch(error => {
+                    addConsoleMessage('ERROR', `Bot shutdown failed: ${error.message}`);
+                })
+                .finally(() => {
+                    // Re-enable button
+                    stopBtn.disabled = false;
+                    stopBtn.innerHTML = '<i class="fas fa-stop mr-3 text-lg group-hover:animate-pulse"></i><span class="font-bold text-lg">STOP BOT</span>';
+                    updateTradingStatus();
                 });
         }
         
