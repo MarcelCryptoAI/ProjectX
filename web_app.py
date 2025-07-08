@@ -2080,6 +2080,119 @@ def get_trading_signals():
         app.logger.error(f"Trading signals error: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/config')
+def get_config():
+    """Get current configuration"""
+    try:
+        ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
+        max_positions = int(os.getenv('MAX_CONCURRENT_TRADES', 5))
+        risk_per_trade = float(os.getenv('RISK_PER_TRADE', 2.0))
+        auto_execute = os.getenv('AUTO_EXECUTE', 'false').lower() == 'true'
+        
+        return jsonify({
+            'success': True,
+            'ai_confidence_threshold': ai_confidence_threshold,
+            'max_positions': max_positions,
+            'risk_per_trade': risk_per_trade,
+            'auto_execute': auto_execute,
+            'api_key': 'configured' if os.getenv('BYBIT_API_KEY') else 'not_configured',
+            'api_secret': 'configured' if os.getenv('BYBIT_API_SECRET') else 'not_configured'
+        })
+    except Exception as e:
+        app.logger.error(f"Config error: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/config', methods=['POST'])
+def update_config():
+    """Update configuration"""
+    try:
+        data = request.get_json()
+        
+        # Update environment variables
+        if 'ai_confidence_threshold' in data:
+            os.environ['AI_CONFIDENCE_THRESHOLD'] = str(data['ai_confidence_threshold'])
+        if 'max_positions' in data:
+            os.environ['MAX_CONCURRENT_TRADES'] = str(data['max_positions'])
+        if 'risk_per_trade' in data:
+            os.environ['RISK_PER_TRADE'] = str(data['risk_per_trade'])
+        if 'auto_execute' in data:
+            os.environ['AUTO_EXECUTE'] = 'true' if data['auto_execute'] else 'false'
+        
+        return jsonify({'success': True, 'message': 'Configuration updated'})
+    except Exception as e:
+        app.logger.error(f"Config update error: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/status/api')
+def api_status():
+    """Check API connectivity status"""
+    try:
+        # Test ByBit API connection
+        bybit_session.get_server_time()
+        return jsonify({
+            'status': 'online',
+            'last_check': datetime.now().isoformat(),
+            'service': 'ByBit API'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'offline',
+            'last_check': datetime.now().isoformat(),
+            'error': str(e),
+            'service': 'ByBit API'
+        })
+
+@app.route('/api/status/db')
+def db_status():
+    """Check database connectivity status"""
+    try:
+        ensure_components_initialized()
+        ai_worker = get_ai_worker(socketio, bybit_session)
+        
+        # Test database connection
+        ai_worker.database.get_latest_training_session()
+        return jsonify({
+            'status': 'online',
+            'last_check': datetime.now().isoformat(),
+            'service': 'Database'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'offline',
+            'last_check': datetime.now().isoformat(),
+            'error': str(e),
+            'service': 'Database'
+        })
+
+@app.route('/api/status/ai')
+def ai_status():
+    """Check AI service status"""
+    try:
+        ensure_components_initialized()
+        ai_worker = get_ai_worker(socketio, bybit_session)
+        
+        # Check if AI worker is properly initialized
+        if ai_worker and hasattr(ai_worker, 'database'):
+            return jsonify({
+                'status': 'online',
+                'last_check': datetime.now().isoformat(),
+                'service': 'AI Worker'
+            })
+        else:
+            return jsonify({
+                'status': 'offline',
+                'last_check': datetime.now().isoformat(),
+                'error': 'AI Worker not initialized',
+                'service': 'AI Worker'
+            })
+    except Exception as e:
+        return jsonify({
+            'status': 'offline',
+            'last_check': datetime.now().isoformat(),
+            'error': str(e),
+            'service': 'AI Worker'
+        })
+
 @app.route('/api/execute_ai_trade', methods=['POST'])
 def execute_ai_trade():
     """Execute a trade based on AI recommendation"""
