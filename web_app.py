@@ -591,19 +591,15 @@ def get_balance():
 
 def get_bybit_balance():
     """
-    Haalt de correcte balance op van Bybit (gebaseerd op complete uitleg)
+    Haalt de correcte balance op van Bybit (zoals account_info dat doet)
     Returns: dict met balance informatie
     """
     try:
         if not bybit_session:
             return {'success': False, 'error': 'ByBit session not initialized'}
             
-        # Unified Trading Account balance (V5 API)
-        response = handle_bybit_request(
-            bybit_session.get_wallet_balance,
-            accountType="UNIFIED",  # Voor spot & futures trading
-            coin="USDT"  # Specifieke coin
-        )
+        # Gebruik dezelfde methode als account_info (die werkt!)
+        response = bybit_session.get_wallet_balance(accountType="UNIFIED")
 
         if response and response.get('retCode') == 0:
             balance_info = response['result']['list'][0]
@@ -641,16 +637,14 @@ def get_bybit_balance():
 
 def get_spot_balance():
     """
-    Voor pure spot trading balance
+    Voor pure spot trading balance (zoals account_info methode)
     """
     try:
         if not bybit_session:
             return {'success': False, 'error': 'ByBit session not initialized'}
             
-        response = handle_bybit_request(
-            bybit_session.get_wallet_balance,
-            accountType="SPOT"
-        )
+        # Gebruik dezelfde directe methode als account_info
+        response = bybit_session.get_wallet_balance(accountType="SPOT")
 
         if response and response.get('retCode') == 0:
             coins = response['result']['list'][0].get('coin', [])
@@ -712,7 +706,7 @@ def api_get_balance():
 @app.route('/api/balance/debug')
 def debug_balance_call():
     """
-    Debug functie om API calls te testen (gebaseerd op complete uitleg)
+    Debug functie om API calls te testen (zoals account_info methode)
     """
     ensure_components_initialized()
     try:
@@ -722,22 +716,27 @@ def debug_balance_call():
         }
         
         if bybit_session:
-            # Test connection
+            # Test connection (zoals account_info)
             try:
-                server_time = handle_bybit_request(bybit_session.get_server_time)
+                server_time = bybit_session.get_server_time()
                 debug_info['server_time'] = server_time
                 debug_info['connection'] = 'success'
             except Exception as e:
                 debug_info['connection'] = f'failed: {str(e)}'
 
-            # Test balance call
+            # Test balance call (exact zoals account_info)
             try:
-                balance = get_bybit_balance()
-                debug_info['balance_test'] = balance
+                balance_response = bybit_session.get_wallet_balance(accountType="UNIFIED")
+                debug_info['balance_raw'] = balance_response
+                
+                # Parse zoals de nieuwe get_bybit_balance functie
+                balance_parsed = get_bybit_balance()
+                debug_info['balance_parsed'] = balance_parsed
+                
             except Exception as e:
                 debug_info['balance_test'] = {'error': str(e)}
             
-            # Test spot balance
+            # Test spot balance (exact zoals account_info maar dan SPOT)
             try:
                 spot_balance = get_spot_balance()
                 debug_info['spot_balance_test'] = spot_balance
