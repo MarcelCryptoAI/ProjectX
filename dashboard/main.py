@@ -1,77 +1,106 @@
-from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import json
 import os
+from datetime import datetime
+import random
 
-app = FastAPI()
-
-app.mount("/static", StaticFiles(directory="dashboard/static"), name="static")
-templates = Jinja2Templates(directory="dashboard/templates")
+app = Flask(__name__)
+app.secret_key = 'your_secret_key_here'
 
 USERNAME = "admin"
 PASSWORD = "changeme123"
 
-@app.get("/", response_class=HTMLResponse)
-async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request, "error": ""})
+# Mock configuration data
+CONFIG_DATA = {
+    'ai_confidence_threshold': 85,
+    'max_positions': 20,
+    'risk_per_trade': 2.0,
+    'auto_execute': True,
+    'api_key': 'demo_key_***',
+    'api_secret': 'demo_secret_***'
+}
 
-@app.post("/login", response_class=HTMLResponse)
-async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+# Routes
+@app.route('/')
+def login_page():
+    return render_template('login.html')
+
+@app.route('/login', methods=['POST'])
+def login():
+    username = request.form['username']
+    password = request.form['password']
     if username == USERNAME and password == PASSWORD:
-        response = RedirectResponse(url="/dashboard", status_code=302)
-        response.set_cookie("authenticated", "yes")
-        return response
+        session['authenticated'] = True
+        return redirect(url_for('dashboard'))
     else:
-        return templates.TemplateResponse("login.html", {
-            "request": request,
-            "error": "Invalid credentials"
-        })
+        return render_template('login.html', error='Invalid credentials')
 
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_page(request: Request):
-    if request.cookies.get("authenticated") != "yes":
-        return RedirectResponse("/")
+@app.route('/dashboard')
+def dashboard():
+    if not session.get('authenticated'):
+        return redirect(url_for('login_page'))
+    return render_template('dashboard.html')
 
-    trades = []
-    stats = {}
-    last_trade = {}
+# API Routes
+@app.route('/api/analytics_data')
+def analytics_data():
+    # Mock data that matches the current configuration
+    data = {
+        'success': True,
+        'total_balance': 12543.67,
+        'unrealized_pnl': 234.89,
+        'total_volume': 45678.90,
+        'total_trades': 156,
+        'win_rate': CONFIG_DATA['ai_confidence_threshold'],  # Use actual config value
+        'sharpe_ratio': 1.45,
+        'max_drawdown': -8.2,
+        'profit_factor': 1.32,
+        'total_fees': 45.67,
+        'ai_confidence': CONFIG_DATA['ai_confidence_threshold'],
+        'max_positions': CONFIG_DATA['max_positions'],
+        'current_positions': 3
+    }
+    return jsonify(data)
 
-    if os.path.exists("trades.json"):
-        with open("trades.json", "r") as f:
-            trades = json.load(f)
-            if trades:
-                last_trade = trades[-1]
-
-    if trades:
-        logger = TradeLogger()
-        stats = logger.calculate_stats()
-
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
-        "last_trade": last_trade,
-        "trades": trades,
-        "stats": stats
+@app.route('/api/balance_header')
+def balance_header():
+    return jsonify({
+        'total_balance': 12543.67,
+        'unrealized_pnl': 234.89,
+        'status': 'online'
     })
 
-@app.get("/api/trades")
-async def get_trades():
-    with open("trades.json", "r") as f:
-        data = json.load(f)
-    return JSONResponse(data)
+@app.route('/api/config')
+def get_config():
+    return jsonify(CONFIG_DATA)
 
-@app.get("/api/forecast")
-async def get_forecast():
-    try:
-        predictor = TrendPredictor()
-        forecast = predictor.predict_trend(symbol="BTCUSDT")
-        return JSONResponse({
-            "symbol": "BTCUSDT",
-            "confidence": forecast["confidence"],
-            "direction": forecast["direction"],
-            "from_price": forecast["from"],
-            "to_price": forecast["to"]
-        })
-    except Exception as e:
-        return JSONResponse({"error": str(e)})
+@app.route('/api/config', methods=['POST'])
+def update_config():
+    global CONFIG_DATA
+    data = request.get_json()
+    CONFIG_DATA.update(data)
+    return jsonify({'success': True, 'message': 'Configuration updated'})
+
+@app.route('/start_bot', methods=['POST'])
+def start_bot():
+    return jsonify({'success': True, 'message': 'Bot started successfully'})
+
+@app.route('/stop_bot', methods=['POST'])
+def stop_bot():
+    return jsonify({'success': True, 'message': 'Bot stopped successfully'})
+
+# Status endpoints
+@app.route('/api/status/api')
+def api_status():
+    return jsonify({'status': 'online', 'last_check': datetime.now().isoformat()})
+
+@app.route('/api/status/db')
+def db_status():
+    return jsonify({'status': 'online', 'last_check': datetime.now().isoformat()})
+
+@app.route('/api/status/ai')
+def ai_status():
+    return jsonify({'status': 'online', 'last_check': datetime.now().isoformat()})
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)

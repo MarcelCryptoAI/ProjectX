@@ -3,9 +3,9 @@
 
 :root {
     --neon-cyan: #00D9FF;
-    --neon-pink: #FF00C1;
+    --neon-red: #FF4444;
     --neon-yellow: #FFD700;
-    --neon-green: #00FF88;
+    --neon-green: #00CC66;
 }
 
 body {
@@ -33,7 +33,7 @@ body {
 }
 
 .cyber-button {
-    background: linear-gradient(135deg, var(--neon-yellow), var(--neon-pink));
+    background: linear-gradient(135deg, var(--neon-yellow), var(--neon-red));
     color: #000;
     font-weight: 600;
     transition: all 0.3s;
@@ -80,7 +80,7 @@ body {
 }
 
 .loss {
-    color: var(--neon-pink) !important;
+    color: var(--neon-red) !important;
 }
 
 .stat-table td {
@@ -100,4 +100,28 @@ body {
 
 .chart-container {
     min-height: 350px;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.status-online {
+    background: var(--neon-green);
+    box-shadow: 0 0 10px var(--neon-green);
+}
+
+.status-offline {
+    background: var(--neon-red);
+    box-shadow: 0 0 10px var(--neon-red);
+}
+
+.status-unknown {
+    background: var(--neon-yellow);
+    box-shadow: 0 0 10px var(--neon-yellow);
 }

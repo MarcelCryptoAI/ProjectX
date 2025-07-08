@@ -32,6 +32,22 @@
                         <i class="fas fa-robot mr-2"></i>Bot Control
                     </h2>
                     <p class="text-gray-400">Manage your trading bot operations</p>
+                    
+                    <!-- Status Indicators -->
+                    <div class="flex items-center gap-6 mt-4">
+                        <div class="flex items-center gap-2">
+                            <div class="status-dot status-online" id="apiStatus"></div>
+                            <span class="text-sm text-gray-400">API</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="status-dot status-online" id="dbStatus"></div>
+                            <span class="text-sm text-gray-400">Database</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="status-dot status-online" id="aiStatus"></div>
+                            <span class="text-sm text-gray-400">AI Model</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="flex items-center gap-4">
                     <button id="startBotBtn" onclick="startBot()" class="cyber-button px-6 py-3 rounded-lg">
@@ -221,9 +237,11 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadAnalyticsData();
             initializeCharts();
+            checkSystemStatus();
             
             // Auto-refresh every 30 seconds
             setInterval(loadAnalyticsData, 30000);
+            setInterval(checkSystemStatus, 15000);
         });
 
         function changePeriod(period) {
@@ -261,6 +279,53 @@
                 .catch(error => {
                     console.error('Error:', error);
                     alert('Failed to stop bot');
+                });
+        }
+
+        function checkSystemStatus() {
+            // Check API status
+            fetch('/api/status/api')
+                .then(response => response.json())
+                .then(data => {
+                    const apiDot = document.getElementById('apiStatus');
+                    if (data.status === 'online') {
+                        apiDot.className = 'status-dot status-online';
+                    } else {
+                        apiDot.className = 'status-dot status-offline';
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('apiStatus').className = 'status-dot status-offline';
+                });
+
+            // Check Database status
+            fetch('/api/status/db')
+                .then(response => response.json())
+                .then(data => {
+                    const dbDot = document.getElementById('dbStatus');
+                    if (data.status === 'online') {
+                        dbDot.className = 'status-dot status-online';
+                    } else {
+                        dbDot.className = 'status-dot status-offline';
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('dbStatus').className = 'status-dot status-offline';
+                });
+
+            // Check AI Model status
+            fetch('/api/status/ai')
+                .then(response => response.json())
+                .then(data => {
+                    const aiDot = document.getElementById('aiStatus');
+                    if (data.status === 'online') {
+                        aiDot.className = 'status-dot status-online';
+                    } else {
+                        aiDot.className = 'status-dot status-offline';
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('aiStatus').className = 'status-dot status-offline';
                 });
         }
 
