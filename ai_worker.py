@@ -281,6 +281,18 @@ class AIWorker:
                     
                     self.console_logger.log('SUCCESS', f'✅ {symbol}: Accuracy {accuracy:.1f}%, Confidence {confidence:.1f}%')
                     
+                    # Emit real-time training progress
+                    if self.socketio:
+                        self.socketio.emit('training_log', {
+                            'level': 'SUCCESS',
+                            'message': f'✅ {symbol}: Accuracy {accuracy:.1f}%, Confidence {confidence:.1f}%'
+                        })
+                        self.socketio.emit('training_progress', {
+                            'progress': self.training_progress,
+                            'level': 'INFO',
+                            'message': f'Training progress: {overall_progress:.1f}% complete'
+                        })
+                    
                     # Update training session progress
                     self.database.update_training_session(self.current_training_session, self.training_progress['completed_symbols'])
                     

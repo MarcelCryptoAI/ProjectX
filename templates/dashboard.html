@@ -160,6 +160,88 @@
                     </div>
                 </div>
 
+                <!-- Training Progress Panel -->
+                <div class="row mb-4" id="trainingProgressPanel" style="display: none;">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="fas fa-brain"></i> AI Training Progress</h5>
+                                <button class="btn btn-sm btn-outline-info float-end" onclick="testCryptoPanic()">
+                                    <i class="fas fa-newspaper"></i> Test CryptoPanic
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <!-- Progress Bar -->
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span>Overall Progress</span>
+                                            <span id="progressPercent">0%</span>
+                                        </div>
+                                        <div class="progress" style="height: 8px;">
+                                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                 id="trainingProgressBar" 
+                                                 role="progressbar" 
+                                                 style="width: 0%;" 
+                                                 aria-valuenow="0" 
+                                                 aria-valuemin="0" 
+                                                 aria-valuemax="100">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Training Details -->
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="text-center">
+                                            <h6 class="text-muted">Current Symbol</h6>
+                                            <span class="h5" id="currentSymbol">-</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="text-center">
+                                            <h6 class="text-muted">Batch Progress</h6>
+                                            <span class="h5" id="batchProgress">0/0</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="text-center">
+                                            <h6 class="text-muted">Symbols Completed</h6>
+                                            <span class="h5" id="symbolsCompleted">0/0</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="text-center">
+                                            <h6 class="text-muted">Avg Accuracy</h6>
+                                            <span class="h5" id="avgAccuracy">0%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Training Console -->
+                <div class="row mb-4" id="trainingConsolePanel" style="display: none;">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6><i class="fas fa-terminal"></i> Training Console</h6>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="clearTrainingLogs()">
+                                    <i class="fas fa-trash"></i> Clear
+                                </button>
+                            </div>
+                            <div class="card-body p-2">
+                                <div id="trainingConsole" style="height: 200px; overflow-y: auto; background: #000; color: #0f0; font-family: monospace; padding: 10px; font-size: 12px;">
+                                    <!-- Training logs will appear here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Charts Row -->
                 <div class="row">
                     <div class="col-md-8">
@@ -810,9 +892,15 @@
                     if (stats.training_in_progress) {
                         trainingIndicator.textContent = 'ACTIVE';
                         trainingIndicator.className = 'badge bg-warning';
+                        // Show training progress panel when training is active
+                        document.getElementById('trainingProgressPanel').style.display = 'block';
+                        document.getElementById('trainingConsolePanel').style.display = 'block';
                     } else {
                         trainingIndicator.textContent = 'STOPPED';
                         trainingIndicator.className = 'badge bg-secondary';
+                        // Hide training progress panel when training is stopped
+                        document.getElementById('trainingProgressPanel').style.display = 'none';
+                        document.getElementById('trainingConsolePanel').style.display = 'none';
                     }
                     
                     // Update signals indicator
@@ -869,6 +957,99 @@
                 document.getElementById('dbRecordCount').textContent = 'Error loading stats';
             });
         }
+
+        // Training Progress Functions
+        function updateTrainingProgress() {
+            fetch('/api/training_progress')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.progress) {
+                    const progress = data.progress;
+                    
+                    // Update progress bar
+                    const progressBar = document.getElementById('trainingProgressBar');
+                    const progressPercent = document.getElementById('progressPercent');
+                    progressBar.style.width = progress.overall_progress + '%';
+                    progressBar.setAttribute('aria-valuenow', progress.overall_progress);
+                    progressPercent.textContent = progress.overall_progress.toFixed(1) + '%';
+                    
+                    // Update training details
+                    document.getElementById('currentSymbol').textContent = progress.current_symbol || '-';
+                    document.getElementById('batchProgress').textContent = `${progress.current_batch}/${progress.total_batches}`;
+                    document.getElementById('symbolsCompleted').textContent = `${progress.completed_symbols}/${progress.total_symbols}`;
+                    
+                    // Calculate average accuracy from batch results
+                    let avgAccuracy = 0;
+                    if (progress.batch_results && progress.batch_results.length > 0) {
+                        const totalAccuracy = progress.batch_results.reduce((sum, batch) => sum + (batch.avg_accuracy || 0), 0);
+                        avgAccuracy = totalAccuracy / progress.batch_results.length;
+                    }
+                    document.getElementById('avgAccuracy').textContent = avgAccuracy.toFixed(1) + '%';
+                }
+            })
+            .catch(error => {
+                console.error('Training progress error:', error);
+            });
+        }
+
+        function appendTrainingLog(level, message) {
+            const console = document.getElementById('trainingConsole');
+            const timestamp = new Date().toLocaleTimeString();
+            const logLine = document.createElement('div');
+            
+            let color = '#0f0'; // Default green
+            if (level === 'ERROR') color = '#f00';
+            else if (level === 'WARNING') color = '#ff0';
+            else if (level === 'SUCCESS') color = '#0ff';
+            
+            logLine.innerHTML = `<span style="color: #888">[${timestamp}]</span> <span style="color: ${color}">[${level}]</span> ${message}`;
+            console.appendChild(logLine);
+            console.scrollTop = console.scrollHeight; // Auto scroll to bottom
+        }
+
+        function clearTrainingLogs() {
+            document.getElementById('trainingConsole').innerHTML = '';
+        }
+
+        // CryptoPanic Test Function
+        function testCryptoPanic() {
+            const button = event.target.closest('button');
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+            button.disabled = true;
+            
+            fetch('/api/test_cryptopanic')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(`CryptoPanic Test Success: ${data.news_count} articles found`, 'success');
+                    appendTrainingLog('SUCCESS', `CryptoPanic API: ${data.news_count} articles, sentiment: ${data.avg_sentiment}`);
+                } else {
+                    showNotification(`CryptoPanic Test Failed: ${data.error}`, 'error');
+                    appendTrainingLog('ERROR', `CryptoPanic API: ${data.error}`);
+                }
+            })
+            .catch(error => {
+                showNotification('CryptoPanic Test Error: Network failed', 'error');
+                appendTrainingLog('ERROR', `CryptoPanic API: Network error - ${error.message}`);
+            })
+            .finally(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        }
+
+        // Socket event handlers for real-time training updates
+        socket.on('training_progress', function(data) {
+            updateTrainingProgress();
+            if (data.message) {
+                appendTrainingLog(data.level || 'INFO', data.message);
+            }
+        });
+
+        socket.on('training_log', function(data) {
+            appendTrainingLog(data.level, data.message);
+        });
     </script>
 </body>
 </html>

@@ -1671,6 +1671,68 @@ def get_database_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/test_cryptopanic')
+def test_cryptopanic():
+    """Test CryptoPanic API connection and functionality"""
+    try:
+        from utils.news_scraper import NewsScraper
+        
+        # Initialize news scraper with API key from settings
+        try:
+            news_scraper = NewsScraper()
+        except Exception as init_error:
+            return jsonify({
+                'success': False,
+                'error': f'NewsScraper initialization failed: {str(init_error)}'
+            })
+        
+        # Test API connection
+        try:
+            # Fetch recent crypto news
+            news_data = news_scraper.get_recent_news(limit=5)
+            
+            if news_data and len(news_data) > 0:
+                # Calculate basic sentiment metrics
+                total_sentiment = 0
+                valid_sentiment_count = 0
+                
+                for article in news_data:
+                    if 'sentiment' in article and article['sentiment'] is not None:
+                        total_sentiment += article['sentiment']
+                        valid_sentiment_count += 1
+                
+                avg_sentiment = total_sentiment / valid_sentiment_count if valid_sentiment_count > 0 else 0
+                
+                return jsonify({
+                    'success': True,
+                    'news_count': len(news_data),
+                    'avg_sentiment': round(avg_sentiment, 2),
+                    'sample_headlines': [article.get('title', 'No title')[:50] + '...' for article in news_data[:3]],
+                    'api_status': 'Working',
+                    'sentiment_analysis': 'Available' if valid_sentiment_count > 0 else 'Limited'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'No news data received from CryptoPanic API',
+                    'news_count': 0,
+                    'api_status': 'Connected but no data'
+                })
+                
+        except Exception as api_error:
+            return jsonify({
+                'success': False,
+                'error': f'CryptoPanic API call failed: {str(api_error)}',
+                'api_status': 'Failed'
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'CryptoPanic test error: {str(e)}',
+            'api_status': 'Error'
+        })
+
 @app.route('/api/pnl_chart')
 def get_pnl_chart():
     try:
