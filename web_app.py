@@ -2197,6 +2197,153 @@ if __name__ == '__main__':
     print("📊 Dashboard: http://localhost:5000")
     print("⚙️  Settings: http://localhost:5000/config")
     print("📈 Analytics: http://localhost:5000/analytics")
+# Settings Management
+settings_file = 'trading_settings.json'
+
+@app.route('/api/save_settings', methods=['POST'])
+def save_settings():
+    """Save trading settings to file"""
+    try:
+        settings_data = request.get_json()
+        
+        # Validate required settings
+        required_settings = [
+            'riskPerTrade', 'maxConcurrentTrades', 'minTradeAmount',
+            'defaultTakeProfit', 'defaultStopLoss', 'confidenceThreshold'
+        ]
+        
+        for setting in required_settings:
+            if setting not in settings_data:
+                return jsonify({
+                    'success': False,
+                    'error': f'Missing required setting: {setting}'
+                })
+        
+        # Save to file
+        with open(settings_file, 'w') as f:
+            json.dump(settings_data, f, indent=2)
+        
+        # Update environment variables for immediate effect
+        os.environ['AI_CONFIDENCE_THRESHOLD'] = str(settings_data.get('confidenceThreshold', 75))
+        os.environ['RISK_PER_TRADE'] = str(settings_data.get('riskPerTrade', 2.0))
+        os.environ['MAX_LEVERAGE'] = str(settings_data.get('maxLeverage', 10))
+        os.environ['LEVERAGE_MODE'] = settings_data.get('leverageMode', 'cross')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Settings saved successfully'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to save settings: {str(e)}'
+        })
+
+@app.route('/api/load_settings')
+def load_settings():
+    """Load trading settings from file"""
+    try:
+        # Default settings
+        default_settings = {
+            'riskPerTrade': 2.0,
+            'maxConcurrentTrades': 20,
+            'minTradeAmount': 19,  # Default $19 minimum
+            'defaultTakeProfit': 3.0,
+            'defaultStopLoss': 1.5,
+            'trailingStopLoss': False,
+            'trailingStopValue': 1.0,
+            'dynamicTakeProfit': True,
+            'partialTakeProfit': False,
+            'tradingEnabled': True,
+            'weekendTrading': False,
+            'maxDailyLoss': 5.0,
+            'maxDrawdown': 15.0,
+            'emergencyStop': True,
+            'leverageMode': 'cross',  # cross or isolated
+            'minLeverage': 1,
+            'maxLeverage': 10,
+            'leverageStrategy': 'confidence_based',  # confidence_based, volatility_based, fixed, adaptive
+            'correlationLimit': 80,
+            'apiKey': '',
+            'apiSecret': '',
+            'testnetMode': False,
+            'apiTimeout': 30,
+            'confidenceThreshold': 75,
+            'modelUpdateFreq': '4h',
+            'technicalIndicators': 15,
+            'strategyMode': 'balanced',
+            'marketCondition': 'auto',
+            'telegramBotToken': '',
+            'telegramChatId': '',
+            'notifyTrades': True,
+            'notifyErrors': True,
+            'notifyProfits': True,
+            'dailySummary': True
+        }
+        
+        # Try to load from file
+        if os.path.exists(settings_file):
+            with open(settings_file, 'r') as f:
+                saved_settings = json.load(f)
+                default_settings.update(saved_settings)
+        
+        return jsonify({
+            'success': True,
+            'settings': default_settings
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to load settings: {str(e)}',
+            'settings': {}
+        })
+
+@app.route('/api/test_connection', methods=['POST'])
+def test_api_connection():
+    """Test ByBit API connection"""
+    try:
+        connection_data = request.get_json()
+        api_key = connection_data.get('api_key')
+        api_secret = connection_data.get('api_secret')
+        testnet = connection_data.get('testnet', False)
+        
+        if not api_key or not api_secret:
+            return jsonify({
+                'success': False,
+                'message': 'API key and secret are required'
+            })
+        
+        # Test connection
+        from pybit.unified_trading import HTTP
+        test_session = HTTP(
+            testnet=testnet,
+            api_key=api_key,
+            api_secret=api_secret
+        )
+        
+        # Try to get account info
+        result = test_session.get_wallet_balance(accountType="UNIFIED")
+        
+        if result and 'result' in result:
+            return jsonify({
+                'success': True,
+                'message': 'API connection successful'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'API connection failed - invalid response'
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'API connection failed: {str(e)}'
+        })
+
+if __name__ == '__main__':
     print("🤖 AI Worker ready...")
     
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)

@@ -336,23 +336,28 @@
                     <div class="lg:col-span-2">
                         <div class="settings-group">
                             <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                                <i class="fas fa-percentage mr-2"></i>Position Sizing
+                                <i class="fas fa-percentage mr-2"></i>Position Sizing (Static - AI Cannot Override)
                             </h3>
                             <div class="grid grid-cols-3 gap-6">
                                 <div>
-                                    <label for="riskPerTrade" class="form-label">Risk Per Trade (%)</label>
+                                    <label for="riskPerTrade" class="form-label">Risk Per Trade (%) - FIXED</label>
                                     <input type="number" class="form-input w-full" id="riskPerTrade" step="0.1" min="0.1" max="10" value="2.0">
-                                    <div class="form-text">Percentage of account balance to risk per trade</div>
+                                    <div class="form-text">Fixed percentage - AI cannot change this value</div>
+                                </div>
+                                <div>
+                                    <label for="minTradeAmount" class="form-label">Minimum Trade Amount ($)</label>
+                                    <input type="number" class="form-input w-full" id="minTradeAmount" step="1" min="1" max="1000" value="19">
+                                    <div class="form-text">Absolute minimum USD per trade (default $19)</div>
                                 </div>
                                 <div>
                                     <label for="maxConcurrentTrades" class="form-label">Max Concurrent Trades</label>
                                     <input type="number" class="form-input w-full" id="maxConcurrentTrades" min="1" max="50" value="20">
                                     <div class="form-text">Maximum number of trades to run simultaneously</div>
                                 </div>
-                                <div>
-                                    <label for="minTradeAmount" class="form-label">Min Trade Amount ($)</label>
-                                    <input type="number" class="form-input w-full" id="minTradeAmount" step="1" min="1" max="1000" value="10">
-                                    <div class="form-text">Minimum dollar amount for each trade</div>
+                            </div>
+                            <div class="mt-4 p-3 border border-neon-yellow rounded-lg bg-yellow-900/20">
+                                <div class="text-sm text-neon-yellow">
+                                    <i class="fas fa-lock mr-2"></i><strong>Static Position Sizing:</strong> AI will always use the fixed risk percentage with the minimum amount override. The AI cannot adjust position sizes dynamically.
                                 </div>
                             </div>
                         </div>
@@ -371,18 +376,34 @@
                                     <input type="number" class="form-input w-full" id="defaultStopLoss" step="0.1" min="0.1" max="20" value="1.5">
                                 </div>
                                 <div>
-                                    <label for="trailingStopLoss" class="form-label">Trailing Stop Loss</label>
+                                    <label for="trailingStopLoss" class="form-label">Enable Trailing Stop Loss</label>
                                     <label class="switch">
-                                        <input type="checkbox" id="trailingStopLoss">
+                                        <input type="checkbox" id="trailingStopLoss" onchange="toggleTrailingStopOptions()">
                                         <span class="slider"></span>
                                     </label>
                                 </div>
+                                <div>
+                                    <label for="trailingStopValue" class="form-label">Trailing Stop Distance (%)</label>
+                                    <input type="number" class="form-input w-full" id="trailingStopValue" step="0.1" min="0.1" max="10" value="1.0" disabled>
+                                    <div class="form-text">Distance from peak price to trigger trailing stop</div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-6 mt-4">
                                 <div>
                                     <label for="dynamicTakeProfit" class="form-label">Dynamic Take Profit</label>
                                     <label class="switch">
                                         <input type="checkbox" id="dynamicTakeProfit" checked>
                                         <span class="slider"></span>
                                     </label>
+                                    <div class="form-text">AI adjusts take profit based on market conditions</div>
+                                </div>
+                                <div>
+                                    <label for="partialTakeProfit" class="form-label">Partial Take Profit</label>
+                                    <label class="switch">
+                                        <input type="checkbox" id="partialTakeProfit">
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="form-text">Take profit in steps (25%, 50%, 75%, 100%)</div>
                                 </div>
                             </div>
                         </div>
@@ -458,16 +479,43 @@
                 
                 <div class="settings-group">
                     <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                        <i class="fas fa-chart-line mr-2"></i>Risk Metrics
+                        <i class="fas fa-chart-line mr-2"></i>Leverage & Risk Metrics
                     </h3>
-                    <div class="grid grid-cols-2 gap-6">
+                    <div class="grid grid-cols-3 gap-6">
+                        <div>
+                            <label for="leverageMode" class="form-label">Leverage Mode</label>
+                            <select class="form-input w-full" id="leverageMode">
+                                <option value="cross" selected>Cross Margin</option>
+                                <option value="isolated">Isolated Margin</option>
+                            </select>
+                            <div class="form-text">Cross uses full account balance, Isolated uses fixed amount</div>
+                        </div>
+                        <div>
+                            <label for="minLeverage" class="form-label">Minimum Leverage</label>
+                            <input type="number" class="form-input w-full" id="minLeverage" min="1" max="50" value="1">
+                            <div class="form-text">AI will not use leverage below this value</div>
+                        </div>
                         <div>
                             <label for="maxLeverage" class="form-label">Maximum Leverage</label>
                             <input type="number" class="form-input w-full" id="maxLeverage" min="1" max="100" value="10">
+                            <div class="form-text">AI will not exceed this leverage multiplier</div>
                         </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-6 mt-4">
                         <div>
                             <label for="correlationLimit" class="form-label">Correlation Limit (%)</label>
                             <input type="number" class="form-input w-full" id="correlationLimit" step="0.1" min="50" max="95" value="80">
+                            <div class="form-text">Maximum correlation between open positions</div>
+                        </div>
+                        <div>
+                            <label for="leverageStrategy" class="form-label">Leverage Strategy</label>
+                            <select class="form-input w-full" id="leverageStrategy">
+                                <option value="confidence_based" selected>Confidence Based</option>
+                                <option value="volatility_based">Volatility Based</option>
+                                <option value="fixed">Fixed Leverage</option>
+                                <option value="adaptive">Adaptive AI</option>
+                            </select>
+                            <div class="form-text">How AI determines leverage for each trade</div>
                         </div>
                     </div>
                 </div>
@@ -662,6 +710,20 @@
                 .catch(error => console.error('Error loading balance:', error));
         }
         
+        // Toggle trailing stop options
+        function toggleTrailingStopOptions() {
+            const checkbox = document.getElementById('trailingStopLoss');
+            const valueInput = document.getElementById('trailingStopValue');
+            
+            if (checkbox.checked) {
+                valueInput.disabled = false;
+                valueInput.style.opacity = '1';
+            } else {
+                valueInput.disabled = true;
+                valueInput.style.opacity = '0.5';
+            }
+        }
+
         // Save all settings
         function saveAllSettings() {
             const settings = {
@@ -672,15 +734,20 @@
                 defaultTakeProfit: parseFloat(document.getElementById('defaultTakeProfit').value),
                 defaultStopLoss: parseFloat(document.getElementById('defaultStopLoss').value),
                 trailingStopLoss: document.getElementById('trailingStopLoss').checked,
+                trailingStopValue: parseFloat(document.getElementById('trailingStopValue').value),
                 dynamicTakeProfit: document.getElementById('dynamicTakeProfit').checked,
+                partialTakeProfit: document.getElementById('partialTakeProfit').checked,
                 tradingEnabled: document.getElementById('tradingEnabled').checked,
                 weekendTrading: document.getElementById('weekendTrading').checked,
                 
-                // Risk management
+                // Risk management & Leverage
                 maxDailyLoss: parseFloat(document.getElementById('maxDailyLoss').value),
                 maxDrawdown: parseFloat(document.getElementById('maxDrawdown').value),
                 emergencyStop: document.getElementById('emergencyStop').checked,
+                leverageMode: document.getElementById('leverageMode').value,
+                minLeverage: parseInt(document.getElementById('minLeverage').value),
                 maxLeverage: parseInt(document.getElementById('maxLeverage').value),
+                leverageStrategy: document.getElementById('leverageStrategy').value,
                 correlationLimit: parseFloat(document.getElementById('correlationLimit').value),
                 
                 // API settings
