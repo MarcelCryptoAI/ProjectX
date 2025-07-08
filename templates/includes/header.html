@@ -131,29 +131,34 @@
     .brand-icon {
         width: 45px;
         height: 45px;
-        background: linear-gradient(135deg, #00d9ff, #ffd700);
+        background: linear-gradient(135deg, #ffd700, #ffed4e, #ffa500);
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
         color: #0a0a0f;
         font-size: 20px;
-        box-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
     }
     
     .brand-title {
         font-size: 24px;
         font-weight: 700;
         letter-spacing: 2px;
-        color: #ffd700;
-        text-shadow: 0 0 10px #ffd700;
+        background: linear-gradient(135deg, #ffd700, #ffed4e, #ffa500);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-shadow: none;
+        filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.5));
     }
     
     .brand-subtitle {
         font-size: 12px;
-        color: #00d9ff;
+        color: #ffd700;
         font-weight: 500;
         margin-top: -2px;
+        text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
     }
     
     .nav-links {

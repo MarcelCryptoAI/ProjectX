@@ -1885,19 +1885,15 @@ def get_coin_analysis():
                     
                     # ECHTE STATUS LOGIC
                     confidence = result['confidence']
-                    if confidence < ai_confidence_threshold:
-                        status = "Te lage score"
-                        status_class = "status-low"
+                    if confidence >= ai_confidence_threshold:
+                        status = "high"
+                        status_class = "status-high"
+                    elif confidence >= 60:
+                        status = "medium"
+                        status_class = "status-medium" 
                     else:
-                        # Check if this coin is in signals queue (ready to trade)
-                        # TODO: Implement check against actual signals queue
-                        # For now, assume high confidence = signal
-                        if confidence >= ai_confidence_threshold:
-                            status = "Signal"
-                            status_class = "status-signal"
-                        else:
-                            status = "Te lage score"
-                            status_class = "status-low"
+                        status = "low"
+                        status_class = "status-low"
                     
                     # Generate AI analysis based on training data
                     analysis = "Bullish" if result['accuracy'] > 70 and confidence > 75 else "Bearish"
@@ -1991,13 +1987,44 @@ def get_trading_signals():
                         # Determine side based on analysis
                         side = "Buy" if result['accuracy'] > 70 else "Sell"
                         
+                        # Calculate position size based on settings
+                        risk_per_trade = float(os.getenv('RISK_PER_TRADE', 2.0))  # Default 2%
+                        min_trade_amount = float(os.getenv('MIN_TRADE_AMOUNT', 19))  # Default $19
+                        
+                        # Get current balance
+                        try:
+                            balance_data = bybit_session.get_wallet_balance(accountType="UNIFIED")
+                            total_balance = float(balance_data['result']['list'][0]['totalWalletBalance']) if balance_data['result']['list'] else 1000
+                        except:
+                            total_balance = 1000  # Fallback
+                        
+                        # Calculate amount: percentage of balance with minimum
+                        calculated_amount = (total_balance * risk_per_trade / 100)
+                        amount = max(calculated_amount, min_trade_amount)
+                        
+                        # Calculate leverage based on settings and confidence
+                        min_leverage = int(os.getenv('MIN_LEVERAGE', 1))
+                        max_leverage = int(os.getenv('MAX_LEVERAGE', 10))
+                        leverage_strategy = os.getenv('LEVERAGE_STRATEGY', 'confidence_based')
+                        
+                        if leverage_strategy == 'confidence_based':
+                            # Higher confidence = higher leverage
+                            leverage_factor = (confidence - 50) / 50  # Scale 0-1
+                            leverage = min_leverage + int((max_leverage - min_leverage) * leverage_factor)
+                        elif leverage_strategy == 'fixed':
+                            leverage = min_leverage
+                        else:  # volatility_based or adaptive
+                            leverage = min_leverage + int((max_leverage - min_leverage) * 0.5)  # Mid-range
+                        
+                        leverage = max(min_leverage, min(max_leverage, leverage))
+                        
                         signal = {
                             'id': f'signal_{signal_id}_{result["symbol"]}',
                             'symbol': result['symbol'],
                             'side': side,
                             'confidence': round(confidence, 1),
-                            'amount': 100,  # Default amount
-                            'leverage': 1,  # Default leverage
+                            'amount': round(amount, 2),
+                            'leverage': leverage,
                             'take_profit': round(2 + (confidence / 25), 1),
                             'stop_loss': round(1 + (confidence / 50), 1),
                             'strategy': 'AI Technical Analysis',
@@ -2005,7 +2032,9 @@ def get_trading_signals():
                             'analysis': {
                                 'accuracy': result['accuracy'],
                                 'threshold': ai_confidence_threshold,
-                                'status': 'ready_to_trade'
+                                'status': 'ready_to_trade',
+                                'leverage_strategy': leverage_strategy,
+                                'position_size_method': 'fixed_percentage'
                             }
                         }
                         signals.append(signal)
@@ -2056,8 +2085,10 @@ def execute_ai_trade():
     """Execute a trade based on AI recommendation"""
     try:
         data = request.get_json()
+        app.logger.info(f"Execute AI trade request: {data}")
         
         if not data:
+            app.logger.error("No data provided in execute_ai_trade request")
             return jsonify({'success': False, 'message': 'No data provided'}), 400
         
         symbol = data.get('symbol')
@@ -2066,18 +2097,28 @@ def execute_ai_trade():
         take_profit = data.get('takeProfit')
         stop_loss = data.get('stopLoss')
         
+        app.logger.info(f"Trade parameters: symbol={symbol}, side={side}, amount={amount}")
+        
         if not all([symbol, side]):
-            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+            app.logger.error(f"Missing required fields: symbol={symbol}, side={side}")
+            return jsonify({'success': False, 'message': 'Missing required fields: symbol and side are required'}), 400
         
         # Get AI worker for trade execution
         ensure_components_initialized()
         ai_worker = get_ai_worker(socketio, bybit_session)
         
+        if not ai_worker:
+            app.logger.error("AI worker not available")
+            return jsonify({'success': False, 'message': 'AI worker not available'}), 500
+            
         if not ai_worker.bybit_session:
+            app.logger.error("ByBit session not available in AI worker")
             return jsonify({'success': False, 'message': 'ByBit session not available'}), 500
         
         # Check if under trade limit
         active_trades = ai_worker.get_active_positions_count()
+        app.logger.info(f"Active trades: {active_trades}/{ai_worker.max_concurrent_trades}")
+        
         if active_trades >= ai_worker.max_concurrent_trades:
             return jsonify({
                 'success': False, 
@@ -2095,8 +2136,12 @@ def execute_ai_trade():
             'timestamp': datetime.now().isoformat()
         }
         
+        app.logger.info(f"Executing trade signal: {trade_signal}")
+        
         # Execute the trade directly with pybit
         result = ai_worker.execute_signal_direct(trade_signal)
+        
+        app.logger.info(f"Trade execution result: {result}")
         
         if result:
             ai_worker.console_logger.log('SUCCESS', f'✅ Manual trade executed: {side} {symbol} (${amount})')
@@ -2106,10 +2151,14 @@ def execute_ai_trade():
                 'active_trades': f'{active_trades + 1}/{ai_worker.max_concurrent_trades}'
             })
         else:
-            return jsonify({'success': False, 'message': 'Trade execution failed'}), 500
+            app.logger.error("Trade execution returned False")
+            return jsonify({'success': False, 'message': 'Trade execution failed - check logs for details'}), 500
             
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        app.logger.error(f"Execute AI trade error: {str(e)}")
+        import traceback
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'}), 500
 
 def trading_loop():
     global is_trading, trade_stats

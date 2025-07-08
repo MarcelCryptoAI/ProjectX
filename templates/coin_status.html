@@ -336,12 +336,43 @@
             </div>
         </div>
         
-        <!-- Coins Grid -->
-        <div id="coinsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <!-- Loading state -->
-            <div class="col-span-full text-center py-16">
-                <i class="fas fa-spinner fa-spin text-6xl text-neon-cyan mb-4"></i>
-                <p class="text-gray-400">Loading AI analysis data...</p>
+        <!-- Coins Table -->
+        <div class="glass-card rounded-xl overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-dark-panel/50 border-b border-neon-cyan/20">
+                        <tr>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('symbol')">
+                                Symbol <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('analysis')">
+                                Analysis <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('confidence')">
+                                Confidence <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('status')">
+                                Status <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('accuracy')">
+                                Accuracy <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan">Direction</th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan">TP/SL</th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan">Time</th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="coinsTableBody">
+                        <!-- Loading state -->
+                        <tr>
+                            <td colspan="9" class="text-center py-16">
+                                <i class="fas fa-spinner fa-spin text-4xl text-neon-cyan mb-4"></i>
+                                <div class="text-gray-400">Loading AI analysis data...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
         
@@ -373,11 +404,16 @@
                         document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
                         
                         if (allCoins.length === 0) {
-                            document.getElementById('coinsGrid').classList.add('hidden');
-                            document.getElementById('noDataMessage').classList.remove('hidden');
+                            document.getElementById('coinsTableBody').innerHTML = `
+                                <tr>
+                                    <td colspan="9" class="text-center py-16">
+                                        <i class="fas fa-brain text-4xl text-gray-600 mb-4"></i>
+                                        <div class="text-xl text-gray-400 mb-2">No training data available</div>
+                                        <div class="text-gray-500">Start AI training to see coin analysis</div>
+                                    </td>
+                                </tr>
+                            `;
                         } else {
-                            document.getElementById('coinsGrid').classList.remove('hidden');
-                            document.getElementById('noDataMessage').classList.add('hidden');
                             displayCoins();
                         }
                     } else {
