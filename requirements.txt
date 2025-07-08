@@ -20,3 +20,4 @@ six==1.16.0
 greenlet==2.0.2
 dnspython==2.7.0
 PySocks==1.7.1
+certifi==2025.6.15

@@ -44,14 +44,24 @@ try:
     # Advanced TLS configuration for SOCKS5 proxy compatibility
     import ssl
     
-    # Create legacy SSL context for SOCKS5 proxy compatibility
+    # Stack Overflow solution: Enhanced SSL context with certificate handling
     def create_proxy_ssl_context():
         context = ssl.create_default_context()
+        
+        # Stack Overflow fix: Set SECLEVEL to 1 for legacy compatibility
+        context.set_ciphers('DEFAULT:@SECLEVEL=1')
+        
+        # Stack Overflow fix: Load system certificates
+        try:
+            import certifi
+            context.load_verify_locations(certifi.where())
+            print("✅ System certificates loaded successfully")
+        except Exception as cert_error:
+            print(f"⚠️ Certificate loading failed: {cert_error}")
+        
         # Use broader TLS range for proxy compatibility
         context.minimum_version = ssl.TLSVersion.TLSv1
-        context.maximum_version = ssl.TLSVersion.TLSv1_2
-        # Use wider cipher suite for proxy compatibility
-        context.set_ciphers('ALL:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA')
+        context.maximum_version = ssl.TLSVersion.TLSv1_3
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
         return context
@@ -103,10 +113,36 @@ try:
     # Disable SSL warnings globally
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     
-    # VPN/Proxy support for better connectivity
+    # VPN/Proxy support for better connectivity + Stack Overflow SSL fixes
     import requests
     from requests.adapters import HTTPAdapter
     from requests.packages.urllib3.util.retry import Retry
+    import certifi
+    
+    # Stack Overflow solution: Environment variables for certificate bundle
+    os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+    os.environ['CURL_CA_BUNDLE'] = certifi.where()
+    
+    # Stack Overflow solution: Additional SSL context configuration
+    try:
+        import ssl
+        
+        # Create a more permissive SSL context for proxy compatibility
+        def create_permissive_ssl_context():
+            context = ssl.create_default_context()
+            # Allow self-signed certificates (common with proxies)
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            # Add support for wider range of ciphers
+            context.set_ciphers('DEFAULT:@SECLEVEL=1')
+            return context
+        
+        # Override default SSL context creation
+        ssl._create_default_https_context = create_permissive_ssl_context
+        print("✅ Enhanced SSL context configured for proxy compatibility")
+        
+    except Exception as ssl_config_error:
+        print(f"⚠️ SSL context configuration failed: {ssl_config_error}")
     
     requests.packages.urllib3.disable_warnings()
     
@@ -118,15 +154,26 @@ try:
             'http': proxy_url,
             'https': proxy_url
         }
-        proxy_type = "SOCKS5" if proxy_url.startswith('socks5://') else "HTTP"
-        print(f"🔒 VPN Proxy configured ({proxy_type}): {proxy_url[:50]}...")
+        # Stack Overflow fix: Use socks5h:// for hostname resolution by proxy
+        if proxy_url.startswith('socks5://'):
+            # Convert to socks5h:// for better SSL compatibility
+            socks5h_url = proxy_url.replace('socks5://', 'socks5h://')
+            vpn_proxy = {
+                'http': socks5h_url,
+                'https': socks5h_url
+            }
+            proxy_type = "SOCKS5H (hostname resolution)"
+            print(f"🔒 VPN Proxy configured ({proxy_type}): {socks5h_url[:50]}...")
+        else:
+            proxy_type = "HTTP"
+            print(f"🔒 VPN Proxy configured ({proxy_type}): {proxy_url[:50]}...")
         
         # For SOCKS5, we need additional setup
         if proxy_url.startswith('socks5://'):
             try:
                 import socks
                 import socket as sock_module
-                # Configure global SOCKS proxy
+                # Configure global SOCKS proxy  
                 parsed_url = proxy_url.replace('socks5://', '').split('@')
                 if len(parsed_url) == 2:
                     auth, server = parsed_url
@@ -324,17 +371,30 @@ def init_components():
         from requests.adapters import HTTPAdapter
         from urllib3.poolmanager import PoolManager
         
-        # Alternative SSL adapter - try legacy TLS 1.0 for proxy compatibility  
-        class LegacySSLAdapter(HTTPAdapter):
+        # Stack Overflow solution: Multiple SSL adapter strategies
+        class StackOverflowSSLAdapter(HTTPAdapter):
             def init_poolmanager(self, *args, **kwargs):
+                # Stack Overflow solution: Create permissive SSL context
                 context = ssl.create_default_context()
-                # Try TLS 1.0/1.1 for older proxy compatibility
-                context.minimum_version = ssl.TLSVersion.TLSv1
-                context.maximum_version = ssl.TLSVersion.TLSv1_2
-                # Use broader cipher suite for proxy compatibility
-                context.set_ciphers('ALL:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA')
+                
+                # Solution 1: Set SECLEVEL to 1 for legacy compatibility
+                context.set_ciphers('DEFAULT:@SECLEVEL=1')
+                
+                # Solution 2: Disable hostname and certificate verification
                 context.check_hostname = False  
                 context.verify_mode = ssl.CERT_NONE
+                
+                # Solution 3: Try TLS 1.0+ for maximum compatibility
+                context.minimum_version = ssl.TLSVersion.TLSv1
+                context.maximum_version = ssl.TLSVersion.TLSv1_3
+                
+                # Solution 4: Use certifi bundle if available
+                try:
+                    import certifi
+                    context.load_verify_locations(certifi.where())
+                except:
+                    pass
+                
                 kwargs['ssl_context'] = context
                 return super().init_poolmanager(*args, **kwargs)
         
@@ -342,25 +402,25 @@ def init_components():
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
                 
-                # Configure session with legacy SSL/TLS for proxy compatibility
+                # Configure session with Stack Overflow SSL fixes
                 if hasattr(self, 'session'):
-                    # Mount the legacy SSL adapter for SOCKS5 compatibility
-                    self.session.mount('https://', LegacySSLAdapter())
-                    self.session.verify = False
+                    # Mount the Stack Overflow SSL adapter
+                    self.session.mount('https://', StackOverflowSSLAdapter())
+                    self.session.verify = False  # Disable verification as Stack Overflow suggests
                     if vpn_proxy:
                         self.session.proxies = vpn_proxy
-                        print("🔒 VPN proxy + Legacy SSL (TLS 1.0-1.2) applied to pybit session")
+                        print("🔒 VPN proxy + Stack Overflow SSL fixes applied to pybit session")
                 elif hasattr(self, '_session'):
-                    self._session.mount('https://', LegacySSLAdapter())
+                    self._session.mount('https://', StackOverflowSSLAdapter())
                     self._session.verify = False
                     if vpn_proxy:
                         self._session.proxies = vpn_proxy
-                        print("🔒 VPN proxy + Legacy SSL applied to pybit _session")
+                        print("🔒 VPN proxy + Stack Overflow SSL fixes applied to pybit _session")
                 
                 # Also try to patch the client if it exists
                 if hasattr(self, 'client'):
                     if hasattr(self.client, 'session'):
-                        self.client.session.mount('https://', LegacySSLAdapter())
+                        self.client.session.mount('https://', StackOverflowSSLAdapter())
                         self.client.session.verify = False
                         if vpn_proxy:
                             self.client.session.proxies = vpn_proxy
