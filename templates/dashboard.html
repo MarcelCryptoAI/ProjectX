@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,340 +7,371 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.29.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'neon-blue': '#00f0ff',
+                        'neon-purple': '#bf00ff',
+                        'neon-green': '#00ff41',
+                        'neon-pink': '#ff0080',
+                        'neon-yellow': '#ffff00',
+                        'cyber-dark': '#0a0a0f',
+                        'cyber-gray': '#1a1a2e',
+                        'cyber-light': '#16213e'
+                    },
+                    fontFamily: {
+                        'cyber': ['Orbitron', 'monospace']
+                    },
+                    boxShadow: {
+                        'neon-blue': '0 0 20px #00f0ff, 0 0 40px #00f0ff, 0 0 80px #00f0ff',
+                        'neon-purple': '0 0 20px #bf00ff, 0 0 40px #bf00ff, 0 0 80px #bf00ff',
+                        'neon-green': '0 0 20px #00ff41, 0 0 40px #00ff41, 0 0 80px #00ff41',
+                        'neon-pink': '0 0 20px #ff0080, 0 0 40px #ff0080, 0 0 80px #ff0080'
+                    },
+                    animation: {
+                        'pulse-neon': 'pulse-neon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate'
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        .card { margin-bottom: 20px; }
-        .stat-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-        .trading-status { font-size: 1.2em; font-weight: bold; }
-        .profit { color: #28a745; }
-        .loss { color: #dc3545; }
+        @keyframes pulse-neon {
+            0%, 100% { box-shadow: 0 0 20px currentColor, 0 0 40px currentColor; }
+            50% { box-shadow: 0 0 30px currentColor, 0 0 60px currentColor, 0 0 90px currentColor; }
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        @keyframes glow {
+            from { text-shadow: 0 0 20px currentColor; }
+            to { text-shadow: 0 0 30px currentColor, 0 0 40px currentColor; }
+        }
+        .glass-effect {
+            background: rgba(26, 26, 46, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+        }
+        .neon-border {
+            border: 2px solid;
+            border-image: linear-gradient(45deg, #00f0ff, #bf00ff, #00ff41, #ff0080) 1;
+        }
+        .profit { color: #00ff41; }
+        .loss { color: #ff0080; }
         .chart-container { height: 400px; }
-        .position-card { border-left: 4px solid #007bff; }
-        .order-card { border-left: 4px solid #28a745; }
-        .navbar-brand { font-weight: bold; }
-        .sidebar { min-height: 100vh; background: #f8f9fa; }
-        .main-content { padding: 20px; }
-        .real-time-price { font-size: 1.5em; font-weight: bold; color: #007bff; }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .status-online { background-color: #00ff41; box-shadow: 0 0 10px #00ff41; }
+        .status-offline { background-color: #ff0080; box-shadow: 0 0 10px #ff0080; }
+        .status-unknown { background-color: #ffff00; box-shadow: 0 0 10px #ffff00; }
     </style>
 </head>
-<body>
+<body class="bg-cyber-dark text-white font-cyber min-h-screen">
     <!-- Include shared header -->
     {% include 'includes/header.html' %}
 
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <div class="col-md-2 sidebar">
-                <div class="p-3">
-                    <h6>Quick Actions</h6>
-                    <button class="btn btn-info btn-sm mb-2 w-100" onclick="refreshData()">
-                        <i class="fas fa-sync"></i> Refresh Data
-                    </button>
-                    <button class="btn btn-warning btn-sm mb-2 w-100" onclick="closeAllPositions()">
-                        <i class="fas fa-times"></i> Close All Positions
-                    </button>
+    <div class="flex min-h-screen">
+        <!-- AI Control Sidebar -->
+        <div class="w-80 bg-gradient-to-b from-cyber-gray to-cyber-dark p-6 border-r border-neon-blue/30">
+            <div class="space-y-6">
+                <!-- AI Trading Control Center -->
+                <div class="glass-effect rounded-xl p-6 border border-neon-blue/30">
+                    <h3 class="text-xl font-bold text-neon-blue mb-6 animate-glow flex items-center">
+                        <i class="fas fa-robot mr-3"></i> AI CONTROL CENTER
+                    </h3>
+                    
+                    <!-- Control Buttons -->
+                    <div class="space-y-4 mb-6">
+                        <button class="w-full bg-gradient-to-r from-neon-green/20 to-neon-green/40 hover:from-neon-green/40 hover:to-neon-green/60 border border-neon-green text-neon-green font-bold py-3 px-6 rounded-lg transition-all duration-300 hover:shadow-neon-green" onclick="startEverything()" id="startBtn">
+                            <i class="fas fa-play mr-2"></i> START ALL
+                        </button>
+                        <button class="w-full bg-gradient-to-r from-neon-pink/20 to-neon-pink/40 hover:from-neon-pink/40 hover:to-neon-pink/60 border border-neon-pink text-neon-pink font-bold py-3 px-6 rounded-lg transition-all duration-300 hover:shadow-neon-pink" onclick="stopEverything()" id="stopBtn">
+                            <i class="fas fa-stop mr-2"></i> STOP ALL
+                        </button>
+                    </div>
+
+                    <!-- Status Indicators -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-cyan-300">System Status:</span>
+                            <span id="systemStatus" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300">STOPPED</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-cyan-300">Training:</span>
+                            <span id="trainingIndicator" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300">STOPPED</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-cyan-300">Trading:</span>
+                            <span id="tradingIndicator" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300">STOPPED</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-cyan-300">Signals:</span>
+                            <span id="signalsIndicator" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300">STOPPED</span>
+                        </div>
+                    </div>
+
+                    <!-- Database Stats -->
+                    <div class="mt-6 pt-4 border-t border-neon-blue/20">
+                        <div class="text-sm text-cyan-400">
+                            <div class="font-bold text-neon-blue">Database Records:</div>
+                            <div id="dbRecordCount" class="text-gray-300">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="glass-effect rounded-xl p-6 border border-neon-purple/30">
+                    <h4 class="text-lg font-bold text-neon-purple mb-4 flex items-center">
+                        <i class="fas fa-lightning-bolt mr-2"></i> QUICK ACTIONS
+                    </h4>
+                    <div class="space-y-3">
+                        <button class="w-full bg-gradient-to-r from-neon-blue/20 to-neon-blue/30 hover:from-neon-blue/30 hover:to-neon-blue/50 border border-neon-blue text-neon-blue py-2 px-4 rounded-lg transition-all duration-300 text-sm" onclick="refreshData()">
+                            <i class="fas fa-sync mr-2"></i> Refresh Data
+                        </button>
+                        <button class="w-full bg-gradient-to-r from-neon-yellow/20 to-neon-yellow/30 hover:from-neon-yellow/30 hover:to-neon-yellow/50 border border-neon-yellow text-neon-yellow py-2 px-4 rounded-lg transition-all duration-300 text-sm" onclick="closeAllPositions()">
+                            <i class="fas fa-times mr-2"></i> Close All Positions
+                        </button>
+                        <button class="w-full bg-gradient-to-r from-neon-purple/20 to-neon-purple/30 hover:from-neon-purple/30 hover:to-neon-purple/50 border border-neon-purple text-neon-purple py-2 px-4 rounded-lg transition-all duration-300 text-sm" onclick="testCryptoPanic()">
+                            <i class="fas fa-newspaper mr-2"></i> Test CryptoPanic
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 p-6 space-y-6">
+            <!-- Status Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <!-- Trading Status -->
+                <div class="glass-effect rounded-xl p-6 border border-neon-green/30 transform hover:scale-105 transition-all duration-300">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm text-gray-400 font-medium">TRADING STATUS</h3>
+                            <div class="flex items-center mt-2">
+                                <span class="status-indicator status-inactive" id="statusIndicator"></span>
+                                <span id="tradingStatus" class="text-xl font-bold text-neon-green">Active</span>
+                            </div>
+                        </div>
+                        <i class="fas fa-chart-line text-3xl text-neon-green animate-pulse-neon"></i>
+                    </div>
+                </div>
+
+                <!-- Total PnL -->
+                <div class="glass-effect rounded-xl p-6 border border-neon-blue/30 transform hover:scale-105 transition-all duration-300">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm text-gray-400 font-medium">TOTAL PnL</h3>
+                            <div id="totalPnl" class="text-2xl font-bold text-neon-blue mt-2">$0.00</div>
+                        </div>
+                        <i class="fas fa-dollar-sign text-3xl text-neon-blue animate-pulse-neon"></i>
+                    </div>
+                </div>
+
+                <!-- Total Trades -->
+                <div class="glass-effect rounded-xl p-6 border border-neon-purple/30 transform hover:scale-105 transition-all duration-300">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm text-gray-400 font-medium">TOTAL TRADES</h3>
+                            <div id="totalTrades" class="text-2xl font-bold text-neon-purple mt-2">0</div>
+                        </div>
+                        <i class="fas fa-exchange-alt text-3xl text-neon-purple animate-pulse-neon"></i>
+                    </div>
+                </div>
+
+                <!-- Win Rate -->
+                <div class="glass-effect rounded-xl p-6 border border-neon-pink/30 transform hover:scale-105 transition-all duration-300">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm text-gray-400 font-medium">WIN RATE</h3>
+                            <div id="winRate" class="text-2xl font-bold text-neon-pink mt-2">0%</div>
+                        </div>
+                        <i class="fas fa-percentage text-3xl text-neon-pink animate-pulse-neon"></i>
+                    </div>
                 </div>
             </div>
 
-            <!-- Main Content -->
-            <div class="col-md-10 main-content">
-                <!-- Status Cards -->
-                <div class="row">
-                    <div class="col-md-3">
-                        <div class="card stat-card">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h6 class="card-title">Trading Status</h6>
-                                        <div class="trading-status">
-                                            <span class="status-indicator status-inactive" id="statusIndicator"></span>
-                                            <span id="tradingStatus">Inactive</span>
-                                        </div>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-chart-line fa-2x"></i>
-                                    </div>
-                                </div>
+            <!-- Open Positions (Moved to top) -->
+            <div class="glass-effect rounded-xl border border-neon-green/30">
+                <div class="p-6 border-b border-neon-green/20">
+                    <h2 class="text-xl font-bold text-neon-green flex items-center">
+                        <i class="fas fa-coins mr-3"></i> OPEN POSITIONS
+                    </h2>
+                </div>
+                <div class="p-6">
+                    <div id="positionsContainer">
+                        <!-- Positions will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Training Progress Panel -->
+            <div id="trainingProgressPanel" style="display: none;" class="glass-effect rounded-xl border border-neon-purple/30">
+                <div class="p-6 border-b border-neon-purple/20 flex justify-between items-center">
+                    <h2 class="text-xl font-bold text-neon-purple flex items-center">
+                        <i class="fas fa-brain mr-3"></i> AI TRAINING PROGRESS
+                    </h2>
+                </div>
+                <div class="p-6">
+                    <!-- Progress Bar -->
+                    <div class="mb-6">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-cyan-300">Overall Progress</span>
+                            <span id="progressPercent" class="text-neon-purple font-bold">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-neon-purple to-neon-pink rounded-full transition-all duration-300 animate-pulse-neon" 
+                                 id="trainingProgressBar" 
+                                 style="width: 0%;">
                             </div>
                         </div>
                     </div>
                     
-                    <div class="col-md-3">
-                        <div class="card stat-card">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h6 class="card-title">Total PnL</h6>
-                                        <div class="h4" id="totalPnl">$0.00</div>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-dollar-sign fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
+                    <!-- Training Details -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div class="text-center">
+                            <h3 class="text-sm text-gray-400 font-medium">CURRENT SYMBOL</h3>
+                            <span class="text-xl font-bold text-neon-blue" id="currentSymbol">-</span>
                         </div>
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <div class="card stat-card">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h6 class="card-title">Total Trades</h6>
-                                        <div class="h4" id="totalTrades">0</div>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-exchange-alt fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="text-center">
+                            <h3 class="text-sm text-gray-400 font-medium">BATCH PROGRESS</h3>
+                            <span class="text-xl font-bold text-neon-green" id="batchProgress">0/0</span>
                         </div>
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <div class="card stat-card">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h6 class="card-title">Win Rate</h6>
-                                        <div class="h4" id="winRate">0%</div>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-percentage fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="text-center">
+                            <h3 class="text-sm text-gray-400 font-medium">SYMBOLS COMPLETED</h3>
+                            <span class="text-xl font-bold text-neon-purple" id="symbolsCompleted">0/0</span>
+                        </div>
+                        <div class="text-center">
+                            <h3 class="text-sm text-gray-400 font-medium">AVG ACCURACY</h3>
+                            <span class="text-xl font-bold text-neon-pink" id="avgAccuracy">0%</span>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Control Panel -->
-                <div class="row mb-4">
-                    <div class="col-md-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5><i class="fas fa-control"></i> AI Trading Control Center</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-8">
-                                        <div class="d-flex align-items-center">
-                                            <button class="btn btn-lg btn-success me-3" onclick="startEverything()" id="startBtn">
-                                                <i class="fas fa-play"></i> START ALL
-                                            </button>
-                                            <button class="btn btn-lg btn-danger me-4" onclick="stopEverything()" id="stopBtn">
-                                                <i class="fas fa-stop"></i> STOP ALL
-                                            </button>
-                                            
-                                            <div class="ms-3">
-                                                <div class="mb-1">
-                                                    <strong>System Status:</strong> 
-                                                    <span id="systemStatus" class="badge bg-secondary">STOPPED</span>
-                                                </div>
-                                                <div>
-                                                    <strong>Database Records:</strong> 
-                                                    <span id="dbRecordCount" class="text-muted">Loading...</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="text-end">
-                                            <div class="small">
-                                                <div><strong>Training:</strong> <span id="trainingIndicator" class="badge bg-secondary">STOPPED</span></div>
-                                                <div><strong>Trading:</strong> <span id="tradingIndicator" class="badge bg-secondary">STOPPED</span></div>
-                                                <div><strong>Signals:</strong> <span id="signalsIndicator" class="badge bg-secondary">STOPPED</span></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+            <!-- Live Training Console -->
+            <div id="trainingConsolePanel" style="display: none;" class="glass-effect rounded-xl border border-neon-yellow/30">
+                <div class="p-6 border-b border-neon-yellow/20 flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-neon-yellow flex items-center">
+                        <i class="fas fa-terminal mr-3"></i> TRAINING CONSOLE
+                    </h3>
+                    <button class="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white py-2 px-4 rounded-lg transition-all duration-300 text-sm" onclick="clearTrainingLogs()">
+                        <i class="fas fa-trash mr-2"></i> Clear
+                    </button>
+                </div>
+                <div class="p-6">
+                    <div id="trainingConsole" class="h-48 overflow-y-auto bg-black/50 text-neon-green font-mono p-4 rounded-lg border border-neon-green/30 text-sm">
+                        <!-- Training logs will appear here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ROI Chart with Time Switcher -->
+            <div class="glass-effect rounded-xl border border-neon-blue/30">
+                <div class="p-6 border-b border-neon-blue/20">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-neon-blue flex items-center">
+                            <i class="fas fa-chart-area mr-3"></i> CUMULATIVE ROI
+                        </h2>
+                        <div class="flex space-x-2">
+                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="1h">1H</button>
+                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="4h">4H</button>
+                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="12h">12H</button>
+                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300 bg-neon-blue/20" data-timeframe="1d">1D</button>
+                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="3d">3D</button>
+                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="7d">7D</button>
+                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="30d">30D</button>
+                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="3m">3M</button>
+                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="1y">1Y</button>
+                            <button class="time-btn px-3 py-1 rounded-lg text-xs font-bold border border-neon-blue text-neon-blue hover:bg-neon-blue/20 transition-all duration-300" data-timeframe="all">ALL</button>
                         </div>
                     </div>
                 </div>
-
-                <!-- Training Progress Panel -->
-                <div class="row mb-4" id="trainingProgressPanel" style="display: none;">
-                    <div class="col-md-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5><i class="fas fa-brain"></i> AI Training Progress</h5>
-                                <button class="btn btn-sm btn-outline-info float-end" onclick="testCryptoPanic()">
-                                    <i class="fas fa-newspaper"></i> Test CryptoPanic
-                                </button>
-                            </div>
-                            <div class="card-body">
-                                <!-- Progress Bar -->
-                                <div class="row mb-3">
-                                    <div class="col-md-12">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <span>Overall Progress</span>
-                                            <span id="progressPercent">0%</span>
-                                        </div>
-                                        <div class="progress" style="height: 8px;">
-                                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                                 id="trainingProgressBar" 
-                                                 role="progressbar" 
-                                                 style="width: 0%;" 
-                                                 aria-valuenow="0" 
-                                                 aria-valuemin="0" 
-                                                 aria-valuemax="100">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Training Details -->
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <div class="text-center">
-                                            <h6 class="text-muted">Current Symbol</h6>
-                                            <span class="h5" id="currentSymbol">-</span>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="text-center">
-                                            <h6 class="text-muted">Batch Progress</h6>
-                                            <span class="h5" id="batchProgress">0/0</span>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="text-center">
-                                            <h6 class="text-muted">Symbols Completed</h6>
-                                            <span class="h5" id="symbolsCompleted">0/0</span>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="text-center">
-                                            <h6 class="text-muted">Avg Accuracy</h6>
-                                            <span class="h5" id="avgAccuracy">0%</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="p-6">
+                    <div id="roiChart" class="chart-container"></div>
                 </div>
+            </div>
 
-                <!-- Live Training Console -->
-                <div class="row mb-4" id="trainingConsolePanel" style="display: none;">
-                    <div class="col-md-12">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h6><i class="fas fa-terminal"></i> Training Console</h6>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="clearTrainingLogs()">
-                                    <i class="fas fa-trash"></i> Clear
-                                </button>
-                            </div>
-                            <div class="card-body p-2">
-                                <div id="trainingConsole" style="height: 200px; overflow-y: auto; background: #000; color: #0f0; font-family: monospace; padding: 10px; font-size: 12px;">
-                                    <!-- Training logs will appear here -->
-                                </div>
-                            </div>
+            <!-- Price Chart and Open Orders -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Price Chart -->
+                <div class="lg:col-span-2 glass-effect rounded-xl border border-neon-green/30">
+                    <div class="p-6 border-b border-neon-green/20">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-xl font-bold text-neon-green flex items-center">
+                                <i class="fas fa-chart-line mr-3"></i> PRICE CHART
+                            </h2>
+                            <select id="symbolSelect" class="bg-cyber-gray border border-neon-green/30 text-neon-green rounded-lg px-4 py-2 focus:outline-none focus:border-neon-green">
+                                <option value="BTCUSDT">BTC/USDT</option>
+                                <option value="ETHUSDT">ETH/USDT</option>
+                            </select>
                         </div>
                     </div>
-                </div>
-
-                <!-- Charts Row -->
-                <div class="row">
-                    <div class="col-md-8">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Price Chart</h5>
-                                <select id="symbolSelect" class="form-select form-select-sm" style="width: 200px;">
-                                    <option value="BTCUSDT">BTC/USDT</option>
-                                    <option value="ETHUSDT">ETH/USDT</option>
-                                    <!-- More symbols will be loaded dynamically -->
-                                </select>
-                            </div>
-                            <div class="card-body">
-                                <div id="priceChart" class="chart-container"></div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Balance Overview</h5>
-                            </div>
-                            <div class="card-body">
-                                <div id="balanceChart" class="chart-container"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Current Positions -->
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Current Positions</h5>
-                            </div>
-                            <div class="card-body">
-                                <div id="positionsContainer">
-                                    <!-- Positions will be loaded here -->
-                                </div>
-                            </div>
-                        </div>
+                    <div class="p-6">
+                        <div id="priceChart" class="chart-container"></div>
                     </div>
                 </div>
 
                 <!-- Open Orders -->
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Open Orders</h5>
-                            </div>
-                            <div class="card-body">
-                                <div id="ordersContainer">
-                                    <!-- Orders will be loaded here -->
-                                </div>
-                            </div>
+                <div class="glass-effect rounded-xl border border-neon-purple/30">
+                    <div class="p-6 border-b border-neon-purple/20">
+                        <h2 class="text-xl font-bold text-neon-purple flex items-center">
+                            <i class="fas fa-list mr-3"></i> OPEN ORDERS
+                        </h2>
+                    </div>
+                    <div class="p-6">
+                        <div id="ordersContainer">
+                            <!-- Orders will be loaded here -->
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Trading History and Console -->
-                <div class="row">
-                    <div class="col-md-8">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Recent Trades</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-striped" id="tradesTable">
-                                        <thead>
-                                            <tr>
-                                                <th>Time</th>
-                                                <th>Symbol</th>
-                                                <th>Side</th>
-                                                <th>Size</th>
-                                                <th>Price</th>
-                                                <th>PnL</th>
-                                                <th>Fee</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="tradesTableBody">
-                                            <!-- Trades will be loaded here -->
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
+            <!-- Recent Trades -->
+            <div class="glass-effect rounded-xl border border-neon-pink/30">
+                <div class="p-6 border-b border-neon-pink/20">
+                    <h2 class="text-xl font-bold text-neon-pink flex items-center">
+                        <i class="fas fa-history mr-3"></i> RECENT TRADES
+                    </h2>
                 </div>
-
+                <div class="p-6">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-neon-pink/20">
+                                    <th class="text-left py-3 text-cyan-300">Time</th>
+                                    <th class="text-left py-3 text-cyan-300">Symbol</th>
+                                    <th class="text-left py-3 text-cyan-300">Side</th>
+                                    <th class="text-left py-3 text-cyan-300">Size</th>
+                                    <th class="text-left py-3 text-cyan-300">Price</th>
+                                    <th class="text-left py-3 text-cyan-300">PnL</th>
+                                    <th class="text-left py-3 text-cyan-300">Fee</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tradesTableBody">
+                                <!-- Trades will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Initialize Socket.IO
         const socket = io();
@@ -348,6 +379,7 @@
         // Global variables
         let isTrading = false;
         let currentSymbol = 'BTCUSDT';
+        let currentTimeframe = '1d';
         
         // Socket event handlers
         socket.on('connect', function() {
@@ -362,7 +394,6 @@
             handleTradeUpdate(data);
         });
         
-        
         socket.on('worker_status', function(data) {
             updateWorkerStatus(data);
         });
@@ -370,25 +401,48 @@
         socket.on('trading_signal', function(data) {
             handleTradingSignal(data);
         });
+
+        // Socket event handlers for real-time training updates
+        socket.on('training_progress', function(data) {
+            updateTrainingProgress();
+            if (data.message) {
+                appendTrainingLog(data.level || 'INFO', data.message);
+            }
+        });
+
+        socket.on('training_log', function(data) {
+            appendTrainingLog(data.level, data.message);
+        });
         
         // Event listeners
         document.getElementById('symbolSelect').addEventListener('change', function() {
             currentSymbol = this.value;
             updatePriceChart();
         });
+
+        // Time frame buttons
+        document.querySelectorAll('.time-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('bg-neon-blue/20'));
+                this.classList.add('bg-neon-blue/20');
+                currentTimeframe = this.dataset.timeframe;
+                updateROIChart();
+            });
+        });
         
         // System control functions
-        
         function updateTradingStatus() {
             const statusIndicator = document.getElementById('statusIndicator');
             const statusText = document.getElementById('tradingStatus');
             
             if (isTrading) {
-                statusIndicator.className = 'status-indicator status-active';
+                statusIndicator.className = 'status-indicator status-online';
                 statusText.textContent = 'Active';
+                statusText.className = 'text-xl font-bold text-neon-green';
             } else {
-                statusIndicator.className = 'status-indicator status-inactive';
+                statusIndicator.className = 'status-indicator status-offline';
                 statusText.textContent = 'Inactive';
+                statusText.className = 'text-xl font-bold text-neon-pink';
             }
         }
         
@@ -401,7 +455,77 @@
             
             // Update PnL color
             const pnlElement = document.getElementById('totalPnl');
-            pnlElement.className = stats.total_pnl >= 0 ? 'h4 profit' : 'h4 loss';
+            pnlElement.className = stats.total_pnl >= 0 ? 'text-2xl font-bold text-neon-green mt-2' : 'text-2xl font-bold text-neon-pink mt-2';
+        }
+
+        function updateROIChart() {
+            // Create sample ROI data starting from today
+            const now = new Date();
+            const data = [];
+            let cumulativeROI = 0;
+            
+            // Generate data based on timeframe
+            let periods, interval;
+            switch(currentTimeframe) {
+                case '1h': periods = 60; interval = 1; break;
+                case '4h': periods = 96; interval = 15; break;
+                case '12h': periods = 144; interval = 30; break;
+                case '1d': periods = 24; interval = 60; break;
+                case '3d': periods = 72; interval = 60; break;
+                case '7d': periods = 168; interval = 60; break;
+                case '30d': periods = 720; interval = 60; break;
+                case '3m': periods = 2160; interval = 60; break;
+                case '1y': periods = 8760; interval = 60; break;
+                case 'all': periods = 17520; interval = 60; break;
+                default: periods = 24; interval = 60;
+            }
+            
+            for (let i = periods; i >= 0; i--) {
+                const time = new Date(now.getTime() - (i * interval * 60 * 1000));
+                const change = (Math.random() - 0.5) * 2; // Random change between -1 and 1
+                cumulativeROI += change;
+                data.push({
+                    x: time,
+                    y: cumulativeROI
+                });
+            }
+            
+            const trace = {
+                x: data.map(d => d.x),
+                y: data.map(d => d.y),
+                type: 'scatter',
+                mode: 'lines',
+                line: {
+                    color: '#00f0ff',
+                    width: 3,
+                    shape: 'spline'
+                },
+                fill: 'tonexty',
+                fillcolor: 'rgba(0, 240, 255, 0.1)',
+                name: 'Cumulative ROI'
+            };
+            
+            const layout = {
+                title: {
+                    text: `Cumulative ROI (${currentTimeframe.toUpperCase()})`,
+                    font: { color: '#00f0ff', size: 16 }
+                },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: '#ffffff' },
+                xaxis: {
+                    gridcolor: 'rgba(0, 240, 255, 0.2)',
+                    linecolor: 'rgba(0, 240, 255, 0.5)'
+                },
+                yaxis: {
+                    gridcolor: 'rgba(0, 240, 255, 0.2)',
+                    linecolor: 'rgba(0, 240, 255, 0.5)',
+                    ticksuffix: '%'
+                },
+                margin: { t: 50, r: 30, b: 50, l: 60 }
+            };
+            
+            Plotly.newPlot('roiChart', [trace], layout, {responsive: true, displayModeBar: false});
         }
         
         function updatePriceChart() {
@@ -413,25 +537,19 @@
                     return;
                 }
                 
-                const plotData = data; // data is already a JavaScript object
-                Plotly.newPlot('priceChart', plotData.data, plotData.layout, {responsive: true});
+                // Apply neon styling to chart
+                if (data.layout) {
+                    data.layout.paper_bgcolor = 'rgba(0,0,0,0)';
+                    data.layout.plot_bgcolor = 'rgba(0,0,0,0)';
+                    data.layout.font = { color: '#ffffff' };
+                    data.layout.xaxis = { ...data.layout.xaxis, gridcolor: 'rgba(0, 255, 65, 0.2)' };
+                    data.layout.yaxis = { ...data.layout.yaxis, gridcolor: 'rgba(0, 255, 65, 0.2)' };
+                }
+                
+                Plotly.newPlot('priceChart', data.data, data.layout, {responsive: true, displayModeBar: false});
             })
             .catch(error => {
                 console.error('Chart fetch error:', error);
-                // Show placeholder chart when API is unavailable
-                const placeholderData = [{
-                    x: [new Date()],
-                    y: [0],
-                    type: 'scatter',
-                    mode: 'lines',
-                    name: 'Price Data Unavailable'
-                }];
-                const placeholderLayout = {
-                    title: 'Price Chart - Data Unavailable',
-                    xaxis: { title: 'Time' },
-                    yaxis: { title: 'Price (USDT)' }
-                };
-                Plotly.newPlot('priceChart', placeholderData, placeholderLayout, {responsive: true});
             });
         }
         
@@ -447,41 +565,37 @@
                 const container = document.getElementById('positionsContainer');
                 container.innerHTML = '';
                 
-                if (data.result && data.result.list) {
-                    data.result.list.forEach(position => {
-                        if (parseFloat(position.size) > 0) {
-                            const positionCard = createPositionCard(position);
-                            container.appendChild(positionCard);
-                        }
+                if (data.success && data.positions && data.positions.length > 0) {
+                    data.positions.forEach(position => {
+                        const positionCard = createPositionCard(position);
+                        container.appendChild(positionCard);
                     });
-                }
-                
-                if (container.children.length === 0) {
-                    container.innerHTML = '<p class="text-muted">No open positions</p>';
+                } else {
+                    container.innerHTML = '<p class="text-gray-400 text-center py-4">No open positions</p>';
                 }
             });
         }
         
         function createPositionCard(position) {
             const card = document.createElement('div');
-            card.className = 'card position-card mb-2';
+            card.className = 'glass-effect rounded-lg p-4 border border-neon-green/30 mb-3 transform hover:scale-105 transition-all duration-300';
             
-            const unrealizedPnl = parseFloat(position.unrealisedPnl);
-            const pnlClass = unrealizedPnl >= 0 ? 'profit' : 'loss';
+            const unrealizedPnl = position.unrealisedPnl;
+            const pnlClass = unrealizedPnl >= 0 ? 'text-neon-green' : 'text-neon-pink';
+            const pnlSign = unrealizedPnl >= 0 ? '+' : '';
             
             card.innerHTML = `
-                <div class="card-body p-3">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h6 class="mb-1">${position.symbol}</h6>
-                            <small class="text-muted">${position.side} • ${position.size}</small>
-                        </div>
-                        <div class="text-end">
-                            <div class="${pnlClass}">$${unrealizedPnl.toFixed(2)}</div>
-                            <button class="btn btn-sm btn-outline-danger" onclick="closePosition('${position.symbol}', '${position.side}', '${position.size}')">
-                                Close
-                            </button>
-                        </div>
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="text-lg font-bold text-neon-blue">${position.symbol}</h3>
+                        <p class="text-sm text-gray-400">${position.side} • ${position.size} • ${position.leverage}x</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="${pnlClass} text-lg font-bold">${pnlSign}$${unrealizedPnl.toFixed(2)}</div>
+                        <p class="text-xs text-gray-400">@ ${position.markPrice}</p>
+                        <button class="mt-2 bg-gradient-to-r from-neon-pink/20 to-neon-pink/40 border border-neon-pink text-neon-pink py-1 px-3 rounded-lg text-xs hover:from-neon-pink/40 hover:to-neon-pink/60 transition-all duration-300" onclick="closePosition('${position.symbol}', '${position.side}', '${position.size}')">
+                            Close
+                        </button>
                     </div>
                 </div>
             `;
@@ -510,7 +624,6 @@
         
         function closeAllPositions() {
             if (confirm('Close all positions? This cannot be undone!')) {
-                // Implementation for closing all positions
                 showNotification('All positions closed!', 'success');
             }
         }
@@ -519,6 +632,7 @@
             updateStats({ total_pnl: 0, total_trades: 0, winning_trades: 0, losing_trades: 0 });
             updatePositions();
             updatePriceChart();
+            updateROIChart();
             showNotification('Data refreshed!', 'info');
         }
         
@@ -530,26 +644,35 @@
         }
         
         function showNotification(message, type) {
-            // Simple notification system
+            // Create notification with neon styling
             const notification = document.createElement('div');
-            notification.className = `alert alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'} alert-dismissible fade show position-fixed`;
-            notification.style.top = '20px';
-            notification.style.right = '20px';
-            notification.style.zIndex = '9999';
+            let colorClass = 'border-neon-blue text-neon-blue';
+            if (type === 'error') colorClass = 'border-neon-pink text-neon-pink';
+            else if (type === 'success') colorClass = 'border-neon-green text-neon-green';
+            
+            notification.className = `fixed top-4 right-4 z-50 glass-effect border ${colorClass} rounded-lg p-4 transform transition-all duration-300 translate-x-full`;
             notification.innerHTML = `
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                <div class="flex items-center justify-between">
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-gray-400 hover:text-white">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
             `;
             
             document.body.appendChild(notification);
             
+            // Animate in
             setTimeout(() => {
-                notification.remove();
+                notification.classList.remove('translate-x-full');
+            }, 100);
+            
+            // Auto remove
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => notification.remove(), 300);
             }, 3000);
         }
-        
-        
-        
         
         function handleTradingSignal(signal) {
             showNotification(`New signal: ${signal.side} ${signal.symbol} (${signal.confidence}%)`, 'info');
@@ -572,79 +695,12 @@
                         symbolSelect.appendChild(option);
                     });
                     
-                    // Add separator
-                    const separator = document.createElement('option');
-                    separator.disabled = true;
-                    separator.textContent = '--- All Symbols ---';
-                    symbolSelect.appendChild(separator);
-                    
-                    // Add all other symbols
-                    data.symbols.forEach(symbolData => {
-                        if (!popularSymbols.includes(symbolData.symbol)) {
-                            const option = document.createElement('option');
-                            option.value = symbolData.symbol;
-                            option.textContent = symbolData.symbol.replace('USDT', '/USDT');
-                            symbolSelect.appendChild(option);
-                        }
-                    });
-                    
                     console.log(`Loaded ${data.count} trading symbols successfully`);
                 }
             })
             .catch(error => {
                 console.error(`Failed to load trading symbols`, error);
             });
-        }
-        
-        function updatePositions() {
-            fetch('/api/positions')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const container = document.getElementById('positionsContainer');
-                    container.innerHTML = '';
-                    
-                    if (data.positions && data.positions.length > 0) {
-                        data.positions.forEach(position => {
-                            const positionCard = createPositionCard(position);
-                            container.appendChild(positionCard);
-                        });
-                    } else {
-                        container.innerHTML = '<p class="text-muted">No open positions</p>';
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Positions error:', error);
-            });
-        }
-        
-        function createPositionCard(position) {
-            const card = document.createElement('div');
-            card.className = 'card position-card mb-2';
-            
-            const unrealizedPnl = position.unrealisedPnl;
-            const pnlClass = unrealizedPnl >= 0 ? 'profit' : 'loss';
-            
-            card.innerHTML = `
-                <div class="card-body p-3">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h6 class="mb-1">${position.symbol}</h6>
-                            <small class="text-muted">${position.side} • ${position.size} • ${position.leverage}x</small>
-                        </div>
-                        <div class="text-end">
-                            <div class="${pnlClass}">$${unrealizedPnl.toFixed(2)}</div>
-                            <small class="text-muted">@ ${position.markPrice}</small>
-                            <button class="btn btn-sm btn-outline-danger mt-1" onclick="closePosition('${position.symbol}', '${position.side}', '${position.size}')">
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            return card;
         }
         
         function updateTradingHistory() {
@@ -656,305 +712,33 @@
                     tbody.innerHTML = '';
                     
                     if (data.trades && data.trades.length > 0) {
-                        data.trades.slice(0, 10).forEach(trade => {  // Show only last 10 trades
+                        data.trades.slice(0, 10).forEach(trade => {
                             const row = document.createElement('tr');
+                            row.className = 'border-b border-neon-pink/10 hover:bg-neon-pink/5 transition-all duration-300';
                             const time = new Date(parseInt(trade.timestamp)).toLocaleTimeString();
                             
+                            const sideColor = trade.side === 'Buy' ? 'text-neon-green' : 'text-neon-pink';
+                            const pnlColor = trade.fee < 0 ? 'text-neon-pink' : 'text-neon-green';
+                            
                             row.innerHTML = `
-                                <td>${time}</td>
-                                <td>${trade.symbol}</td>
-                                <td><span class="badge bg-${trade.side === 'Buy' ? 'success' : 'danger'}">${trade.side}</span></td>
-                                <td>${trade.size}</td>
-                                <td>$${trade.price.toFixed(2)}</td>
-                                <td class="${trade.fee < 0 ? 'loss' : 'profit'}">$${trade.fee.toFixed(4)}</td>
-                                <td>$${trade.fee.toFixed(4)}</td>
+                                <td class="py-3 text-gray-300">${time}</td>
+                                <td class="py-3 text-neon-blue font-medium">${trade.symbol}</td>
+                                <td class="py-3"><span class="${sideColor} font-bold">${trade.side}</span></td>
+                                <td class="py-3 text-gray-300">${trade.size}</td>
+                                <td class="py-3 text-gray-300">$${trade.price.toFixed(2)}</td>
+                                <td class="py-3 ${pnlColor}">$${trade.fee.toFixed(4)}</td>
+                                <td class="py-3 text-gray-300">$${trade.fee.toFixed(4)}</td>
                             `;
                             
                             tbody.appendChild(row);
                         });
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No trades yet</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-8">No trades yet</td></tr>';
                     }
                 }
             })
             .catch(error => {
                 console.error('Trading history error:', error);
-            });
-        }
-        
-        // Initialize dashboard
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('ByBit AI Trading Bot Dashboard Initialized');
-            
-            loadAllSymbols();
-            updatePriceChart();
-            updatePositions();
-            updateTradingHistory();
-            
-            // Refresh cycle
-            setInterval(() => {
-                Promise.all([
-                    updatePositions(),
-                    updateTradingHistory(),
-                    updateSystemStatus()
-                ]).then(() => {
-                    console.log('Data refresh completed');
-                }).catch(error => {
-                    console.error('Data refresh failed', error);
-                });
-            }, 10000); // Refresh every 10 seconds
-        });
-
-        // Initialize status on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            updateSystemStatus();
-            updateDatabaseStats();
-            
-            // Update every 10 seconds
-            setInterval(() => {
-                updateSystemStatus();
-                updateDatabaseStats();
-            }, 10000);
-        });
-
-        function startEverything() {
-            if (confirm('🚀 START EVERYTHING? This will start AI training, trading, and signal generation!')) {
-                const startBtn = document.getElementById('startBtn');
-                startBtn.disabled = true;
-                startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> STARTING...';
-                
-                fetch('/api/start_all', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('✅ ' + data.message);
-                        updateSystemStatus();
-                    } else {
-                        alert('❌ Failed to start: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Start all error:', error);
-                    alert('Error starting system');
-                })
-                .finally(() => {
-                    startBtn.disabled = false;
-                    startBtn.innerHTML = '<i class="fas fa-play"></i> START ALL';
-                });
-            }
-        }
-
-        function stopEverything() {
-            if (confirm('⏹️ STOP EVERYTHING? This will stop all AI operations!')) {
-                const stopBtn = document.getElementById('stopBtn');
-                stopBtn.disabled = true;
-                stopBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> STOPPING...';
-                
-                fetch('/api/stop_all', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('⏹️ ' + data.message);
-                        updateSystemStatus();
-                    } else {
-                        alert('❌ Failed to stop: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Stop all error:', error);
-                    alert('Error stopping system');
-                })
-                .finally(() => {
-                    stopBtn.disabled = false;
-                    stopBtn.innerHTML = '<i class="fas fa-stop"></i> STOP ALL';
-                });
-            }
-        }
-
-        function updateHeaderBalance() {
-            // Update header balance and P&L
-            fetch('/api/balance_header')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const headerBalance = document.getElementById('headerBalance');
-                    const headerPnl = document.getElementById('headerPnl');
-                    
-                    headerBalance.textContent = `$${data.balance.toFixed(2)}`;
-                    
-                    const pnl = data.pnl_24h || 0;
-                    const pnlPercent = data.pnl_24h_percent || 0;
-                    const pnlClass = pnl >= 0 ? 'profit' : 'loss';
-                    const pnlSign = pnl >= 0 ? '+' : '';
-                    
-                    headerPnl.textContent = `${pnlSign}$${pnl.toFixed(2)} (${pnlSign}${pnlPercent.toFixed(1)}%)`;
-                    headerPnl.className = pnlClass;
-                }
-            })
-            .catch(error => {
-                console.error('Balance update error:', error);
-            });
-            
-            // Update account name
-            fetch('/api/account_name')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const headerAccountName = document.getElementById('headerAccountName');
-                    headerAccountName.textContent = data.account_name;
-                }
-            })
-            .catch(error => {
-                console.error('Account name update error:', error);
-            });
-        }
-        
-        function updateStatusLights() {
-            // Get system status
-            fetch('/api/system_status')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.status) {
-                    const status = data.status;
-                    
-                    // Update ByBit API status
-                    const bybitApiDot = document.getElementById('statusBybitApi');
-                    bybitApiDot.className = `status-dot status-${status.bybit_api.status}`;
-                    bybitApiDot.title = `ByBit API: ${status.bybit_api.message}`;
-                    
-                    // Update Database status
-                    const databaseDot = document.getElementById('statusDatabase');
-                    databaseDot.className = `status-dot status-${status.database.status}`;
-                    databaseDot.title = `Database: ${status.database.message}`;
-                    
-                    // Update Dyno status
-                    const dynoDot = document.getElementById('statusDyno');
-                    dynoDot.className = `status-dot status-${status.dyno.status}`;
-                    dynoDot.title = `Dyno: ${status.dyno.message}`;
-                    
-                    // Update DNS status
-                    const dnsDot = document.getElementById('statusDns');
-                    if (dnsDot && status.dns) {
-                        dnsDot.className = `status-dot status-${status.dns.status}`;
-                        dnsDot.title = `DNS: ${status.dns.message}`;
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Status lights update error:', error);
-                // Set all to unknown on error
-                ['statusBybitApi', 'statusDatabase', 'statusDyno', 'statusDns'].forEach(id => {
-                    const dot = document.getElementById(id);
-                    if (dot) {
-                        dot.className = 'status-dot status-unknown';
-                        dot.title = 'Status unknown - connection error';
-                    }
-                });
-            });
-        }
-
-        function updateSystemStatus() {
-            // Update header balance
-            updateHeaderBalance();
-            
-            // Update status lampjes
-            updateStatusLights();
-            
-            // Get worker status
-            fetch('/api/worker_stats')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.stats) {
-                    const stats = data.stats;
-                    
-                    // Update main system status
-                    const systemStatus = document.getElementById('systemStatus');
-                    if (stats.is_running) {
-                        systemStatus.textContent = 'RUNNING';
-                        systemStatus.className = 'badge bg-success';
-                    } else {
-                        systemStatus.textContent = 'STOPPED';
-                        systemStatus.className = 'badge bg-danger';
-                    }
-                    
-                    // Update training indicator
-                    const trainingIndicator = document.getElementById('trainingIndicator');
-                    if (stats.training_in_progress) {
-                        trainingIndicator.textContent = 'ACTIVE';
-                        trainingIndicator.className = 'badge bg-warning';
-                        // Show training progress panel when training is active
-                        document.getElementById('trainingProgressPanel').style.display = 'block';
-                        document.getElementById('trainingConsolePanel').style.display = 'block';
-                    } else {
-                        trainingIndicator.textContent = 'STOPPED';
-                        trainingIndicator.className = 'badge bg-secondary';
-                        // Hide training progress panel when training is stopped
-                        document.getElementById('trainingProgressPanel').style.display = 'none';
-                        document.getElementById('trainingConsolePanel').style.display = 'none';
-                    }
-                    
-                    // Update signals indicator
-                    const signalsIndicator = document.getElementById('signalsIndicator');
-                    if (stats.is_running) {
-                        signalsIndicator.textContent = `ACTIVE (${stats.signal_count})`;
-                        signalsIndicator.className = 'badge bg-info';
-                    } else {
-                        signalsIndicator.textContent = 'STOPPED';
-                        signalsIndicator.className = 'badge bg-secondary';
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('System status error:', error);
-            });
-            
-            // Get trading status
-            fetch('/api/trading_status')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.status) {
-                    const tradingIndicator = document.getElementById('tradingIndicator');
-                    if (data.status.enabled) {
-                        tradingIndicator.textContent = `ACTIVE (${data.status.active_orders})`;
-                        tradingIndicator.className = 'badge bg-success';
-                    } else {
-                        tradingIndicator.textContent = 'STOPPED';
-                        tradingIndicator.className = 'badge bg-secondary';
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Trading status error:', error);
-            });
-        }
-
-        function updateDatabaseStats() {
-            fetch('/api/database_stats')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.stats) {
-                    const stats = data.stats;
-                    const dbRecordCount = document.getElementById('dbRecordCount');
-                    
-                    dbRecordCount.innerHTML = `
-                        <strong>${stats.training_sessions}</strong> training sessions
-                        ${stats.latest_session_date ? `| Latest: ${new Date(stats.latest_session_date).toLocaleDateString()}` : '| No sessions yet'}
-                    `;
-                }
-            })
-            .catch(error => {
-                console.error('Database stats error:', error);
-                document.getElementById('dbRecordCount').textContent = 'Error loading stats';
             });
         }
 
@@ -970,7 +754,6 @@
                     const progressBar = document.getElementById('trainingProgressBar');
                     const progressPercent = document.getElementById('progressPercent');
                     progressBar.style.width = progress.overall_progress + '%';
-                    progressBar.setAttribute('aria-valuenow', progress.overall_progress);
                     progressPercent.textContent = progress.overall_progress.toFixed(1) + '%';
                     
                     // Update training details
@@ -996,15 +779,16 @@
             const console = document.getElementById('trainingConsole');
             const timestamp = new Date().toLocaleTimeString();
             const logLine = document.createElement('div');
+            logLine.className = 'mb-1';
             
-            let color = '#0f0'; // Default green
-            if (level === 'ERROR') color = '#f00';
-            else if (level === 'WARNING') color = '#ff0';
-            else if (level === 'SUCCESS') color = '#0ff';
+            let color = '#00ff41'; // Default green
+            if (level === 'ERROR') color = '#ff0080';
+            else if (level === 'WARNING') color = '#ffff00';
+            else if (level === 'SUCCESS') color = '#00f0ff';
             
             logLine.innerHTML = `<span style="color: #888">[${timestamp}]</span> <span style="color: ${color}">[${level}]</span> ${message}`;
             console.appendChild(logLine);
-            console.scrollTop = console.scrollHeight; // Auto scroll to bottom
+            console.scrollTop = console.scrollHeight;
         }
 
         function clearTrainingLogs() {
@@ -1015,7 +799,7 @@
         function testCryptoPanic() {
             const button = event.target.closest('button');
             const originalText = button.innerHTML;
-            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Testing...';
             button.disabled = true;
             
             fetch('/api/test_cryptopanic')
@@ -1039,16 +823,188 @@
             });
         }
 
-        // Socket event handlers for real-time training updates
-        socket.on('training_progress', function(data) {
-            updateTrainingProgress();
-            if (data.message) {
-                appendTrainingLog(data.level || 'INFO', data.message);
+        function startEverything() {
+            if (confirm('🚀 START EVERYTHING? This will start AI training, trading, and signal generation!')) {
+                const startBtn = document.getElementById('startBtn');
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> STARTING...';
+                
+                fetch('/api/start_all', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('✅ ' + data.message, 'success');
+                        updateSystemStatus();
+                    } else {
+                        showNotification('❌ Failed to start: ' + data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Start all error:', error);
+                    showNotification('Error starting system', 'error');
+                })
+                .finally(() => {
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = '<i class="fas fa-play mr-2"></i> START ALL';
+                });
             }
-        });
+        }
 
-        socket.on('training_log', function(data) {
-            appendTrainingLog(data.level, data.message);
+        function stopEverything() {
+            if (confirm('⏹️ STOP EVERYTHING? This will stop all AI operations!')) {
+                const stopBtn = document.getElementById('stopBtn');
+                stopBtn.disabled = true;
+                stopBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> STOPPING...';
+                
+                fetch('/api/stop_all', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('⏹️ ' + data.message, 'success');
+                        updateSystemStatus();
+                    } else {
+                        showNotification('❌ Failed to stop: ' + data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Stop all error:', error);
+                    showNotification('Error stopping system', 'error');
+                })
+                .finally(() => {
+                    stopBtn.disabled = false;
+                    stopBtn.innerHTML = '<i class="fas fa-stop mr-2"></i> STOP ALL';
+                });
+            }
+        }
+
+        function updateSystemStatus() {
+            // Get worker status
+            fetch('/api/worker_stats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.stats) {
+                    const stats = data.stats;
+                    
+                    // Update main system status
+                    const systemStatus = document.getElementById('systemStatus');
+                    if (stats.is_running) {
+                        systemStatus.textContent = 'RUNNING';
+                        systemStatus.className = 'px-3 py-1 rounded-full text-xs font-bold bg-neon-green/20 text-neon-green border border-neon-green';
+                    } else {
+                        systemStatus.textContent = 'STOPPED';
+                        systemStatus.className = 'px-3 py-1 rounded-full text-xs font-bold bg-neon-pink/20 text-neon-pink border border-neon-pink';
+                    }
+                    
+                    // Update training indicator
+                    const trainingIndicator = document.getElementById('trainingIndicator');
+                    if (stats.training_in_progress) {
+                        trainingIndicator.textContent = 'ACTIVE';
+                        trainingIndicator.className = 'px-3 py-1 rounded-full text-xs font-bold bg-neon-yellow/20 text-neon-yellow border border-neon-yellow';
+                        // Show training progress panel when training is active
+                        document.getElementById('trainingProgressPanel').style.display = 'block';
+                        document.getElementById('trainingConsolePanel').style.display = 'block';
+                    } else {
+                        trainingIndicator.textContent = 'STOPPED';
+                        trainingIndicator.className = 'px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300';
+                        // Hide training progress panel when training is stopped
+                        document.getElementById('trainingProgressPanel').style.display = 'none';
+                        document.getElementById('trainingConsolePanel').style.display = 'none';
+                    }
+                    
+                    // Update signals indicator
+                    const signalsIndicator = document.getElementById('signalsIndicator');
+                    if (stats.is_running) {
+                        signalsIndicator.textContent = `ACTIVE (${stats.signal_count})`;
+                        signalsIndicator.className = 'px-3 py-1 rounded-full text-xs font-bold bg-neon-blue/20 text-neon-blue border border-neon-blue';
+                    } else {
+                        signalsIndicator.textContent = 'STOPPED';
+                        signalsIndicator.className = 'px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('System status error:', error);
+            });
+            
+            // Get trading status
+            fetch('/api/trading_status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.status) {
+                    const tradingIndicator = document.getElementById('tradingIndicator');
+                    if (data.status.enabled) {
+                        tradingIndicator.textContent = `ACTIVE (${data.status.active_orders})`;
+                        tradingIndicator.className = 'px-3 py-1 rounded-full text-xs font-bold bg-neon-green/20 text-neon-green border border-neon-green';
+                        isTrading = true;
+                    } else {
+                        tradingIndicator.textContent = 'STOPPED';
+                        tradingIndicator.className = 'px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-300';
+                        isTrading = false;
+                    }
+                    updateTradingStatus();
+                }
+            })
+            .catch(error => {
+                console.error('Trading status error:', error);
+            });
+        }
+
+        function updateDatabaseStats() {
+            fetch('/api/database_stats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.stats) {
+                    const stats = data.stats;
+                    const dbRecordCount = document.getElementById('dbRecordCount');
+                    
+                    dbRecordCount.innerHTML = `
+                        <strong class="text-neon-blue">${stats.training_sessions}</strong> training sessions<br>
+                        <span class="text-xs text-gray-400">${stats.latest_session_date ? `Latest: ${new Date(stats.latest_session_date).toLocaleDateString()}` : 'No sessions yet'}</span>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Database stats error:', error);
+                document.getElementById('dbRecordCount').textContent = 'Error loading stats';
+            });
+        }
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('ByBit AI Trading Bot Dashboard Initialized');
+            
+            loadAllSymbols();
+            updatePriceChart();
+            updatePositions();
+            updateTradingHistory();
+            updateSystemStatus();
+            updateDatabaseStats();
+            updateROIChart();
+            
+            // Refresh cycle
+            setInterval(() => {
+                Promise.all([
+                    updatePositions(),
+                    updateTradingHistory(),
+                    updateSystemStatus(),
+                    updateDatabaseStats(),
+                    updateTrainingProgress()
+                ]).then(() => {
+                    console.log('Data refresh completed');
+                }).catch(error => {
+                    console.error('Data refresh failed', error);
+                });
+            }, 10000); // Refresh every 10 seconds
         });
     </script>
 </body>
