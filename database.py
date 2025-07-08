@@ -490,7 +490,7 @@ class TradingDatabase:
     def get_latest_training_session(self):
         """Get the most recent training session"""
         conn = self.get_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=self.RealDictCursor) if self.use_postgres else conn.cursor()
         
         cursor.execute('''
             SELECT session_id, total_symbols, completed_symbols, overall_accuracy, status, created_at
@@ -503,20 +503,32 @@ class TradingDatabase:
         conn.close()
         
         if result:
-            return {
-                'session_id': result[0],
-                'total_symbols': result[1],
-                'completed_symbols': result[2],
-                'overall_accuracy': result[3],
-                'status': result[4],
-                'created_at': result[5]
-            }
+            if self.use_postgres:
+                # PostgreSQL with RealDictCursor returns dict-like objects
+                return {
+                    'session_id': result['session_id'],
+                    'total_symbols': result['total_symbols'],
+                    'completed_symbols': result['completed_symbols'],
+                    'overall_accuracy': float(result['overall_accuracy']) if result['overall_accuracy'] else None,
+                    'status': result['status'],
+                    'created_at': result['created_at'].isoformat() if hasattr(result['created_at'], 'isoformat') else str(result['created_at'])
+                }
+            else:
+                # SQLite returns tuples
+                return {
+                    'session_id': result[0],
+                    'total_symbols': result[1],
+                    'completed_symbols': result[2],
+                    'overall_accuracy': result[3],
+                    'status': result[4],
+                    'created_at': result[5]
+                }
         return None
     
     def get_training_results(self, session_id):
         """Get training results for a specific session"""
         conn = self.get_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=self.RealDictCursor) if self.use_postgres else conn.cursor()
         
         placeholder = '%s' if self.use_postgres else '?'
         cursor.execute(f'''
@@ -528,14 +540,26 @@ class TradingDatabase:
         
         results = []
         for row in cursor.fetchall():
-            results.append({
-                'symbol': row[0],
-                'accuracy': row[1],
-                'confidence': row[2],
-                'features': json.loads(row[3]) if row[3] else {},
-                'model_params': json.loads(row[4]) if row[4] else {},
-                'timestamp': row[5]
-            })
+            if self.use_postgres:
+                # PostgreSQL with RealDictCursor returns dict-like objects
+                results.append({
+                    'symbol': row['symbol'],
+                    'accuracy': float(row['accuracy']) if row['accuracy'] else 0.0,
+                    'confidence': float(row['confidence']) if row['confidence'] else 0.0,
+                    'features': json.loads(row['features']) if row['features'] else {},
+                    'model_params': json.loads(row['model_params']) if row['model_params'] else {},
+                    'timestamp': row['timestamp'].isoformat() if hasattr(row['timestamp'], 'isoformat') else str(row['timestamp'])
+                })
+            else:
+                # SQLite returns tuples
+                results.append({
+                    'symbol': row[0],
+                    'accuracy': row[1],
+                    'confidence': row[2],
+                    'features': json.loads(row[3]) if row[3] else {},
+                    'model_params': json.loads(row[4]) if row[4] else {},
+                    'timestamp': row[5]
+                })
         
         conn.close()
         return results
