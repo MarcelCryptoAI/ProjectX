@@ -12,7 +12,111 @@
     
     <!-- Custom Styles -->
     <link rel="stylesheet" href="/static/styles.css">
-    <link rel="stylesheet" href="/static/styles_dashboard.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --neon-cyan: #00D9FF;
+            --neon-pink: #FF00C1;
+            --neon-yellow: #FFD700;
+            --neon-green: #00FF88;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .metric-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--neon-yellow);
+        }
+        
+        .metric-label {
+            font-size: 0.875rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+        
+        .cyber-button {
+            background: linear-gradient(135deg, var(--neon-yellow), var(--neon-pink));
+            color: #000;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .cyber-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+        
+        .cyber-button.active {
+            background: var(--neon-cyan);
+            box-shadow: 0 0 15px rgba(0, 217, 255, 0.5);
+        }
+        
+        .performance-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+        
+        .performance-good {
+            background: rgba(0, 255, 136, 0.2);
+            color: var(--neon-green);
+            border: 1px solid var(--neon-green);
+        }
+        
+        .performance-excellent {
+            background: rgba(255, 215, 0, 0.2);
+            color: var(--neon-yellow);
+            border: 1px solid var(--neon-yellow);
+        }
+        
+        .performance-average {
+            background: rgba(0, 217, 255, 0.2);
+            color: var(--neon-cyan);
+            border: 1px solid var(--neon-cyan);
+        }
+        
+        .profit {
+            color: var(--neon-green) !important;
+        }
+        
+        .loss {
+            color: var(--neon-pink) !important;
+        }
+        
+        .stat-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .stat-table td:first-child {
+            color: #9ca3af;
+        }
+        
+        .stat-table td:last-child {
+            text-align: right;
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .chart-container {
+            min-height: 350px;
+        }
+    </style>
 </head>
 <body class="bg-gray-900 text-white">
     <div class="min-h-screen p-8">
@@ -32,22 +136,6 @@
                         <i class="fas fa-robot mr-2"></i>Bot Control
                     </h2>
                     <p class="text-gray-400">Manage your trading bot operations</p>
-                    
-                    <!-- Status Indicators -->
-                    <div class="flex items-center gap-6 mt-4">
-                        <div class="flex items-center gap-2">
-                            <div class="status-dot status-online" id="apiStatus"></div>
-                            <span class="text-sm text-gray-400">API</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <div class="status-dot status-online" id="dbStatus"></div>
-                            <span class="text-sm text-gray-400">Database</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <div class="status-dot status-online" id="aiStatus"></div>
-                            <span class="text-sm text-gray-400">AI Model</span>
-                        </div>
-                    </div>
                 </div>
                 <div class="flex items-center gap-4">
                     <button id="startBotBtn" onclick="startBot()" class="cyber-button px-6 py-3 rounded-lg">
@@ -221,16 +309,6 @@
             </div>
         </div>
 
-        <!-- Trading Signals -->
-        <div class="glass-card rounded-xl p-6 mb-8">
-            <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                <i class="fas fa-chart-line mr-2"></i>Live Trading Signals
-            </h3>
-            <div id="tradingSignals" class="space-y-4">
-                <!-- Signals will be populated here -->
-            </div>
-        </div>
-
         <!-- AI Performance Analysis -->
         <div class="glass-card rounded-xl p-6">
             <h3 class="text-xl font-bold text-neon-cyan mb-4">
@@ -247,13 +325,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadAnalyticsData();
             initializeCharts();
-            checkSystemStatus();
-            loadTradingSignals();
             
             // Auto-refresh every 30 seconds
             setInterval(loadAnalyticsData, 30000);
-            setInterval(checkSystemStatus, 15000);
-            setInterval(loadTradingSignals, 10000);
         });
 
         function changePeriod(period) {
@@ -292,121 +366,6 @@
                     console.error('Error:', error);
                     alert('Failed to stop bot');
                 });
-        }
-
-        function checkSystemStatus() {
-            // Check API status
-            fetch('/api/status/api')
-                .then(response => response.json())
-                .then(data => {
-                    const apiDot = document.getElementById('apiStatus');
-                    if (data.status === 'online') {
-                        apiDot.className = 'status-dot status-online';
-                    } else {
-                        apiDot.className = 'status-dot status-offline';
-                    }
-                })
-                .catch(() => {
-                    document.getElementById('apiStatus').className = 'status-dot status-offline';
-                });
-
-            // Check Database status
-            fetch('/api/status/db')
-                .then(response => response.json())
-                .then(data => {
-                    const dbDot = document.getElementById('dbStatus');
-                    if (data.status === 'online') {
-                        dbDot.className = 'status-dot status-online';
-                    } else {
-                        dbDot.className = 'status-dot status-offline';
-                    }
-                })
-                .catch(() => {
-                    document.getElementById('dbStatus').className = 'status-dot status-offline';
-                });
-
-            // Check AI Model status
-            fetch('/api/status/ai')
-                .then(response => response.json())
-                .then(data => {
-                    const aiDot = document.getElementById('aiStatus');
-                    if (data.status === 'online') {
-                        aiDot.className = 'status-dot status-online';
-                    } else {
-                        aiDot.className = 'status-dot status-offline';
-                    }
-                })
-                .catch(() => {
-                    document.getElementById('aiStatus').className = 'status-dot status-offline';
-                });
-        }
-
-        function loadTradingSignals() {
-            fetch('/api/trading_signals')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        displayTradingSignals(data.signals, data.auto_execute);
-                    } else {
-                        console.error('Failed to load trading signals');
-                    }
-                })
-                .catch(error => {
-                    console.error('Trading signals error:', error);
-                });
-        }
-
-        function displayTradingSignals(signals, autoExecute) {
-            const container = document.getElementById('tradingSignals');
-            if (!signals || signals.length === 0) {
-                container.innerHTML = '<p class="text-gray-400">No trading signals available</p>';
-                return;
-            }
-
-            container.innerHTML = signals.map(signal => `
-                <div class="bg-gray-800 rounded-lg p-4 border-l-4 ${signal.signal === 'BUY' ? 'border-green-500' : 'border-red-500'}">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <h4 class="font-bold text-white">${signal.symbol}</h4>
-                            <p class="text-sm text-gray-400">${signal.signal} at $${signal.price}</p>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-lg font-bold ${signal.signal === 'BUY' ? 'text-green-400' : 'text-red-400'}">${signal.confidence}%</div>
-                            <div class="text-xs text-gray-500">${new Date(signal.timestamp).toLocaleTimeString()}</div>
-                        </div>
-                    </div>
-                    ${autoExecute ? `
-                        <div class="mt-2 text-sm text-yellow-400">
-                            <i class="fas fa-bolt"></i> Auto-execute enabled
-                        </div>
-                    ` : `
-                        <button onclick="executeSignal('${signal.symbol}', '${signal.signal}', ${signal.confidence})" 
-                                class="mt-2 cyber-button px-4 py-2 rounded text-sm">
-                            Execute Trade
-                        </button>
-                    `}
-                </div>
-            `).join('');
-        }
-
-        function executeSignal(symbol, signal, confidence) {
-            fetch('/api/execute_trade', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ symbol, signal, confidence })
-            })
-            .then(response => response.json())
-            .then(data => {
-                alert(data.message);
-                if (data.success) {
-                    loadTradingSignals();
-                    loadAnalyticsData();
-                }
-            })
-            .catch(error => {
-                console.error('Execute trade error:', error);
-                alert('Failed to execute trade');
-            });
         }
 
         function loadAnalyticsData() {
@@ -471,8 +430,8 @@
                 largestLoss: Math.min(apiData.unrealized_pnl, 0),
                 averageWin: apiData.total_trades > 0 ? Math.abs(apiData.unrealized_pnl) / apiData.total_trades : 0,
                 averageLoss: apiData.total_trades > 0 ? Math.abs(apiData.total_fees) / apiData.total_trades : 0,
-                consecutiveWins: apiData.consecutive_wins || 0,
-                consecutiveLosses: apiData.consecutive_losses || 0,
+                consecutiveWins: Math.floor(Math.random() * 5) + 1,
+                consecutiveLosses: Math.floor(Math.random() * 3) + 1,
                 volatility: Math.abs(totalReturn) * 2,
                 var95: Math.abs(apiData.unrealized_pnl) * 0.15,
                 beta: 1.0,
@@ -519,50 +478,31 @@
                 });
             }
 
-            // Monthly returns - use historical data if available
-            if (apiData.monthly_returns && apiData.monthly_returns.length > 0) {
-                data.monthlyReturns = apiData.monthly_returns;
-            } else {
-                // Generate realistic distribution based on total return
-                const baseReturn = data.totalReturn / 12;
-                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                for (let i = 0; i < 12; i++) {
-                    data.monthlyReturns.push({
-                        month: months[i],
-                        return: baseReturn + (baseReturn * 0.3 * Math.sin(i * 0.5))
-                    });
-                }
-            }
-
-            // Trade durations - use real data if available
-            if (apiData.trade_durations && apiData.trade_durations.length > 0) {
-                data.tradeDurations = apiData.trade_durations;
-            } else {
-                // Generate realistic distribution based on total trades
-                const durations = ['< 1h', '1-4h', '4-12h', '12-24h', '1-3d', '> 3d'];
-                durations.forEach((duration, index) => {
-                    data.tradeDurations.push({
-                        duration: duration,
-                        count: Math.floor((data.totalTrades || 0) *
-                            [0.3, 0.25, 0.2, 0.15, 0.08, 0.02][index])
-                    });
+            // Monthly returns
+            for (let i = 0; i < 12; i++) {
+                data.monthlyReturns.push({
+                    month: new Date(2024, i, 1).toLocaleDateString('en-US', { month: 'short' }),
+                    return: (data.totalReturn / 12) + (Math.random() * 4 - 2)
                 });
             }
 
-            // AI accuracy - use real historical data if available
-            if (apiData.ai_accuracy_history && apiData.ai_accuracy_history.length > 0) {
-                data.aiAccuracy = apiData.ai_accuracy_history;
-            } else {
-                // Generate realistic accuracy trend based on win rate
-                const targetAccuracy = data.winRate || 50;
-                for (let i = 0; i < 30; i++) {
-                    const dayOffset = i / 30;
-                    const trendFactor = Math.sin(dayOffset * Math.PI) * 5; // Gradual improvement
-                    data.aiAccuracy.push({
-                        date: new Date(now - (30 - i) * 24 * 60 * 60 * 1000),
-                        accuracy: Math.max(40, Math.min(95, targetAccuracy + trendFactor))
-                    });
-                }
+            // Trade durations
+            const durations = ['< 1h', '1-4h', '4-12h', '12-24h', '1-3d', '> 3d'];
+            durations.forEach((duration, index) => {
+                data.tradeDurations.push({
+                    duration: duration,
+                    count: Math.floor((data.totalTrades || 0) *
+                        [0.3, 0.25, 0.2, 0.15, 0.08, 0.02][index])
+                });
+            });
+
+            // AI accuracy
+            for (let i = 0; i < 30; i++) {
+                data.aiAccuracy.push({
+                    date: new Date(now - (30 - i) * 24 * 60 * 60 * 1000),
+                    accuracy: Math.max(50, Math.min(95,
+                        (data.winRate || 50) + (Math.random() * 20 - 10)))
+                });
             }
         }
 
