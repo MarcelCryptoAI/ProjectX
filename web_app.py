@@ -1865,11 +1865,9 @@ def get_coin_analysis():
         try:
             # Get recent training session data
             latest_session = ai_worker.database.get_latest_training_session()
-            app.logger.info(f"Latest session: {latest_session}")
             
             if latest_session:
                 training_results = ai_worker.database.get_training_results(latest_session['session_id'])
-                app.logger.info(f"Found {len(training_results)} training results")
                 
                 for result in training_results:
                     # Calculate tijd sinds aanbeveling
@@ -1978,11 +1976,9 @@ def get_trading_signals():
         try:
             # Get recent training session data
             latest_session = ai_worker.database.get_latest_training_session()
-            app.logger.info(f"Trading signals - Latest session: {latest_session}")
             
             if latest_session:
                 training_results = ai_worker.database.get_training_results(latest_session['session_id'])
-                app.logger.info(f"Trading signals - Found {len(training_results)} training results")
                 
                 signal_id = 0
                 for result in training_results:
