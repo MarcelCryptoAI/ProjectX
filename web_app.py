@@ -43,14 +43,14 @@ try:
     # Advanced TLS configuration for SOCKS5 proxy compatibility
     import ssl
     
-    # Create enhanced SSL context for proxy compatibility
+    # Create legacy SSL context for SOCKS5 proxy compatibility
     def create_proxy_ssl_context():
         context = ssl.create_default_context()
-        # Force modern TLS versions for better compatibility
-        context.minimum_version = ssl.TLSVersion.TLSv1_2
-        context.maximum_version = ssl.TLSVersion.TLSv1_3
-        # Configure cipher suites that work well with SOCKS5 proxies
-        context.set_ciphers('ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS')
+        # Use broader TLS range for proxy compatibility
+        context.minimum_version = ssl.TLSVersion.TLSv1
+        context.maximum_version = ssl.TLSVersion.TLSv1_2
+        # Use wider cipher suite for proxy compatibility
+        context.set_ciphers('ALL:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA')
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
         return context
@@ -323,17 +323,16 @@ def init_components():
         from requests.adapters import HTTPAdapter
         from urllib3.poolmanager import PoolManager
         
-        # Create custom SSL adapter for TLS 1.2+ and secure cipher suites
-        class SecureSSLAdapter(HTTPAdapter):
+        # Alternative SSL adapter - try legacy TLS 1.0 for proxy compatibility  
+        class LegacySSLAdapter(HTTPAdapter):
             def init_poolmanager(self, *args, **kwargs):
                 context = ssl.create_default_context()
-                # Force TLS 1.2 or higher for ByBit compatibility
-                context.minimum_version = ssl.TLSVersion.TLSv1_2
-                context.maximum_version = ssl.TLSVersion.TLSv1_3
-                # Set secure cipher suites that work with SOCKS5 proxies
-                context.set_ciphers('ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS')
-                # Disable hostname verification for proxy compatibility
-                context.check_hostname = False
+                # Try TLS 1.0/1.1 for older proxy compatibility
+                context.minimum_version = ssl.TLSVersion.TLSv1
+                context.maximum_version = ssl.TLSVersion.TLSv1_2
+                # Use broader cipher suite for proxy compatibility
+                context.set_ciphers('ALL:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA')
+                context.check_hostname = False  
                 context.verify_mode = ssl.CERT_NONE
                 kwargs['ssl_context'] = context
                 return super().init_poolmanager(*args, **kwargs)
@@ -342,25 +341,25 @@ def init_components():
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
                 
-                # Configure session with advanced SSL/TLS settings
+                # Configure session with legacy SSL/TLS for proxy compatibility
                 if hasattr(self, 'session'):
-                    # Mount the secure SSL adapter
-                    self.session.mount('https://', SecureSSLAdapter())
+                    # Mount the legacy SSL adapter for SOCKS5 compatibility
+                    self.session.mount('https://', LegacySSLAdapter())
                     self.session.verify = False
                     if vpn_proxy:
                         self.session.proxies = vpn_proxy
-                        print("🔒 VPN proxy + Advanced SSL applied to pybit session")
+                        print("🔒 VPN proxy + Legacy SSL (TLS 1.0-1.2) applied to pybit session")
                 elif hasattr(self, '_session'):
-                    self._session.mount('https://', SecureSSLAdapter())
+                    self._session.mount('https://', LegacySSLAdapter())
                     self._session.verify = False
                     if vpn_proxy:
                         self._session.proxies = vpn_proxy
-                        print("🔒 VPN proxy + Advanced SSL applied to pybit _session")
+                        print("🔒 VPN proxy + Legacy SSL applied to pybit _session")
                 
                 # Also try to patch the client if it exists
                 if hasattr(self, 'client'):
                     if hasattr(self.client, 'session'):
-                        self.client.session.mount('https://', SecureSSLAdapter())
+                        self.client.session.mount('https://', LegacySSLAdapter())
                         self.client.session.verify = False
                         if vpn_proxy:
                             self.client.session.proxies = vpn_proxy
