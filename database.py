@@ -350,7 +350,11 @@ class TradingDatabase:
                 ('entry_price', 'DECIMAL(20,8)' if self.use_postgres else 'REAL'),
                 ('exit_price', 'DECIMAL(20,8)' if self.use_postgres else 'REAL'),
                 ('realized_pnl', 'DECIMAL(20,8)' if self.use_postgres else 'REAL'),
-                ('exit_time', 'TIMESTAMP')
+                ('exit_time', 'TIMESTAMP'),
+                ('ai_entry_price', 'DECIMAL(20,8)' if self.use_postgres else 'REAL'),  # AI-advised entry price
+                ('entry_order_id', 'VARCHAR(100)' if self.use_postgres else 'TEXT'),  # Entry order ID for tracking
+                ('tp_order_ids', 'TEXT'),  # JSON array of TP order IDs
+                ('sl_order_id', 'VARCHAR(100)' if self.use_postgres else 'TEXT')  # SL order ID
             ]
             
             for column_name, column_type in new_columns:
@@ -820,15 +824,15 @@ class TradingDatabase:
             placeholder = '%s' if self.use_postgres else '?'
             cursor.execute(f'''
                 INSERT INTO trading_signals 
-                (signal_id, symbol, side, confidence, accuracy, amount, leverage, take_profit, stop_loss, status)
-                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                (signal_id, symbol, side, confidence, accuracy, amount, leverage, take_profit, stop_loss, ai_entry_price, status)
+                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
                 ON CONFLICT (signal_id) DO UPDATE SET
                 status = EXCLUDED.status,
                 updated_at = CURRENT_TIMESTAMP
             ''' if self.use_postgres else f'''
                 INSERT OR REPLACE INTO trading_signals 
-                (signal_id, symbol, side, confidence, accuracy, amount, leverage, take_profit, stop_loss, status)
-                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                (signal_id, symbol, side, confidence, accuracy, amount, leverage, take_profit, stop_loss, ai_entry_price, status)
+                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
             ''', (
                 signal_data['signal_id'],
                 signal_data['symbol'],
@@ -839,6 +843,7 @@ class TradingDatabase:
                 signal_data['leverage'],
                 signal_data['take_profit'],
                 signal_data['stop_loss'],
+                signal_data.get('entry_price', 0.0),  # AI-advised entry price
                 signal_data.get('status', 'waiting')
             ))
             
@@ -1006,26 +1011,46 @@ class TradingDatabase:
             # Insert new symbols
             placeholder = '%s' if self.use_postgres else '?'
             for symbol_data in symbols_data:
-                cursor.execute(f'''
-                    INSERT INTO supported_symbols 
-                    (symbol, base_currency, quote_currency, status, min_order_qty, qty_step, min_leverage, max_leverage, leverage_multiplier)
-                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
-                ''', (
-                    symbol_data['symbol'],
-                    symbol_data.get('base_currency', ''),
-                    symbol_data.get('quote_currency', ''),
-                    symbol_data.get('status', 'active'),
-                    symbol_data.get('min_order_qty', 0),
-                    symbol_data.get('qty_step', 0),
-                    symbol_data.get('min_leverage', 1),
-                    symbol_data.get('max_leverage', 10),
-                    symbol_data.get('leverage_multiplier', 1.0)
-                ))
+                if self.use_postgres:
+                    cursor.execute(f'''
+                        INSERT INTO supported_symbols 
+                        (symbol, base_currency, quote_currency, status, min_order_qty, qty_step, min_leverage, max_leverage, leverage_multiplier, last_updated)
+                        VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
+                    ''', (
+                        symbol_data['symbol'],
+                        symbol_data.get('base_currency', ''),
+                        symbol_data.get('quote_currency', ''),
+                        symbol_data.get('status', 'active'),
+                        symbol_data.get('min_order_qty', 0),
+                        symbol_data.get('qty_step', 0),
+                        symbol_data.get('min_leverage', 1),
+                        symbol_data.get('max_leverage', 10),
+                        symbol_data.get('leverage_multiplier', 1.0)
+                    ))
+                else:
+                    cursor.execute(f'''
+                        INSERT INTO supported_symbols 
+                        (symbol, base_currency, quote_currency, status, min_order_qty, qty_step, min_leverage, max_leverage, leverage_multiplier, last_updated)
+                        VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
+                    ''', (
+                        symbol_data['symbol'],
+                        symbol_data.get('base_currency', ''),
+                        symbol_data.get('quote_currency', ''),
+                        symbol_data.get('status', 'active'),
+                        symbol_data.get('min_order_qty', 0),
+                        symbol_data.get('qty_step', 0),
+                        symbol_data.get('min_leverage', 1),
+                        symbol_data.get('max_leverage', 10),
+                        symbol_data.get('leverage_multiplier', 1.0)
+                    ))
             
             conn.commit()
+            print(f"Successfully refreshed {len(symbols_data)} symbols in database")
             
         except Exception as e:
             print(f"Error refreshing supported symbols: {e}")
+            import traceback
+            traceback.print_exc()
             conn.rollback()
         
         conn.close()

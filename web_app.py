@@ -3892,50 +3892,90 @@ def refresh_symbols():
         from database import TradingDatabase
         db = TradingDatabase()
         
+        # Check current database state
+        current_symbols = db.get_supported_symbols()
+        current_count = len(current_symbols)
+        
         # Get instruments from ByBit
+        print("Fetching instruments from ByBit...")
         instruments = bybit_session.get_instruments_info(category="linear")
         
         if not instruments or 'result' not in instruments:
             return jsonify({
                 'success': False,
-                'error': 'Failed to fetch instruments from ByBit'
+                'error': 'Failed to fetch instruments from ByBit - API response invalid'
             })
         
+        total_instruments = len(instruments['result']['list'])
+        print(f"Found {total_instruments} total instruments from ByBit")
+        
+        # Process symbols
         symbols_data = []
+        active_count = 0
+        inactive_count = 0
+        
         for instrument in instruments['result']['list']:
             if instrument['symbol'].endswith('USDT'):  # Only USDT pairs
-                # Extract leverage information from leverageFilter
-                leverage_filter = instrument.get('leverageFilter', {})
-                min_leverage = float(leverage_filter.get('minLeverage', 1))
-                max_leverage = float(leverage_filter.get('maxLeverage', 10))
-                
-                symbol_data = {
-                    'symbol': instrument['symbol'],
-                    'base_currency': instrument['baseCoin'],
-                    'quote_currency': instrument['quoteCoin'],
-                    'status': 'active' if instrument['status'] == 'Trading' else 'inactive',
-                    'min_order_qty': float(instrument['lotSizeFilter']['minOrderQty']),
-                    'qty_step': float(instrument['lotSizeFilter']['qtyStep']),
-                    'min_leverage': min_leverage,
-                    'max_leverage': max_leverage
-                }
-                symbols_data.append(symbol_data)
+                try:
+                    # Extract leverage information from leverageFilter
+                    leverage_filter = instrument.get('leverageFilter', {})
+                    min_leverage = float(leverage_filter.get('minLeverage', 1))
+                    max_leverage = float(leverage_filter.get('maxLeverage', 10))
+                    
+                    status = 'active' if instrument['status'] == 'Trading' else 'inactive'
+                    if status == 'active':
+                        active_count += 1
+                    else:
+                        inactive_count += 1
+                    
+                    symbol_data = {
+                        'symbol': instrument['symbol'],
+                        'base_currency': instrument['baseCoin'],
+                        'quote_currency': instrument['quoteCoin'],
+                        'status': status,
+                        'min_order_qty': float(instrument['lotSizeFilter']['minOrderQty']),
+                        'qty_step': float(instrument['lotSizeFilter']['qtyStep']),
+                        'min_leverage': min_leverage,
+                        'max_leverage': max_leverage
+                    }
+                    symbols_data.append(symbol_data)
+                    
+                except Exception as symbol_error:
+                    print(f"Error processing symbol {instrument.get('symbol', 'unknown')}: {symbol_error}")
+                    continue
+        
+        print(f"Processed {len(symbols_data)} USDT pairs ({active_count} active, {inactive_count} inactive)")
         
         # Save to database
+        print("Saving symbols to database...")
         db.refresh_supported_symbols(symbols_data)
+        
+        # Verify save
+        new_symbols = db.get_supported_symbols()
+        new_count = len(new_symbols)
+        
+        print(f"Database refresh complete: {current_count} → {new_count} symbols")
         
         return jsonify({
             'success': True,
-            'message': f'Refreshed {len(symbols_data)} symbols',
-            'count': len(symbols_data),
-            'symbols_count': len(symbols_data),
-            'total_symbols': len(symbols_data)
+            'message': f'Successfully refreshed {len(symbols_data)} symbols (was {current_count}, now {new_count})',
+            'previous_count': current_count,
+            'new_count': new_count,
+            'total_instruments': total_instruments,
+            'usdt_pairs_found': len(symbols_data),
+            'active_pairs': active_count,
+            'inactive_pairs': inactive_count,
+            'database_verified': new_count == len(symbols_data)
         })
         
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in refresh_symbols: {error_details}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'details': error_details
         }), 500
 
 @app.route('/api/symbols_info')

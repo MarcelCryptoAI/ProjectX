@@ -120,25 +120,41 @@ class AIWorker:
         }
     
     def get_supported_symbols(self):
-        """Get supported symbols from database"""
+        """Get supported symbols from database, with fallback to settings and ByBit refresh"""
         try:
             symbols = self.database.get_supported_symbols()
             # Filter only active symbols and extract symbol names
             active_symbols = [s['symbol'] for s in symbols if s.get('status') == 'active']
             
-            if not active_symbols:
-                self.console_logger.log('WARNING', 'No active symbols found in database, attempting to refresh from ByBit')
-                # Try to refresh symbols from ByBit if database is empty
+            # Check if database has too few symbols (indicating incomplete or old refresh)
+            # ByBit should have 100+ USDT pairs, so anything less than 50 is likely incomplete
+            if len(active_symbols) < 50:
+                self.console_logger.log('WARNING', f'Only {len(active_symbols)} symbols in database, attempting to refresh from ByBit')
+                # Try to refresh symbols from ByBit
                 self._refresh_symbols_from_bybit()
                 # Try again after refresh
                 symbols = self.database.get_supported_symbols()
                 active_symbols = [s['symbol'] for s in symbols if s.get('status') == 'active']
+                
+                # If still no symbols after refresh, fallback to settings
+                if len(active_symbols) == 0:
+                    self.console_logger.log('WARNING', 'No symbols found after ByBit refresh, using settings fallback')
+                    enabled_pairs = self.settings.bot.get('enabled_pairs', ['BTCUSDT', 'ETHUSDT'])
+                    self.console_logger.log('INFO', f'📊 Using {len(enabled_pairs)} symbols from settings.yaml')
+                    return enabled_pairs
             
             self.console_logger.log('INFO', f'📊 Found {len(active_symbols)} active symbols in database')
             return active_symbols
         except Exception as e:
             self.console_logger.log('ERROR', f'Failed to get supported symbols from database: {str(e)}')
-            return []
+            # Final fallback to settings if everything fails
+            try:
+                enabled_pairs = self.settings.bot.get('enabled_pairs', ['BTCUSDT', 'ETHUSDT'])
+                self.console_logger.log('WARNING', f'Using settings fallback: {len(enabled_pairs)} symbols')
+                return enabled_pairs
+            except:
+                self.console_logger.log('ERROR', 'All symbol sources failed, using minimal fallback')
+                return ['BTCUSDT', 'ETHUSDT']
     
     def _refresh_symbols_from_bybit(self):
         """Refresh symbols from ByBit API"""
@@ -686,6 +702,7 @@ class AIWorker:
                         'leverage': prediction.get('leverage', 1),
                         'stop_loss': prediction.get('stop_loss', 2.0),
                         'take_profit': prediction.get('take_profit', 3.0),
+                        'entry_price': prediction.get('entry_price', 0.0),  # AI-advised entry price
                         'status': 'waiting'
                     }
                     db.save_trading_signal(signal_data)
@@ -957,6 +974,12 @@ class AIWorker:
             
             current_price = float(ticker['result']['list'][0]['lastPrice'])
             
+            # Calculate AI-advised entry price
+            ai_entry_adjustment = float(signal.get('entry_price', 0.0))  # Get AI price adjustment
+            ai_entry_price = current_price * (1 + ai_entry_adjustment)
+            
+            self.console_logger.log('INFO', f'📈 Market Price: ${current_price:.4f}, AI Entry Price: ${ai_entry_price:.4f} ({ai_entry_adjustment*100:+.2f}%)')
+            
             # Get user settings for leverage and trade amount
             try:
                 from database import TradingDatabase
@@ -1065,35 +1088,70 @@ class AIWorker:
             
             self.console_logger.log('INFO', f'📊 Using AI-determined TP: {take_profit_pct:.2f}% (bounds: {min_tp}-{max_tp}%)')
             
+            # Calculate stop loss and take profit based on AI ENTRY PRICE (not current market price)
             if side == 'Buy':
-                stop_loss_price = current_price * (1 - stop_loss_pct / 100)
-                take_profit_price = current_price * (1 + take_profit_pct / 100)
+                stop_loss_price = ai_entry_price * (1 - stop_loss_pct / 100)
+                take_profit_price = ai_entry_price * (1 + take_profit_pct / 100)
             else:  # Sell
-                stop_loss_price = current_price * (1 + stop_loss_pct / 100)
-                take_profit_price = current_price * (1 - take_profit_pct / 100)
+                stop_loss_price = ai_entry_price * (1 + stop_loss_pct / 100)
+                take_profit_price = ai_entry_price * (1 - take_profit_pct / 100)
             
-            # Place main market order with stop loss only (no TP in main order)
+            # Check if TP is already reached at current market price
+            if side == 'Buy' and current_price >= take_profit_price:
+                self.console_logger.log('WARNING', f'⚠️ TP already reached! Market: ${current_price:.4f}, TP: ${take_profit_price:.4f} - Cancelling signal')
+                return False
+            elif side == 'Sell' and current_price <= take_profit_price:
+                self.console_logger.log('WARNING', f'⚠️ TP already reached! Market: ${current_price:.4f}, TP: ${take_profit_price:.4f} - Cancelling signal')
+                return False
+            
+            # Place main LIMIT order (no stop loss in main order - will be placed separately)
             order_params = {
                 'category': 'linear',
                 'symbol': symbol,
                 'side': side,  # Use exact case: 'Buy' or 'Sell'
-                'orderType': 'Market',
+                'orderType': 'Limit',  # LIMIT ORDER ONLY
                 'qty': str(total_qty),
-                'timeInForce': 'IOC',  # Immediate or Cancel
-                'stopLoss': str(stop_loss_price)
+                'price': str(ai_entry_price),  # Use AI-advised entry price
+                'timeInForce': 'GTC'  # Good Till Cancelled
             }
             
-            self.console_logger.log('INFO', f'📤 Placing {side} order: {total_qty} {symbol} @ market (~${current_price:.4f})')
+            self.console_logger.log('INFO', f'📤 Placing {side} LIMIT order: {total_qty} {symbol} @ ${ai_entry_price:.4f} (AI-advised)')
             
-            # Execute the main order first
+            # Execute the main LIMIT order first
             order_result = self.bybit_session.place_order(**order_params)
             
             if order_result and 'result' in order_result:
-                order_id = order_result['result']['orderId']
+                entry_order_id = order_result['result']['orderId']
                 
-                # Log successful trade
-                self.console_logger.log('SUCCESS', f'✅ Order placed: {order_id}')
-                self.console_logger.log('INFO', f'📊 Details: {total_qty} {symbol}, SL: ${stop_loss_price:.4f}')
+                # Log successful LIMIT order placement
+                self.console_logger.log('SUCCESS', f'✅ LIMIT Order placed: {entry_order_id}')
+                self.console_logger.log('INFO', f'📊 Details: {total_qty} {symbol} @ ${ai_entry_price:.4f} (waiting for fill)')
+                
+                # Place stop loss order immediately (conditional order)
+                sl_order_id = None
+                try:
+                    sl_order_params = {
+                        'category': 'linear',
+                        'symbol': symbol,
+                        'side': 'Sell' if side == 'Buy' else 'Buy',
+                        'orderType': 'StopMarket',
+                        'qty': str(total_qty),
+                        'stopPrice': str(stop_loss_price),
+                        'timeInForce': 'GTC',
+                        'reduceOnly': True
+                    }
+                    
+                    sl_result = self.bybit_session.place_order(**sl_order_params)
+                    
+                    if sl_result and 'result' in sl_result:
+                        sl_order_id = sl_result['result']['orderId']
+                        self.console_logger.log('SUCCESS', f'✅ Stop Loss placed: {sl_order_id} @ ${stop_loss_price:.4f}')
+                    else:
+                        error_msg = sl_result.get('retMsg', 'Unknown error') if sl_result else 'No response'
+                        self.console_logger.log('WARNING', f'⚠️ SL order failed: {error_msg}')
+                        
+                except Exception as sl_error:
+                    self.console_logger.log('ERROR', f'❌ SL order error: {str(sl_error)}')
                 
                 # Calculate 4 TP levels with equal quantity distribution
                 tp_levels = []
@@ -1108,9 +1166,9 @@ class AIWorker:
                     tp_percentage = (take_profit_pct * i) / 4  # Divide TP into 4 levels
                     
                     if side == 'Buy':
-                        tp_price = current_price * (1 + tp_percentage / 100)
+                        tp_price = ai_entry_price * (1 + tp_percentage / 100)  # Use AI entry price
                     else:  # Sell
-                        tp_price = current_price * (1 - tp_percentage / 100)
+                        tp_price = ai_entry_price * (1 - tp_percentage / 100)  # Use AI entry price
                     
                     tp_level = {
                         'level': i,
@@ -1150,28 +1208,47 @@ class AIWorker:
                         self.console_logger.log('ERROR', f'❌ TP{i} error: {str(tp_error)}')
                 
                 # Store trade in active trades for monitoring
-                self.active_trades[order_id] = {
+                self.active_trades[entry_order_id] = {
                     'signal_id': signal.get('signal_id'),  # Add signal_id for P&L tracking
                     'symbol': symbol,
                     'side': side,
                     'quantity': total_qty,
-                    'entry_price': current_price,
+                    'entry_price': ai_entry_price,  # Use AI entry price
+                    'market_price': current_price,  # Store market price for comparison
                     'stop_loss': stop_loss_price,
                     'original_stop_loss': stop_loss_price,  # Keep original for reference
                     'take_profit_levels': tp_levels,
                     'tp_order_ids': tp_order_ids,
+                    'sl_order_id': sl_order_id,
+                    'entry_order_id': entry_order_id,
+                    'entry_filled': False,  # Track if entry order is filled
                     'tp1_hit': False,
                     'sl_moved_to_breakeven': False,
                     'trailing_stop_enabled': signal.get('trailing_stop_enabled', True),
                     'trailing_stop_distance': signal.get('trailing_stop_distance', 1.0),
                     'timestamp': datetime.now().isoformat(),
-                    'trade_amount_usd': trade_amount_usd,
-                    'balance_percentage': balance_percentage
+                    'trade_amount_usd': trade_amount_usd
                 }
                 
-                self.console_logger.log('SUCCESS', f'✅ Trade setup complete: {len(tp_order_ids)}/4 TP levels active')
+                self.console_logger.log('SUCCESS', f'✅ LIMIT Order setup complete: Entry @ ${ai_entry_price:.4f}, {len(tp_order_ids)}/4 TP levels active')
                 self.console_logger.log('INFO', f'📊 TP1: ${tp_levels[0]["price"]:.4f}, TP2: ${tp_levels[1]["price"]:.4f}, TP3: ${tp_levels[2]["price"]:.4f}, TP4: ${tp_levels[3]["price"]:.4f}')
                 self.console_logger.log('INFO', f'🛡️ Stop Loss: ${stop_loss_price:.4f} (will move to breakeven+0.1% when TP1 hits)')
+                
+                # Update signal status and store order IDs in database
+                if 'signal_id' in signal:
+                    try:
+                        from database import TradingDatabase
+                        db = TradingDatabase()
+                        # Update signal with order IDs
+                        signal_update = {
+                            'entry_order_id': entry_order_id,
+                            'tp_order_ids': tp_order_ids,
+                            'sl_order_id': sl_order_id
+                        }
+                        # For now, just update status - we'll add the order ID fields later
+                        db.update_signal_status(signal['signal_id'], 'executed')
+                    except Exception as db_error:
+                        self.console_logger.log('WARNING', f'⚠️ Could not update signal in database: {db_error}')
                 
                 return True
             else:
@@ -1231,7 +1308,45 @@ class AIWorker:
                 entry_price = trade_data['entry_price']
                 tp_levels = trade_data['take_profit_levels']
                 tp_order_ids = trade_data['tp_order_ids']
+                entry_order_id = trade_data['entry_order_id']
                 
+                # First, check if entry order has been filled
+                entry_filled = trade_data.get('entry_filled', False)
+                if not entry_filled:
+                    # Check if entry order is still pending
+                    entry_still_open = False
+                    for order in orders['result']['list']:
+                        if order['orderId'] == entry_order_id:
+                            entry_still_open = True
+                            break
+                    
+                    # If entry order is no longer in open orders, it was filled
+                    if not entry_still_open:
+                        trade_data['entry_filled'] = True
+                        self.console_logger.log('SUCCESS', f'✅ Entry order filled for {symbol} @ ${entry_price:.4f}')
+                    else:
+                        # Entry order still pending - check if TP is reached (cancel signal)
+                        ticker = self.bybit_session.get_tickers(category="linear", symbol=symbol)
+                        if ticker and 'result' in ticker and ticker['result']['list']:
+                            current_price = float(ticker['result']['list'][0]['lastPrice'])
+                            tp_price = trade_data['take_profit_levels'][3]['price']  # Final TP level
+                            
+                            # Check if TP is reached before entry
+                            if side == 'Buy' and current_price >= tp_price:
+                                self.console_logger.log('WARNING', f'⚠️ TP reached before entry fill for {symbol}! Cancelling all orders')
+                                self._cancel_all_orders_for_symbol(symbol)
+                                del self.active_trades[order_id]
+                                continue
+                            elif side == 'Sell' and current_price <= tp_price:
+                                self.console_logger.log('WARNING', f'⚠️ TP reached before entry fill for {symbol}! Cancelling all orders')
+                                self._cancel_all_orders_for_symbol(symbol)
+                                del self.active_trades[order_id]
+                                continue
+                        
+                        # Entry order still pending, continue monitoring
+                        continue
+                
+                # Entry is filled, now monitor TP levels
                 # Check if TP1 has been hit by looking at open orders
                 tp1_still_open = False
                 for order in orders['result']['list']:
@@ -1252,16 +1367,17 @@ class AIWorker:
                     # Update stop loss
                     try:
                         # Cancel existing stop loss order first
-                        self.bybit_session.cancel_all_orders(category="linear", symbol=symbol, orderFilter="StopOrder")
+                        if trade_data.get('sl_order_id'):
+                            self.bybit_session.cancel_order(category="linear", symbol=symbol, orderId=trade_data['sl_order_id'])
                         
                         # Place new stop loss at breakeven + 0.1%
                         sl_result = self.bybit_session.place_order(
                             category="linear",
                             symbol=symbol,
                             side="Sell" if side == "Buy" else "Buy",
-                            orderType="Market",
+                            orderType="StopMarket",
                             qty=str(trade_data['quantity']),
-                            stopLoss=str(new_sl_price),
+                            stopPrice=str(new_sl_price),
                             reduceOnly=True
                         )
                         
@@ -1270,6 +1386,7 @@ class AIWorker:
                             trade_data['tp1_hit'] = True
                             trade_data['sl_moved_to_breakeven'] = True
                             trade_data['stop_loss'] = new_sl_price
+                            trade_data['sl_order_id'] = sl_result['result']['orderId']
                             trade_data['tp_levels'][0]['status'] = 'hit'
                             trade_data['tp_levels'][0]['hit_time'] = datetime.now().isoformat()
                             
@@ -1369,6 +1486,15 @@ class AIWorker:
                     
         except Exception as e:
             self.console_logger.log('ERROR', f'❌ Trade monitoring error: {str(e)}')
+    
+    def _cancel_all_orders_for_symbol(self, symbol):
+        """Cancel all orders for a specific symbol"""
+        try:
+            # Cancel all open orders for this symbol
+            self.bybit_session.cancel_all_orders(category="linear", symbol=symbol)
+            self.console_logger.log('INFO', f'🚫 Cancelled all orders for {symbol}')
+        except Exception as e:
+            self.console_logger.log('ERROR', f'❌ Error cancelling orders for {symbol}: {str(e)}')
 
 # Global worker instance
 ai_worker = None
