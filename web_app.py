@@ -1961,36 +1961,67 @@ def get_coin_analysis():
 def get_trading_signals():
     """Get trading signals ONLY above AI confidence threshold"""
     try:
-        ensure_components_initialized()
-        ai_worker = get_ai_worker(socketio, bybit_session)
-        
-        # Get AI confidence threshold and auto_execute from saved settings first, then env var
+        # Get AI confidence threshold and auto_execute from database first
         ai_confidence_threshold = 75  # Default
         auto_execute = False  # Default
-        try:
-            if os.path.exists(settings_file):
-                with open(settings_file, 'r') as f:
-                    saved_settings = json.load(f)
-                    ai_confidence_threshold = float(saved_settings.get('confidenceThreshold', 75))
-                    auto_execute = saved_settings.get('autoExecute', False)
-        except:
-            pass
         
-        # Also check environment variable as fallback
-        if not ai_confidence_threshold:
+        try:
+            from database import TradingDatabase
+            db = TradingDatabase()
+            db_settings = db.load_settings()
+            ai_confidence_threshold = float(db_settings.get('confidenceThreshold', 75))
+            auto_execute = db_settings.get('autoExecute', False)
+        except Exception as settings_error:
+            app.logger.warning(f"Could not load settings from database: {settings_error}")
+            # Fallback to environment variables
             ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
-        if not auto_execute:
             auto_execute = os.getenv('AUTO_EXECUTE', 'false').lower() == 'true'
+        
+        # Try to get AI worker
+        ai_worker = None
+        try:
+            ensure_components_initialized()
+            ai_worker = get_ai_worker(socketio, bybit_session)
+        except Exception as worker_error:
+            app.logger.warning(f"Could not initialize AI worker: {worker_error}")
         
         signals = []
         
+        # Check if AI worker is available
+        if not ai_worker:
+            return jsonify({
+                'success': True,
+                'signals': [],
+                'count': 0,
+                'message': 'AI Worker not initialized - no training data available',
+                'auto_execute': auto_execute,
+                'ai_threshold': ai_confidence_threshold,
+                'last_updated': datetime.now().isoformat()
+            })
+        
         try:
             # Get recent training session data
-            latest_session = ai_worker.database.get_latest_training_session()
+            latest_session = None
+            training_results = []
             
-            if latest_session:
-                training_results = ai_worker.database.get_training_results(latest_session['session_id'])
-                
+            try:
+                latest_session = ai_worker.database.get_latest_training_session()
+                if latest_session:
+                    training_results = ai_worker.database.get_training_results(latest_session['session_id'])
+            except Exception as db_error:
+                app.logger.warning(f"Database error accessing training data: {db_error}")
+                # Try direct database access as fallback
+                try:
+                    from database import TradingDatabase
+                    db = TradingDatabase()
+                    latest_session = db.get_latest_training_session()
+                    if latest_session:
+                        training_results = db.get_training_results(latest_session['session_id'])
+                except Exception as fallback_error:
+                    app.logger.error(f"Fallback database access failed: {fallback_error}")
+                    training_results = []
+            
+            if training_results:
                 signal_id = 0
                 for result in training_results:
                     confidence = result['confidence']
@@ -2138,7 +2169,16 @@ def get_trading_signals():
         
     except Exception as e:
         app.logger.error(f"Trading signals error: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        # Return graceful error response instead of 500
+        return jsonify({
+            'success': True,
+            'signals': [],
+            'count': 0,
+            'message': f'Service temporarily unavailable: {str(e)}',
+            'auto_execute': False,
+            'ai_threshold': 75,
+            'last_updated': datetime.now().isoformat()
+        })
 
 @app.route('/api/config')
 def get_config():

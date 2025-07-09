@@ -243,20 +243,30 @@
         
         function loadSignals() {
             fetch('/api/trading_signals')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.success) {
                         allSignals = data.signals || [];
                         updateStats();
                         displaySignals();
+                        
+                        // Show message if no signals but API worked
+                        if (allSignals.length === 0 && data.message) {
+                            showNoSignalsWithMessage(data.message);
+                        }
                     } else {
                         console.error('Failed to load signals:', data.error);
-                        showNoSignals();
+                        showNoSignalsWithMessage(data.error || 'Failed to load signals');
                     }
                 })
                 .catch(error => {
                     console.error('Error loading signals:', error);
-                    showNoSignals();
+                    showNoSignalsWithMessage(`Connection error: ${error.message}`);
                 });
         }
         
@@ -470,6 +480,17 @@
                     <td colspan="10" class="text-center py-16">
                         <i class="fas fa-exclamation-triangle text-6xl text-neon-red mb-4"></i>
                         <div class="text-gray-400">Failed to load trading signals</div>
+                    </td>
+                </tr>
+            `;
+        }
+        
+        function showNoSignalsWithMessage(message) {
+            document.getElementById('signalsTableBody').innerHTML = `
+                <tr>
+                    <td colspan="10" class="text-center py-16">
+                        <i class="fas fa-info-circle text-6xl text-neon-yellow mb-4"></i>
+                        <div class="text-gray-400">${message}</div>
                     </td>
                 </tr>
             `;
