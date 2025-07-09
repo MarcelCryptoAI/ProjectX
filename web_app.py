@@ -2239,51 +2239,92 @@ def get_analytics_data():
                     active_positions.append(pos)
                     total_position_value += float(pos.get('positionValue', 0))
         
-        # Process trading history for statistics
+        # Get AI signal trade data from database to count only real signal trades
         trades_data = {
             'total_trades': 0, 
             'winning_trades': 0, 
             'losing_trades': 0,
             'total_volume': 0, 
             'total_fees': 0,
-            'trades_by_date': [],
+            'trades_by_date': {},
             'largest_win': 0,
             'largest_loss': 0,
             'total_profit': 0,
             'total_loss': 0
         }
         
-        if history and 'result' in history:
-            trades_data['total_trades'] = len(history['result']['list'])
+        # Get AI worker to access signal trades
+        ai_worker = None
+        try:
+            ai_worker = get_ai_worker(socketio, bybit_session)
+        except:
+            pass
+        
+        # Count only completed signal trades from database
+        try:
+            from database import TradingDatabase
+            db = TradingDatabase()
+            signal_trades = db.get_trading_signals()
             
-            # Group trades by date for time series
-            trades_by_date = {}
+            # Filter for executed/completed signal trades only
+            executed_signals = [s for s in signal_trades if s.get('status') == 'executed']
+            trades_data['total_trades'] = len(executed_signals)
             
-            for trade in history['result']['list']:
-                trades_data['total_volume'] += float(trade.get('execQty', 0)) * float(trade.get('execPrice', 0))
-                trades_data['total_fees'] += abs(float(trade.get('execFee', 0)))
+            # Get trade history for P&L calculation (but only count signal trades)
+            if history and 'result' in history and executed_signals:
+                trades_by_date = {}
                 
-                # Parse trade date
-                trade_time = trade.get('execTime', '')
-                if trade_time:
-                    trade_date = datetime.fromtimestamp(int(trade_time)/1000).strftime('%Y-%m-%d')
-                    if trade_date not in trades_by_date:
-                        trades_by_date[trade_date] = {'volume': 0, 'pnl': 0, 'count': 0}
-                    trades_by_date[trade_date]['volume'] += float(trade.get('execQty', 0)) * float(trade.get('execPrice', 0))
-                    trades_by_date[trade_date]['count'] += 1
+                # Match executed signals with actual trade history
+                for signal in executed_signals:
+                    signal_symbol = signal.get('symbol')
+                    signal_time = signal.get('updated_at')
                     
-                # Track P&L for individual trades (simplified)
-                pnl = float(trade.get('realizedPnl', 0)) if 'realizedPnl' in trade else 0
-                if pnl > 0:
-                    trades_data['winning_trades'] += 1
-                    trades_data['total_profit'] += pnl
-                    trades_data['largest_win'] = max(trades_data['largest_win'], pnl)
-                elif pnl < 0:
-                    trades_data['losing_trades'] += 1
-                    trades_data['total_loss'] += abs(pnl)
-                    trades_data['largest_loss'] = min(trades_data['largest_loss'], pnl)
-            
-            trades_data['trades_by_date'] = trades_by_date
+                    # Find corresponding trades in history
+                    for trade in history['result']['list']:
+                        if trade.get('symbol') == signal_symbol:
+                            trade_time = trade.get('execTime', '')
+                            
+                            # Track volume and fees for signal trades
+                            if trade_time:
+                                trade_value = float(trade.get('execQty', 0)) * float(trade.get('execPrice', 0))
+                                trades_data['total_volume'] += trade_value
+                                trades_data['total_fees'] += abs(float(trade.get('execFee', 0)))
+                                
+                                # Group by date
+                                trade_date = datetime.fromtimestamp(int(trade_time)/1000).strftime('%Y-%m-%d')
+                                if trade_date not in trades_by_date:
+                                    trades_by_date[trade_date] = {'volume': 0, 'pnl': 0, 'count': 0}
+                                trades_by_date[trade_date]['volume'] += trade_value
+                                trades_by_date[trade_date]['count'] += 1
+                                
+                                # Track P&L for signal trades
+                                pnl = float(trade.get('realizedPnl', 0)) if 'realizedPnl' in trade else 0
+                                if pnl > 0:
+                                    trades_data['winning_trades'] += 1
+                                    trades_data['total_profit'] += pnl
+                                    trades_data['largest_win'] = max(trades_data['largest_win'], pnl)
+                                elif pnl < 0:
+                                    trades_data['losing_trades'] += 1
+                                    trades_data['total_loss'] += abs(pnl)
+                                    trades_data['largest_loss'] = min(trades_data['largest_loss'], pnl)
+                
+                trades_data['trades_by_date'] = trades_by_date
+                
+        except Exception as signal_error:
+            # Fallback to empty data if signal database access fails
+            app.logger.warning(f"Could not access signal trades: {signal_error}")
+            trades_data = {
+                'total_trades': 0, 
+                'winning_trades': 0, 
+                'losing_trades': 0,
+                'total_volume': 0, 
+                'total_fees': 0,
+                'trades_by_date': {},
+                'largest_win': 0,
+                'largest_loss': 0,
+                'total_profit': 0,
+                'total_loss': 0
+            }
         
         # Calculate performance metrics - ONLY real data
         win_rate = 0
@@ -2294,12 +2335,7 @@ def get_analytics_data():
         # Format positions for frontend with TP level information
         formatted_positions = []
         
-        # Get AI worker to access active trades info
-        ai_worker = None
-        try:
-            ai_worker = get_ai_worker(socketio, bybit_session)
-        except:
-            pass
+        # AI worker already initialized above for signal trades
         
         for pos in active_positions:
             symbol = pos.get('symbol')
