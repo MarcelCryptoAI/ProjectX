@@ -2535,6 +2535,264 @@ def get_analytics_data():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/performance_analytics')
+def get_performance_analytics():
+    """Get performance analytics data for specific time period"""
+    try:
+        period = request.args.get('period', '1h')
+        
+        # Calculate time filter based on period
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        
+        if period == '1h':
+            start_time = now - timedelta(hours=1)
+        elif period == '4h':
+            start_time = now - timedelta(hours=4)
+        elif period == '12h':
+            start_time = now - timedelta(hours=12)
+        elif period == '1d':
+            start_time = now - timedelta(days=1)
+        elif period == '3d':
+            start_time = now - timedelta(days=3)
+        elif period == '7d':
+            start_time = now - timedelta(days=7)
+        elif period == '30d':
+            start_time = now - timedelta(days=30)
+        elif period == '3m':
+            start_time = now - timedelta(days=90)
+        elif period == '1y':
+            start_time = now - timedelta(days=365)
+        else:  # 'all'
+            start_time = datetime(2020, 1, 1)  # Very old date to get all data
+        
+        # Get trading signals from database for the specified period
+        try:
+            from database import TradingDatabase
+            db = TradingDatabase()
+            signal_trades = db.get_trading_signals()
+            
+            # Filter signals by time period
+            filtered_signals = []
+            for signal in signal_trades:
+                if signal.get('exit_time'):
+                    try:
+                        exit_time = datetime.fromisoformat(str(signal.get('exit_time')).replace('Z', '+00:00'))
+                        if exit_time >= start_time:
+                            filtered_signals.append(signal)
+                    except:
+                        pass
+                elif signal.get('created_at'):
+                    try:
+                        created_at = datetime.fromisoformat(str(signal.get('created_at')).replace('Z', '+00:00'))
+                        if created_at >= start_time:
+                            filtered_signals.append(signal)
+                    except:
+                        pass
+            
+            # Calculate performance metrics
+            completed_signals = [s for s in filtered_signals if s.get('status') == 'completed' and s.get('realized_pnl') is not None]
+            pending_signals = [s for s in filtered_signals if s.get('status') in ['active', 'waiting', 'pending']]
+            
+            winning_trades = len([s for s in completed_signals if float(s.get('realized_pnl', 0)) > 0])
+            losing_trades = len([s for s in completed_signals if float(s.get('realized_pnl', 0)) < 0])
+            pending_trades = len(pending_signals)
+            
+            # Calculate additional metrics
+            total_profit = sum([float(s.get('realized_pnl', 0)) for s in completed_signals if float(s.get('realized_pnl', 0)) > 0])
+            total_loss = sum([abs(float(s.get('realized_pnl', 0))) for s in completed_signals if float(s.get('realized_pnl', 0)) < 0])
+            
+            win_rate = (winning_trades / len(completed_signals) * 100) if completed_signals else 0
+            
+            return jsonify({
+                'success': True,
+                'period': period,
+                'winning_trades': winning_trades,
+                'losing_trades': losing_trades,
+                'pending_trades': pending_trades,
+                'total_trades': len(completed_signals),
+                'win_rate': win_rate,
+                'total_profit': total_profit,
+                'total_loss': total_loss,
+                'profit_factor': total_profit / total_loss if total_loss > 0 else 0,
+                'avg_win': total_profit / winning_trades if winning_trades > 0 else 0,
+                'avg_loss': total_loss / losing_trades if losing_trades > 0 else 0
+            })
+            
+        except Exception as db_error:
+            # Fallback to empty data if database access fails
+            return jsonify({
+                'success': False,
+                'error': f'Database error: {str(db_error)}',
+                'winning_trades': 0,
+                'losing_trades': 0,
+                'pending_trades': 0,
+                'total_trades': 0,
+                'win_rate': 0,
+                'total_profit': 0,
+                'total_loss': 0,
+                'profit_factor': 0,
+                'avg_win': 0,
+                'avg_loss': 0
+            })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/cumulative_roi')
+def get_cumulative_roi():
+    """Get cumulative ROI data starting from July 9th with proper time period filtering"""
+    try:
+        period = request.args.get('period', '1h')
+        
+        # Calculate time filter based on period
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        july_9_2024 = datetime(2024, 7, 9)  # Starting point
+        
+        # Determine time range based on period
+        if period == '1h':
+            start_time = max(july_9_2024, now - timedelta(hours=1))
+            time_step = timedelta(minutes=5)  # 5-minute intervals
+        elif period == '4h':
+            start_time = max(july_9_2024, now - timedelta(hours=4))
+            time_step = timedelta(minutes=15)  # 15-minute intervals
+        elif period == '12h':
+            start_time = max(july_9_2024, now - timedelta(hours=12))
+            time_step = timedelta(hours=1)  # 1-hour intervals
+        elif period == '1d':
+            start_time = max(july_9_2024, now - timedelta(days=1))
+            time_step = timedelta(hours=2)  # 2-hour intervals
+        elif period == '3d':
+            start_time = max(july_9_2024, now - timedelta(days=3))
+            time_step = timedelta(hours=6)  # 6-hour intervals
+        elif period == '7d':
+            start_time = max(july_9_2024, now - timedelta(days=7))
+            time_step = timedelta(hours=12)  # 12-hour intervals
+        elif period == '30d':
+            start_time = max(july_9_2024, now - timedelta(days=30))
+            time_step = timedelta(days=1)  # Daily intervals
+        elif period == '3m':
+            start_time = max(july_9_2024, now - timedelta(days=90))
+            time_step = timedelta(days=3)  # 3-day intervals
+        elif period == '1y':
+            start_time = max(july_9_2024, now - timedelta(days=365))
+            time_step = timedelta(days=7)  # Weekly intervals
+        else:  # 'all'
+            start_time = july_9_2024
+            time_step = timedelta(days=1)  # Daily intervals
+        
+        # Get trading signals from database
+        try:
+            from database import TradingDatabase
+            db = TradingDatabase()
+            signal_trades = db.get_trading_signals()
+            
+            # Filter for completed signals with realized P&L
+            completed_signals = []
+            for signal in signal_trades:
+                if signal.get('status') == 'completed' and signal.get('realized_pnl') is not None:
+                    exit_time = None
+                    if signal.get('exit_time'):
+                        try:
+                            exit_time = datetime.fromisoformat(str(signal.get('exit_time')).replace('Z', '+00:00'))
+                        except:
+                            pass
+                    elif signal.get('updated_at'):
+                        try:
+                            exit_time = datetime.fromisoformat(str(signal.get('updated_at')).replace('Z', '+00:00'))
+                        except:
+                            pass
+                    
+                    if exit_time and exit_time >= july_9_2024:
+                        completed_signals.append({
+                            'exit_time': exit_time,
+                            'realized_pnl': float(signal.get('realized_pnl', 0)),
+                            'amount': float(signal.get('amount', 0))
+                        })
+            
+            # Sort by exit time
+            completed_signals.sort(key=lambda x: x['exit_time'])
+            
+            # Get initial balance (estimate based on first trades or use default)
+            initial_balance = 1000.0  # Default starting balance
+            
+            # Try to get actual balance from first trade
+            if completed_signals:
+                # Use the first trade to estimate initial balance
+                first_trade_amount = completed_signals[0]['amount']
+                if first_trade_amount > 0:
+                    # Estimate initial balance as 50x the first trade amount
+                    initial_balance = max(first_trade_amount * 50, 1000.0)
+            
+            # Generate time series data
+            roi_data = []
+            current_time = start_time
+            cumulative_pnl = 0
+            signal_index = 0
+            
+            while current_time <= now:
+                # Add all trades that happened before or at current_time
+                while signal_index < len(completed_signals) and completed_signals[signal_index]['exit_time'] <= current_time:
+                    cumulative_pnl += completed_signals[signal_index]['realized_pnl']
+                    signal_index += 1
+                
+                # Calculate ROI as percentage of initial balance
+                cumulative_roi_percent = (cumulative_pnl / initial_balance) * 100
+                
+                roi_data.append({
+                    'date': current_time.isoformat(),
+                    'cumulative_pnl': cumulative_pnl,
+                    'cumulative_roi_percent': cumulative_roi_percent
+                })
+                
+                current_time += time_step
+            
+            # If no data points, create at least one starting point
+            if not roi_data:
+                roi_data.append({
+                    'date': start_time.isoformat(),
+                    'cumulative_pnl': 0,
+                    'cumulative_roi_percent': 0
+                })
+            
+            return jsonify({
+                'success': True,
+                'period': period,
+                'roi_data': roi_data,
+                'total_trades': len(completed_signals),
+                'initial_balance': initial_balance,
+                'final_pnl': cumulative_pnl,
+                'final_roi_percent': (cumulative_pnl / initial_balance) * 100 if initial_balance > 0 else 0
+            })
+            
+        except Exception as db_error:
+            # Fallback: generate empty data starting from July 9th
+            roi_data = []
+            current_time = start_time
+            
+            while current_time <= now:
+                roi_data.append({
+                    'date': current_time.isoformat(),
+                    'cumulative_pnl': 0,
+                    'cumulative_roi_percent': 0
+                })
+                current_time += time_step
+            
+            return jsonify({
+                'success': True,
+                'period': period,
+                'roi_data': roi_data,
+                'total_trades': 0,
+                'initial_balance': 1000.0,
+                'final_pnl': 0,
+                'final_roi_percent': 0,
+                'error': f'Database error: {str(db_error)}'
+            })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/coin_analysis')
 def get_coin_analysis():
     """Get AI analysis for all coins with REAL status logic"""

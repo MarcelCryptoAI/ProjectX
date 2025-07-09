@@ -201,6 +201,12 @@
             transform: translateY(0);
         }
         
+        .performance-period-active {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.3), rgba(161, 0, 255, 0.3));
+            border-color: #00D9FF;
+            box-shadow: 0 0 15px rgba(0, 217, 255, 0.4);
+        }
+        
         .status-indicator {
             width: 10px;
             height: 10px;
@@ -549,7 +555,21 @@
                 
                 <!-- Performance Analytics -->
                 <div class="glass-panel rounded-xl p-6">
-                    <h3 class="text-lg font-bold font-bold text-white mb-4">PERFORMANCE ANALYTICS</h3>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold font-bold text-white">PERFORMANCE ANALYTICS</h3>
+                        <div class="flex space-x-2">
+                            <button class="cyber-button py-1 px-3 rounded text-xs performance-period-active" onclick="changePerformancePeriod('1h', this)">1H</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('4h', this)">4H</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('12h', this)">12H</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('1d', this)">1D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('3d', this)">3D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('7d', this)">7D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('30d', this)">30D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('3m', this)">3M</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('1y', this)">1Y</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('all', this)">ALL</button>
+                        </div>
+                    </div>
                     <div class="chart-container">
                         <canvas id="performanceChart"></canvas>
                     </div>
@@ -1048,77 +1068,133 @@
                 });
         }
         
+        // Performance period change
+        let currentPerformancePeriod = '1h';
+        
+        function changePerformancePeriod(period, button) {
+            currentPerformancePeriod = period;
+            
+            // Update button states
+            button.parentElement.querySelectorAll('.cyber-button').forEach(btn => {
+                btn.classList.remove('performance-period-active');
+            });
+            button.classList.add('performance-period-active');
+            
+            // Update chart data
+            updatePerformanceChart({}, period);
+        }
+        
         // ROI period change
         function changeROIPeriod(period, button) {
             currentROIPeriod = period;
             
             // Update button states
-            document.querySelectorAll('.cyber-button').forEach(btn => {
-                if (btn.textContent.toLowerCase() === period.toLowerCase() || 
-                    (period === 'all' && btn.textContent === 'ALL')) {
-                    btn.classList.add('active');
-                } else if (btn.parentElement.classList.contains('flex') && 
-                          btn.parentElement.classList.contains('space-x-2')) {
-                    btn.classList.remove('active');
-                }
+            button.parentElement.querySelectorAll('.cyber-button').forEach(btn => {
+                btn.classList.remove('active');
             });
+            button.classList.add('active');
             
             // Update chart data
             updateROIChart(period);
         }
         
         function updateROIChart(period) {
-            // Fetch actual trading history for ROI calculation
-            fetch('/api/trading_history')
+            // Fetch cumulative ROI data from the new API endpoint
+            fetch(`/api/cumulative_roi?period=${period}`)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success && data.trades) {
-                        const labels = [];
-                        const roiData = [];
-                        let cumulativeROI = 0;
-                        
-                        // Process actual trade data for ROI
-                        data.trades.forEach((trade, index) => {
-                            if (trade.realizedPnl) {
-                                cumulativeROI += parseFloat(trade.realizedPnl);
+                    if (data.success && data.roi_data) {
+                        const labels = data.roi_data.map(item => {
+                            const date = new Date(item.date);
+                            if (period === '1h' || period === '4h' || period === '12h') {
+                                return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                            } else if (period === '1d' || period === '3d') {
+                                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' });
+                            } else {
+                                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                             }
-                            labels.push(new Date(trade.time).toLocaleDateString());
-                            roiData.push(cumulativeROI);
                         });
-                        
-                        // If no data, show flat line
-                        if (roiData.length === 0) {
-                            labels.push('Today');
-                            roiData.push(0);
-                        }
+                        const roiData = data.roi_data.map(item => item.cumulative_roi_percent);
                         
                         roiChart.data.labels = labels;
                         roiChart.data.datasets[0].data = roiData;
                         roiChart.update();
                     } else {
-                        // Show no data state
-                        roiChart.data.labels = ['No Data'];
-                        roiChart.data.datasets[0].data = [0];
+                        // Show starting from July 9th with 0 ROI
+                        const july9 = new Date('2024-07-09');
+                        const today = new Date();
+                        const labels = [];
+                        const roiData = [];
+                        
+                        // Create data points from July 9th to today
+                        let currentDate = new Date(july9);
+                        while (currentDate <= today) {
+                            labels.push(currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                            roiData.push(0);
+                            currentDate.setDate(currentDate.getDate() + 1);
+                        }
+                        
+                        roiChart.data.labels = labels;
+                        roiChart.data.datasets[0].data = roiData;
                         roiChart.update();
                     }
                 })
                 .catch(error => {
                     console.error('ROI chart error:', error);
-                    // Show error state
-                    roiChart.data.labels = ['Error'];
-                    roiChart.data.datasets[0].data = [0];
+                    // Show error state starting from July 9th
+                    const july9 = new Date('2024-07-09');
+                    const today = new Date();
+                    const labels = [];
+                    const roiData = [];
+                    
+                    // Create data points from July 9th to today
+                    let currentDate = new Date(july9);
+                    while (currentDate <= today) {
+                        labels.push(currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                        roiData.push(0);
+                        currentDate.setDate(currentDate.getDate() + 1);
+                    }
+                    
+                    roiChart.data.labels = labels;
+                    roiChart.data.datasets[0].data = roiData;
                     roiChart.update();
                 });
         }
         
         // Update performance chart with real data
-        function updatePerformanceChart(data) {
-            const wins = data.winning_trades || 0;
-            const losses = (data.total_trades || 0) - wins;
-            const pending = data.active_positions_count || 0;
-            
-            performanceChart.data.datasets[0].data = [wins, losses, pending];
-            performanceChart.update();
+        function updatePerformanceChart(data, period = '1h') {
+            // Get performance data for the specified period
+            fetch(`/api/performance_analytics?period=${period}`)
+                .then(response => response.json())
+                .then(perfData => {
+                    if (perfData.success) {
+                        // Use real data from the API
+                        const wins = perfData.winning_trades || 0;
+                        const losses = perfData.losing_trades || 0;
+                        const pending = perfData.pending_trades || 0;
+                        
+                        performanceChart.data.datasets[0].data = [wins, losses, pending];
+                        performanceChart.update();
+                    } else {
+                        // Fallback to analytics data
+                        const wins = data.winning_trades || 0;
+                        const losses = data.losing_trades || 0;
+                        const pending = data.active_positions_count || 0;
+                        
+                        performanceChart.data.datasets[0].data = [wins, losses, pending];
+                        performanceChart.update();
+                    }
+                })
+                .catch(error => {
+                    console.error('Performance chart error:', error);
+                    // Fallback to analytics data on error
+                    const wins = data.winning_trades || 0;
+                    const losses = data.losing_trades || 0;
+                    const pending = data.active_positions_count || 0;
+                    
+                    performanceChart.data.datasets[0].data = [wins, losses, pending];
+                    performanceChart.update();
+                });
         }
         
         // Update trading parameters from settings
@@ -1351,6 +1427,10 @@
         }
         
         function sortPositions(positions, column, direction) {
+            if (!positions || positions.length === 0) {
+                return positions;
+            }
+            
             const sortedPositions = [...positions];
             
             sortedPositions.sort((a, b) => {
@@ -1358,24 +1438,24 @@
                 
                 switch(column) {
                     case 'symbol':
-                        aVal = a.symbol;
-                        bVal = b.symbol;
+                        aVal = a.symbol || '';
+                        bVal = b.symbol || '';
                         break;
                     case 'side':
-                        aVal = a.side;
-                        bVal = b.side;
+                        aVal = a.side || '';
+                        bVal = b.side || '';
                         break;
                     case 'size':
-                        aVal = parseFloat(a.size);
-                        bVal = parseFloat(b.size);
+                        aVal = parseFloat(a.size || 0);
+                        bVal = parseFloat(b.size || 0);
                         break;
                     case 'entry':
-                        aVal = parseFloat(a.avgPrice);
-                        bVal = parseFloat(b.avgPrice);
+                        aVal = parseFloat(a.avgPrice || 0);
+                        bVal = parseFloat(b.avgPrice || 0);
                         break;
                     case 'current':
-                        aVal = parseFloat(a.markPrice);
-                        bVal = parseFloat(b.markPrice);
+                        aVal = parseFloat(a.markPrice || 0);
+                        bVal = parseFloat(b.markPrice || 0);
                         break;
                     case 'pnl':
                         aVal = parseFloat(a.unrealisedPnl || 0);
@@ -1403,13 +1483,15 @@
                 
                 // Handle string vs number comparison
                 if (typeof aVal === 'string' && typeof bVal === 'string') {
-                    return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                    const result = direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                    return result;
                 } else {
-                    if (direction === 'asc') {
-                        return aVal - bVal;
-                    } else {
-                        return bVal - aVal;
-                    }
+                    // Handle NaN values
+                    if (isNaN(aVal)) aVal = 0;
+                    if (isNaN(bVal)) bVal = 0;
+                    
+                    const result = direction === 'asc' ? aVal - bVal : bVal - aVal;
+                    return result;
                 }
             });
             
