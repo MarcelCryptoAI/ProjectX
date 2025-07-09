@@ -2587,9 +2587,16 @@ def save_settings():
                     'error': f'Missing required setting: {setting}'
                 })
         
-        # Save to file
-        with open(settings_file, 'w') as f:
-            json.dump(settings_data, f, indent=2)
+        # Save to database
+        try:
+            from database import TradingDatabase
+            db = TradingDatabase()
+            db.save_settings(settings_data)
+        except Exception as db_error:
+            print(f"Database settings save failed, using file fallback: {db_error}")
+            # Fallback to file if database fails
+            with open(settings_file, 'w') as f:
+                json.dump(settings_data, f, indent=2)
         
         # Update environment variables for immediate effect
         os.environ['AI_CONFIDENCE_THRESHOLD'] = str(settings_data.get('confidenceThreshold', 75))
@@ -2617,7 +2624,7 @@ def save_settings():
 
 @app.route('/api/load_settings')
 def load_settings():
-    """Load trading settings from file"""
+    """Load trading settings from database"""
     try:
         # Default settings
         default_settings = {
@@ -2659,11 +2666,20 @@ def load_settings():
             'autoExecute': False  # Added autoExecute field
         }
         
-        # Try to load from file
-        if os.path.exists(settings_file):
-            with open(settings_file, 'r') as f:
-                saved_settings = json.load(f)
-                default_settings.update(saved_settings)
+        # Try to load from database
+        try:
+            from database import TradingDatabase
+            db = TradingDatabase()
+            db_settings = db.load_settings()
+            default_settings.update(db_settings)
+        except Exception as db_error:
+            print(f"Database settings load failed, using defaults: {db_error}")
+            
+            # Fallback to file if database fails
+            if os.path.exists(settings_file):
+                with open(settings_file, 'r') as f:
+                    saved_settings = json.load(f)
+                    default_settings.update(saved_settings)
         
         return jsonify({
             'success': True,

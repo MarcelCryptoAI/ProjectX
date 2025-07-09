@@ -204,8 +204,80 @@ class TradingDatabase:
                 )
             ''')
         
+        # Settings table for storing application settings
+        if self.use_postgres:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS settings (
+                    id SERIAL PRIMARY KEY,
+                    key VARCHAR(100) UNIQUE NOT NULL,
+                    value TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS settings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    key TEXT UNIQUE NOT NULL,
+                    value TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        
         conn.commit()
         conn.close()
+    
+    def save_settings(self, settings_dict):
+        """Save settings to database"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        for key, value in settings_dict.items():
+            try:
+                if self.use_postgres:
+                    cursor.execute('''
+                        INSERT INTO settings (key, value, updated_at)
+                        VALUES (%s, %s, CURRENT_TIMESTAMP)
+                        ON CONFLICT (key) DO UPDATE SET
+                        value = EXCLUDED.value,
+                        updated_at = EXCLUDED.updated_at
+                    ''', (key, json.dumps(value)))
+                else:
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO settings (key, value, updated_at)
+                        VALUES (?, ?, CURRENT_TIMESTAMP)
+                    ''', (key, json.dumps(value)))
+            except Exception as e:
+                print(f"Error saving setting {key}: {e}")
+        
+        conn.commit()
+        conn.close()
+    
+    def load_settings(self):
+        """Load settings from database"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            if self.use_postgres:
+                cursor.execute('SELECT key, value FROM settings')
+                results = cursor.fetchall()
+            else:
+                cursor.execute('SELECT key, value FROM settings')
+                results = cursor.fetchall()
+            
+            settings = {}
+            for row in results:
+                key = row[0]
+                value = json.loads(row[1])
+                settings[key] = value
+            
+            conn.close()
+            return settings
+        except Exception as e:
+            print(f"Error loading settings: {e}")
+            conn.close()
+            return {}
     
     def store_market_data(self, symbol, kline_data):
         """Store market data for a symbol"""
