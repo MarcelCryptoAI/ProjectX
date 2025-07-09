@@ -1771,6 +1771,28 @@ def close_all_positions():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/delete_old_signals', methods=['POST'])
+def delete_old_signals():
+    """Delete oldest trading signals from database"""
+    try:
+        data = request.json
+        count = data.get('count', 10)
+        
+        from database import TradingDatabase
+        db = TradingDatabase()
+        
+        # Delete the oldest signals
+        deleted_count = db.delete_oldest_trading_signals(count)
+        
+        return jsonify({
+            'success': True,
+            'deleted_count': deleted_count,
+            'message': f'Deleted {deleted_count} old trading signals'
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/chart_data/<symbol>')
 def get_chart_data(symbol):
     try:

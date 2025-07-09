@@ -814,6 +814,46 @@ class TradingDatabase:
         finally:
             conn.close()
     
+    def delete_oldest_trading_signals(self, count):
+        """Delete the oldest trading signals"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            placeholder = '%s' if self.use_postgres else '?'
+            
+            # Get the signal_ids of the oldest signals
+            cursor.execute(f'''
+                SELECT signal_id FROM trading_signals
+                ORDER BY created_at ASC
+                LIMIT {placeholder}
+            ''', (count,))
+            
+            old_signals = cursor.fetchall()
+            
+            if old_signals:
+                # Delete these signals
+                signal_ids = [signal[0] for signal in old_signals]
+                placeholders = ','.join([placeholder] * len(signal_ids))
+                
+                cursor.execute(f'''
+                    DELETE FROM trading_signals
+                    WHERE signal_id IN ({placeholders})
+                ''', signal_ids)
+                
+                conn.commit()
+                return len(signal_ids)
+            else:
+                return 0
+            
+        except Exception as e:
+            print(f"Error deleting old signals: {e}")
+            conn.rollback()
+            return 0
+        
+        finally:
+            conn.close()
+    
     def refresh_supported_symbols(self, symbols_data):
         """Refresh supported symbols list"""
         conn = self.get_connection()
