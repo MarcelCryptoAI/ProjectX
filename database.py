@@ -224,6 +224,74 @@ class TradingDatabase:
                 )
             ''')
         
+        # Trading signals table for tracking signal statuses
+        if self.use_postgres:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS trading_signals (
+                    id SERIAL PRIMARY KEY,
+                    signal_id VARCHAR(100) UNIQUE NOT NULL,
+                    symbol VARCHAR(20) NOT NULL,
+                    side VARCHAR(10) NOT NULL,
+                    confidence DECIMAL(5,2),
+                    accuracy DECIMAL(5,2),
+                    amount DECIMAL(20,8),
+                    leverage INTEGER,
+                    take_profit DECIMAL(5,2),
+                    stop_loss DECIMAL(5,2),
+                    status VARCHAR(20) DEFAULT 'waiting',
+                    order_id VARCHAR(100),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS trading_signals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    signal_id TEXT UNIQUE NOT NULL,
+                    symbol TEXT NOT NULL,
+                    side TEXT NOT NULL,
+                    confidence REAL,
+                    accuracy REAL,
+                    amount REAL,
+                    leverage INTEGER,
+                    take_profit REAL,
+                    stop_loss REAL,
+                    status TEXT DEFAULT 'waiting',
+                    order_id TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        
+        # Supported symbols table for coin list management
+        if self.use_postgres:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS supported_symbols (
+                    id SERIAL PRIMARY KEY,
+                    symbol VARCHAR(20) UNIQUE NOT NULL,
+                    base_currency VARCHAR(10),
+                    quote_currency VARCHAR(10),
+                    status VARCHAR(20) DEFAULT 'active',
+                    min_order_qty DECIMAL(20,8),
+                    qty_step DECIMAL(20,8),
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS supported_symbols (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT UNIQUE NOT NULL,
+                    base_currency TEXT,
+                    quote_currency TEXT,
+                    status TEXT DEFAULT 'active',
+                    min_order_qty REAL,
+                    qty_step REAL,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        
         conn.commit()
         conn.close()
     
@@ -635,3 +703,189 @@ class TradingDatabase:
         
         conn.close()
         return results
+    
+    def save_trading_signal(self, signal_data):
+        """Save trading signal to database"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            placeholder = '%s' if self.use_postgres else '?'
+            cursor.execute(f'''
+                INSERT INTO trading_signals 
+                (signal_id, symbol, side, confidence, accuracy, amount, leverage, take_profit, stop_loss, status)
+                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                ON CONFLICT (signal_id) DO UPDATE SET
+                status = EXCLUDED.status,
+                updated_at = CURRENT_TIMESTAMP
+            ''' if self.use_postgres else f'''
+                INSERT OR REPLACE INTO trading_signals 
+                (signal_id, symbol, side, confidence, accuracy, amount, leverage, take_profit, stop_loss, status)
+                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+            ''', (
+                signal_data['signal_id'],
+                signal_data['symbol'],
+                signal_data['side'],
+                signal_data['confidence'],
+                signal_data['accuracy'],
+                signal_data['amount'],
+                signal_data['leverage'],
+                signal_data['take_profit'],
+                signal_data['stop_loss'],
+                signal_data.get('status', 'waiting')
+            ))
+            
+            conn.commit()
+            
+        except Exception as e:
+            print(f"Error saving trading signal: {e}")
+            conn.rollback()
+        
+        conn.close()
+    
+    def update_signal_status(self, signal_id, status, order_id=None):
+        """Update signal status"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            placeholder = '%s' if self.use_postgres else '?'
+            if order_id:
+                cursor.execute(f'''
+                    UPDATE trading_signals 
+                    SET status = {placeholder}, order_id = {placeholder}, updated_at = CURRENT_TIMESTAMP
+                    WHERE signal_id = {placeholder}
+                ''', (status, order_id, signal_id))
+            else:
+                cursor.execute(f'''
+                    UPDATE trading_signals 
+                    SET status = {placeholder}, updated_at = CURRENT_TIMESTAMP
+                    WHERE signal_id = {placeholder}
+                ''', (status, signal_id))
+            
+            conn.commit()
+            
+        except Exception as e:
+            print(f"Error updating signal status: {e}")
+            conn.rollback()
+        
+        conn.close()
+    
+    def get_trading_signals(self):
+        """Get all trading signals"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT signal_id, symbol, side, confidence, accuracy, amount, leverage, 
+                       take_profit, stop_loss, status, order_id, created_at, updated_at
+                FROM trading_signals
+                ORDER BY created_at DESC
+            ''')
+            
+            results = cursor.fetchall()
+            signals = []
+            
+            for row in results:
+                signal = {
+                    'signal_id': row[0],
+                    'symbol': row[1],
+                    'side': row[2],
+                    'confidence': float(row[3]) if row[3] else 0,
+                    'accuracy': float(row[4]) if row[4] else 0,
+                    'amount': float(row[5]) if row[5] else 0,
+                    'leverage': int(row[6]) if row[6] else 1,
+                    'take_profit': float(row[7]) if row[7] else 0,
+                    'stop_loss': float(row[8]) if row[8] else 0,
+                    'status': row[9],
+                    'order_id': row[10],
+                    'created_at': row[11],
+                    'updated_at': row[12]
+                }
+                signals.append(signal)
+            
+            return signals
+            
+        except Exception as e:
+            print(f"Error getting trading signals: {e}")
+            return []
+        
+        finally:
+            conn.close()
+    
+    def refresh_supported_symbols(self, symbols_data):
+        """Refresh supported symbols list"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Clear existing symbols
+            cursor.execute('DELETE FROM supported_symbols')
+            
+            # Insert new symbols
+            placeholder = '%s' if self.use_postgres else '?'
+            for symbol_data in symbols_data:
+                cursor.execute(f'''
+                    INSERT INTO supported_symbols 
+                    (symbol, base_currency, quote_currency, status, min_order_qty, qty_step)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                ''', (
+                    symbol_data['symbol'],
+                    symbol_data.get('base_currency', ''),
+                    symbol_data.get('quote_currency', ''),
+                    symbol_data.get('status', 'active'),
+                    symbol_data.get('min_order_qty', 0),
+                    symbol_data.get('qty_step', 0)
+                ))
+            
+            conn.commit()
+            
+        except Exception as e:
+            print(f"Error refreshing supported symbols: {e}")
+            conn.rollback()
+        
+        conn.close()
+    
+    def get_supported_symbols(self):
+        """Get supported symbols list"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('SELECT symbol, status, last_updated FROM supported_symbols ORDER BY symbol')
+            results = cursor.fetchall()
+            
+            symbols = []
+            for row in results:
+                symbols.append({
+                    'symbol': row[0],
+                    'status': row[1],
+                    'last_updated': row[2]
+                })
+            
+            return symbols
+            
+        except Exception as e:
+            print(f"Error getting supported symbols: {e}")
+            return []
+        
+        finally:
+            conn.close()
+    
+    def get_symbols_last_updated(self):
+        """Get last updated date for symbols"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('SELECT MAX(last_updated) FROM supported_symbols')
+            result = cursor.fetchone()
+            return result[0] if result and result[0] else None
+            
+        except Exception as e:
+            print(f"Error getting symbols last updated: {e}")
+            return None
+        
+        finally:
+            conn.close()

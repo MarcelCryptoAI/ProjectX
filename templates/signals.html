@@ -496,7 +496,7 @@
         function showNoSignals() {
             document.getElementById('signalsTableBody').innerHTML = `
                 <tr>
-                    <td colspan="10" class="text-center py-16">
+                    <td colspan="11" class="text-center py-16">
                         <i class="fas fa-exclamation-triangle text-6xl text-neon-red mb-4"></i>
                         <div class="text-gray-400">Failed to load trading signals</div>
                     </td>
@@ -507,7 +507,7 @@
         function showNoSignalsWithMessage(message) {
             document.getElementById('signalsTableBody').innerHTML = `
                 <tr>
-                    <td colspan="10" class="text-center py-16">
+                    <td colspan="11" class="text-center py-16">
                         <i class="fas fa-info-circle text-6xl text-neon-yellow mb-4"></i>
                         <div class="text-gray-400">${message}</div>
                     </td>
@@ -518,7 +518,7 @@
         function refreshSignals() {
             document.getElementById('signalsTableBody').innerHTML = `
                 <tr>
-                    <td colspan="10" class="text-center py-16">
+                    <td colspan="11" class="text-center py-16">
                         <i class="fas fa-spinner fa-spin text-6xl text-neon-cyan mb-4"></i>
                         <div class="text-gray-400">Refreshing signals...</div>
                     </td>

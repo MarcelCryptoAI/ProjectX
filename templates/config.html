@@ -620,6 +620,42 @@
                         </div>
                     </div>
                 </div>
+                
+                <div class="settings-group">
+                    <h3 class="text-xl font-bold text-neon-cyan mb-4">
+                        <i class="fas fa-coins mr-2"></i>Supported Coins Management
+                    </h3>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <label class="form-label">Last Updated</label>
+                            <div class="text-lg font-mono text-neon-green" id="symbolsLastUpdated">Loading...</div>
+                            <div class="form-text">Last time the coin list was refreshed from ByBit</div>
+                        </div>
+                        <div>
+                            <label class="form-label">Supported Coins</label>
+                            <div class="text-lg font-mono text-neon-yellow" id="symbolsCount">Loading...</div>
+                            <div class="form-text">Number of coins available for trading</div>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button class="cyber-button py-2 px-4 rounded-lg" onclick="refreshSymbolsList()" id="refreshSymbolsBtn">
+                            <i class="fas fa-sync-alt mr-2"></i>Force Refresh Coin List
+                        </button>
+                        <div class="form-text mt-2">Refresh the list of supported coins from ByBit (recommended weekly)</div>
+                    </div>
+                    <div class="mt-4" id="refreshProgress" style="display: none;">
+                        <div class="bg-dark-bg rounded-lg p-4 border border-neon-cyan/20">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm text-gray-400">Refreshing symbols...</span>
+                                <span class="text-sm font-mono text-neon-cyan" id="refreshProgressText">0%</span>
+                            </div>
+                            <div class="w-full bg-dark-panel rounded-full h-2">
+                                <div class="bg-gradient-to-r from-neon-cyan to-neon-green h-2 rounded-full transition-all duration-300" 
+                                     style="width: 0%" id="refreshProgressBar"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <!-- Telegram Tab -->
@@ -895,10 +931,93 @@
             }, 3000);
         }
         
+        // Refresh symbols list
+        function refreshSymbolsList() {
+            const btn = document.getElementById('refreshSymbolsBtn');
+            const progress = document.getElementById('refreshProgress');
+            const progressText = document.getElementById('refreshProgressText');
+            const progressBar = document.getElementById('refreshProgressBar');
+            
+            // Show progress and disable button
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Refreshing...';
+            progress.style.display = 'block';
+            
+            // Start refresh
+            fetch('/api/refresh_symbols', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show progress updates
+                    let currentProgress = 0;
+                    const totalSymbols = data.total_symbols || 100;
+                    
+                    const progressInterval = setInterval(() => {
+                        currentProgress += 5;
+                        const percentage = Math.min(currentProgress, 100);
+                        progressText.textContent = `${percentage}%`;
+                        progressBar.style.width = `${percentage}%`;
+                        
+                        if (currentProgress >= 100) {
+                            clearInterval(progressInterval);
+                            
+                            // Update displays
+                            document.getElementById('symbolsCount').textContent = data.symbols_count || 'Updated';
+                            document.getElementById('symbolsLastUpdated').textContent = new Date().toLocaleString();
+                            
+                            showNotification(`Successfully refreshed ${data.symbols_count || 'symbols'} coins!`, 'success');
+                            
+                            // Hide progress after delay
+                            setTimeout(() => {
+                                progress.style.display = 'none';
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Force Refresh Coin List';
+                            }, 1000);
+                        }
+                    }, 100);
+                } else {
+                    showNotification('Failed to refresh symbols: ' + data.error, 'error');
+                    progress.style.display = 'none';
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Force Refresh Coin List';
+                }
+            })
+            .catch(error => {
+                showNotification('Error refreshing symbols: ' + error.message, 'error');
+                progress.style.display = 'none';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Force Refresh Coin List';
+            });
+        }
+        
+        // Load symbols info
+        function loadSymbolsInfo() {
+            fetch('/api/symbols_info')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('symbolsCount').textContent = data.symbols_count || 'Unknown';
+                        document.getElementById('symbolsLastUpdated').textContent = 
+                            data.last_updated ? new Date(data.last_updated).toLocaleString() : 'Never';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading symbols info:', error);
+                    document.getElementById('symbolsCount').textContent = 'Error';
+                    document.getElementById('symbolsLastUpdated').textContent = 'Error';
+                });
+        }
+        
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadCurrentBalance();
             loadSettings();
+            loadSymbolsInfo();
             
             // Initialize toggle options
             toggleTrailingStopOptions();

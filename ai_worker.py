@@ -598,6 +598,11 @@ class AIWorker:
             # Check if symbol is in our supported list
             if symbol not in supported_symbols:
                 self.console_logger.log('WARNING', f'⚠️ Symbol {symbol} not in supported list, skipping trade')
+                # Update signal status to failed
+                if 'signal_id' in signal:
+                    from database import TradingDatabase
+                    db = TradingDatabase()
+                    db.update_signal_status(signal['signal_id'], 'failed')
                 return False
             
             # Check for existing positions in the same direction
@@ -611,6 +616,11 @@ class AIWorker:
                             # If same direction, block the trade
                             if existing_side == side:
                                 self.console_logger.log('WARNING', f'⚠️ Already have {existing_side} position for {symbol}, blocking same direction trade')
+                                # Update signal status to waiting
+                                if 'signal_id' in signal:
+                                    from database import TradingDatabase
+                                    db = TradingDatabase()
+                                    db.update_signal_status(signal['signal_id'], 'waiting')
                                 return False
                             
                             # If opposite direction, allow it (will close existing position)
@@ -788,10 +798,30 @@ class AIWorker:
                     error_msg = order_result['ret_msg']
                 
                 self.console_logger.log('ERROR', f'❌ Order failed: {error_msg}')
+                
+                # Update signal status to 'failed' in database
+                if 'signal_id' in signal:
+                    try:
+                        from database import TradingDatabase
+                        db = TradingDatabase()
+                        db.update_signal_status(signal['signal_id'], 'failed')
+                    except Exception as db_error:
+                        self.console_logger.log('WARNING', f'⚠️ Could not update signal status: {db_error}')
+                
                 return False
                 
         except Exception as e:
             self.console_logger.log('ERROR', f'❌ Trade execution error: {str(e)}')
+            
+            # Update signal status to 'failed' in database
+            if 'signal_id' in signal:
+                try:
+                    from database import TradingDatabase
+                    db = TradingDatabase()
+                    db.update_signal_status(signal['signal_id'], 'failed')
+                except Exception as db_error:
+                    self.console_logger.log('WARNING', f'⚠️ Could not update signal status: {db_error}')
+            
             return False
     
     def monitor_trades_and_move_sl(self):

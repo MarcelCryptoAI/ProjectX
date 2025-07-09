@@ -2112,8 +2112,38 @@ def get_trading_signals():
                                 'profit_amount': round(profit_amount, 2)
                             })
                         
+                        signal_id_str = f'signal_{signal_id}_{result["symbol"]}'
+                        
+                        # Check signal status from database
+                        signal_status = 'waiting'  # Default status
+                        try:
+                            db_signals = db.get_trading_signals()
+                            existing_signal = next((s for s in db_signals if s['symbol'] == result['symbol']), None)
+                            if existing_signal:
+                                signal_status = existing_signal['status']
+                            else:
+                                # Check if symbol is in supported list
+                                supported_symbols = db.get_supported_symbols()
+                                if not any(s['symbol'] == result['symbol'] for s in supported_symbols):
+                                    signal_status = 'failed'
+                                else:
+                                    # Check if same direction position exists
+                                    try:
+                                        positions = bybit_session.get_positions(category="linear", symbol=result['symbol'])
+                                        if positions and 'result' in positions:
+                                            for position in positions['result']['list']:
+                                                if position['symbol'] == result['symbol'] and float(position['size']) > 0:
+                                                    existing_side = position['side']
+                                                    if existing_side == side:
+                                                        signal_status = 'waiting'
+                                                        break
+                                    except:
+                                        pass
+                        except Exception as status_error:
+                            app.logger.warning(f"Error checking signal status: {status_error}")
+                        
                         signal = {
-                            'id': f'signal_{signal_id}_{result["symbol"]}',
+                            'id': signal_id_str,
                             'symbol': result['symbol'],
                             'side': side,
                             'confidence': round(confidence, 1),
@@ -2123,19 +2153,36 @@ def get_trading_signals():
                             'stop_loss': round(1 + (confidence / 50), 1),
                             'strategy': 'AI Technical Analysis',
                             'timestamp': signal_time.isoformat(),
-                            'status': 'ready_to_trade',
+                            'status': signal_status,
                             'take_profit_levels': take_profit_levels,
                             'partial_take_profit': partial_tp_enabled,
                             'move_stop_loss_on_partial_tp': db_settings.get('moveStopLossOnPartialTP', True),
                             'analysis': {
                                 'accuracy': round(result['accuracy'], 1),
                                 'threshold': ai_confidence_threshold,
-                                'status': 'ready_to_trade',
+                                'status': signal_status,
                                 'leverage_strategy': leverage_strategy,
                                 'position_size_method': 'fixed_percentage',
                                 'auto_execute': os.getenv('AUTO_EXECUTE', 'false').lower() == 'true'
                             }
                         }
+                        
+                        # Save signal to database if not exists
+                        try:
+                            db.save_trading_signal({
+                                'signal_id': signal_id_str,
+                                'symbol': result['symbol'],
+                                'side': side,
+                                'confidence': confidence,
+                                'accuracy': result['accuracy'],
+                                'amount': amount,
+                                'leverage': leverage,
+                                'take_profit': round(2 + (confidence / 25), 1),
+                                'stop_loss': round(1 + (confidence / 50), 1),
+                                'status': signal_status
+                            })
+                        except Exception as save_error:
+                            app.logger.warning(f"Could not save signal to database: {save_error}")
                         signals.append(signal)
                         signal_id += 1
         except Exception as db_error:
@@ -2850,6 +2897,73 @@ def test_api_connection():
             'success': False,
             'message': f'API connection failed: {str(e)}'
         })
+
+@app.route('/api/refresh_symbols', methods=['POST'])
+def refresh_symbols():
+    """Refresh supported symbols from ByBit"""
+    try:
+        from database import TradingDatabase
+        db = TradingDatabase()
+        
+        # Get instruments from ByBit
+        instruments = bybit_session.get_instruments_info(category="linear")
+        
+        if not instruments or 'result' not in instruments:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to fetch instruments from ByBit'
+            })
+        
+        symbols_data = []
+        for instrument in instruments['result']['list']:
+            if instrument['symbol'].endswith('USDT'):  # Only USDT pairs
+                symbol_data = {
+                    'symbol': instrument['symbol'],
+                    'base_currency': instrument['baseCoin'],
+                    'quote_currency': instrument['quoteCoin'],
+                    'status': 'active' if instrument['status'] == 'Trading' else 'inactive',
+                    'min_order_qty': float(instrument['lotSizeFilter']['minOrderQty']),
+                    'qty_step': float(instrument['lotSizeFilter']['qtyStep'])
+                }
+                symbols_data.append(symbol_data)
+        
+        # Save to database
+        db.refresh_supported_symbols(symbols_data)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Refreshed {len(symbols_data)} symbols',
+            'count': len(symbols_data)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/symbols_info')
+def get_symbols_info():
+    """Get symbols info and last updated date"""
+    try:
+        from database import TradingDatabase
+        db = TradingDatabase()
+        
+        symbols = db.get_supported_symbols()
+        last_updated = db.get_symbols_last_updated()
+        
+        return jsonify({
+            'success': True,
+            'symbols': symbols,
+            'last_updated': last_updated.isoformat() if last_updated else None,
+            'count': len(symbols)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 if __name__ == '__main__':
     print("🤖 AI Worker ready...")
