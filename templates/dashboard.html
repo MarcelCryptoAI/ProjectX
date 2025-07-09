@@ -1060,41 +1060,13 @@
         
         // Update trading parameters from settings
         function updateTradingParameters() {
-            fetch('/api/config')
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.success) {
-                        // Update AI confidence threshold
-                        const confidence = data.ai_confidence_threshold || 75;
-                        document.getElementById('aiConfidence').textContent = `${confidence}%`;
-                        
-                        // Update max concurrent trades
-                        const maxTrades = data.max_positions || 5;
-                        document.getElementById('maxPositions').textContent = maxTrades;
-                        
-                        // Update risk per trade
-                        const riskPerTrade = data.risk_per_trade || 2.0;
-                        let riskLevel = 'MODERATE';
-                        if (riskPerTrade <= 1.0) riskLevel = 'LOW';
-                        else if (riskPerTrade >= 5.0) riskLevel = 'HIGH';
-                        document.getElementById('riskLevel').textContent = riskLevel;
-                        
-                        // Update auto execute
-                        const autoExecute = data.auto_execute || false;
-                        document.getElementById('autoExecute').checked = autoExecute;
-                    }
-                })
-                .catch(error => {
-                    console.error('Failed to load trading parameters:', error);
-                });
-                
-            // Load extended settings from settings API
+            // Load all settings from settings API
             fetch('/api/load_settings')
                 .then(response => response.json())
                 .then(data => {
                     if (data && data.success) {
-                        // Update amount per trade
-                        const amountPerTrade = data.settings.amountPerTrade || 100;
+                        // Update amount per trade (using minTradeAmount as base)
+                        const amountPerTrade = data.settings.minTradeAmount || 19;
                         document.getElementById('amountPerTrade').textContent = `$${amountPerTrade}`;
                         
                         // Update leverage
@@ -1112,8 +1084,27 @@
                         document.getElementById('trailingSL').className = trailingSL ? 'text-neon-green' : 'text-neon-yellow';
                         
                         // Update trailing percentage
-                        const trailingPercent = data.settings.trailingPercentage || 2;
+                        const trailingPercent = data.settings.trailingStopValue || 1.0;
                         document.getElementById('trailingPercent').textContent = `${trailingPercent}%`;
+                        
+                        // Update max concurrent trades from settings
+                        const maxConcurrentTrades = data.settings.maxConcurrentTrades || 20;
+                        document.getElementById('maxPositions').textContent = maxConcurrentTrades;
+                        
+                        // Update risk level from settings
+                        const riskPerTrade = data.settings.riskPerTrade || 2.0;
+                        let riskLevel = 'MODERATE';
+                        if (riskPerTrade <= 1.0) riskLevel = 'LOW';
+                        else if (riskPerTrade >= 5.0) riskLevel = 'HIGH';
+                        document.getElementById('riskLevel').textContent = riskLevel;
+                        
+                        // Update AI confidence from settings
+                        const confidenceThreshold = data.settings.confidenceThreshold || 75;
+                        document.getElementById('aiConfidence').textContent = `${confidenceThreshold}%`;
+                        
+                        // Update auto execute from settings
+                        const autoExecute = data.settings.autoExecute || false;
+                        document.getElementById('autoExecute').checked = autoExecute;
                     }
                 })
                 .catch(error => {
