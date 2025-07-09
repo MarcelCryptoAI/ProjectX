@@ -97,6 +97,7 @@ class AIWorker:
         self.database = TradingDatabase()
         # Direct pybit integration - no separate executor needed
         self.max_concurrent_trades = int(os.getenv('MAX_CONCURRENT_TRADES', 5))
+        self.active_trades = {}  # Track active trades for SL management
         if bybit_session:
             self.console_logger.log('INFO', '✅ Direct pybit trading ready')
         else:
@@ -146,6 +147,9 @@ class AIWorker:
                 
                 # Generate trading signals
                 self._generate_signals()
+                
+                # Monitor trades and move stop loss if needed
+                self.monitor_trades_and_move_sl()
                 
                 # Update statistics
                 self._update_statistics()
@@ -666,34 +670,92 @@ class AIWorker:
                 self.console_logger.log('SUCCESS', f'✅ Order placed: {order_id}')
                 self.console_logger.log('INFO', f'📊 Details: {qty} {symbol}, SL: ${stop_loss_price:.4f}, TP: ${take_profit_price:.4f}')
                 
-                # Set stop loss and take profit (optional - can be done later)
+                # Set stop loss and take profit immediately after successful order
                 try:
-                    # Place stop loss order (conditional order)
-                    sl_params = {
-                        'category': 'linear',
-                        'symbol': symbol,
-                        'side': 'Sell' if side == 'Buy' else 'Buy',
-                        'orderType': 'Market',
-                        'qty': str(qty),
-                        'triggerPrice': str(stop_loss_price),
-                        'timeInForce': 'IOC'
-                    }
+                    # Place stop loss order (conditional market order)
+                    sl_result = self.bybit_session.place_order(
+                        category='linear',
+                        symbol=symbol,
+                        side='Sell' if side == 'Buy' else 'Buy',
+                        orderType='Market',
+                        qty=str(qty),
+                        triggerPrice=str(stop_loss_price),
+                        timeInForce='IOC'
+                    )
                     
-                    # Place take profit order (limit order)
-                    tp_params = {
-                        'category': 'linear',
-                        'symbol': symbol,
-                        'side': 'Sell' if side == 'Buy' else 'Buy',
-                        'orderType': 'Limit',
-                        'qty': str(qty),
-                        'price': str(take_profit_price),
-                        'timeInForce': 'GTC'
-                    }
+                    if sl_result and 'result' in sl_result:
+                        sl_order_id = sl_result['result']['orderId']
+                        self.console_logger.log('SUCCESS', f'✅ Stop Loss set: {sl_order_id} @ ${stop_loss_price:.4f}')
+                    else:
+                        self.console_logger.log('WARNING', f'⚠️ Stop Loss failed: {sl_result.get("retMsg", "Unknown error")}')
                     
-                    self.console_logger.log('INFO', f'🎯 SL/TP orders will be managed automatically')
+                    # Handle partial take profit levels if enabled
+                    if signal.get('partial_take_profit', False) and 'take_profit_levels' in signal:
+                        self.console_logger.log('INFO', f'📊 Setting up partial take profit with {len(signal["take_profit_levels"])} levels')
+                        
+                        for level in signal['take_profit_levels']:
+                            # Calculate quantity for this level
+                            level_qty = (qty * level['sell_percentage']) / 100
+                            level_price = current_price * (1 + level['percentage'] / 100) if side == 'Buy' else current_price * (1 - level['percentage'] / 100)
+                            
+                            # Place take profit order for this level
+                            tp_result = self.bybit_session.place_order(
+                                category='linear',
+                                symbol=symbol,
+                                side='Sell' if side == 'Buy' else 'Buy',
+                                orderType='Limit',
+                                qty=str(level_qty),
+                                price=str(level_price),
+                                timeInForce='GTC'
+                            )
+                            
+                            if tp_result and 'result' in tp_result:
+                                tp_order_id = tp_result['result']['orderId']
+                                self.console_logger.log('SUCCESS', f'✅ TP Level {level["level"]} set: {tp_order_id} @ ${level_price:.4f} ({level["sell_percentage"]}%)')
+                            else:
+                                self.console_logger.log('WARNING', f'⚠️ TP Level {level["level"]} failed: {tp_result.get("retMsg", "Unknown error")}')
+                    
+                    else:
+                        # Single take profit order
+                        tp_result = self.bybit_session.place_order(
+                            category='linear',
+                            symbol=symbol,
+                            side='Sell' if side == 'Buy' else 'Buy',
+                            orderType='Limit',
+                            qty=str(qty),
+                            price=str(take_profit_price),
+                            timeInForce='GTC'
+                        )
+                        
+                        if tp_result and 'result' in tp_result:
+                            tp_order_id = tp_result['result']['orderId']
+                            self.console_logger.log('SUCCESS', f'✅ Take Profit set: {tp_order_id} @ ${take_profit_price:.4f}')
+                        else:
+                            self.console_logger.log('WARNING', f'⚠️ Take Profit failed: {tp_result.get("retMsg", "Unknown error")}')
+                    
+                    # Log moving stop loss info if enabled
+                    if signal.get('move_stop_loss_on_partial_tp', False):
+                        self.console_logger.log('INFO', f'📈 Moving stop loss to breakeven enabled for partial profits')
+                        
+                        # Store trade info for monitoring
+                        trade_info = {
+                            'symbol': symbol,
+                            'side': side,
+                            'entry_price': current_price,
+                            'sl_order_id': sl_order_id if 'sl_order_id' in locals() else None,
+                            'move_sl_to_breakeven': True,
+                            'partial_tp_enabled': True,
+                            'timestamp': datetime.now().isoformat()
+                        }
+                        
+                        # Start monitoring thread for this trade
+                        if hasattr(self, 'active_trades'):
+                            self.active_trades[order_id] = trade_info
+                        else:
+                            self.active_trades = {order_id: trade_info}
                     
                 except Exception as tp_sl_error:
-                    self.console_logger.log('WARNING', f'⚠️ Failed to set SL/TP: {str(tp_sl_error)}')
+                    self.console_logger.log('ERROR', f'❌ Failed to set SL/TP: {str(tp_sl_error)}')
                 
                 return True
             else:
@@ -710,6 +772,77 @@ class AIWorker:
         except Exception as e:
             self.console_logger.log('ERROR', f'❌ Trade execution error: {str(e)}')
             return False
+    
+    def monitor_trades_and_move_sl(self):
+        """Monitor active trades and move stop loss to breakeven when first TP is hit"""
+        if not hasattr(self, 'active_trades') or not self.active_trades:
+            return
+        
+        try:
+            # Get current positions
+            positions = self.bybit_session.get_positions(category="linear")
+            if not positions or 'result' not in positions:
+                return
+            
+            for position in positions['result']['list']:
+                symbol = position['symbol']
+                side = position['side']
+                unrealized_pnl = float(position['unrealisedPnl'])
+                
+                # Find matching active trade
+                for order_id, trade_info in list(self.active_trades.items()):
+                    if (trade_info['symbol'] == symbol and 
+                        trade_info['side'] == side and 
+                        trade_info['move_sl_to_breakeven'] and 
+                        unrealized_pnl > 0):  # Position is in profit
+                        
+                        # Move stop loss to breakeven
+                        entry_price = trade_info['entry_price']
+                        sl_order_id = trade_info.get('sl_order_id')
+                        
+                        if sl_order_id:
+                            try:
+                                # Cancel existing stop loss
+                                cancel_result = self.bybit_session.cancel_order(
+                                    category='linear',
+                                    symbol=symbol,
+                                    orderId=sl_order_id
+                                )
+                                
+                                if cancel_result and 'result' in cancel_result:
+                                    self.console_logger.log('SUCCESS', f'✅ Cancelled old SL: {sl_order_id}')
+                                    
+                                    # Place new stop loss at breakeven
+                                    new_sl_result = self.bybit_session.place_order(
+                                        category='linear',
+                                        symbol=symbol,
+                                        side='Sell' if side == 'Buy' else 'Buy',
+                                        orderType='Market',
+                                        qty=position['size'],
+                                        triggerPrice=str(entry_price),
+                                        timeInForce='IOC'
+                                    )
+                                    
+                                    if new_sl_result and 'result' in new_sl_result:
+                                        new_sl_id = new_sl_result['result']['orderId']
+                                        self.console_logger.log('SUCCESS', f'✅ Moved SL to breakeven: {new_sl_id} @ ${entry_price:.4f}')
+                                        
+                                        # Update trade info
+                                        trade_info['sl_order_id'] = new_sl_id
+                                        trade_info['move_sl_to_breakeven'] = False  # Don't move again
+                                        
+                                    else:
+                                        self.console_logger.log('WARNING', f'⚠️ Failed to set new SL at breakeven')
+                                        
+                            except Exception as sl_error:
+                                self.console_logger.log('ERROR', f'❌ Failed to move SL to breakeven: {str(sl_error)}')
+                        
+                        # Remove from active monitoring once moved
+                        if not trade_info['move_sl_to_breakeven']:
+                            del self.active_trades[order_id]
+                            
+        except Exception as e:
+            self.console_logger.log('ERROR', f'❌ Trade monitoring error: {str(e)}')
 
 # Global worker instance
 ai_worker = None
