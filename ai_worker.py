@@ -118,6 +118,64 @@ class AIWorker:
             'overall_progress': 0,
             'batch_results': []
         }
+    
+    def get_supported_symbols(self):
+        """Get supported symbols from database"""
+        try:
+            symbols = self.database.get_supported_symbols()
+            # Filter only active symbols and extract symbol names
+            active_symbols = [s['symbol'] for s in symbols if s.get('status') == 'active']
+            
+            if not active_symbols:
+                self.console_logger.log('WARNING', 'No active symbols found in database, attempting to refresh from ByBit')
+                # Try to refresh symbols from ByBit if database is empty
+                self._refresh_symbols_from_bybit()
+                # Try again after refresh
+                symbols = self.database.get_supported_symbols()
+                active_symbols = [s['symbol'] for s in symbols if s.get('status') == 'active']
+            
+            self.console_logger.log('INFO', f'📊 Found {len(active_symbols)} active symbols in database')
+            return active_symbols
+        except Exception as e:
+            self.console_logger.log('ERROR', f'Failed to get supported symbols from database: {str(e)}')
+            return []
+    
+    def _refresh_symbols_from_bybit(self):
+        """Refresh symbols from ByBit API"""
+        try:
+            if not self.bybit_session:
+                self.console_logger.log('WARNING', 'ByBit session not available for symbol refresh')
+                return
+                
+            self.console_logger.log('INFO', 'Refreshing symbols from ByBit API...')
+            instruments = self.bybit_session.get_instruments_info(category="linear")
+            
+            if not instruments or 'result' not in instruments:
+                self.console_logger.log('ERROR', 'Failed to fetch instruments from ByBit')
+                return
+            
+            symbols_data = []
+            for instrument in instruments['result']['list']:
+                if instrument['symbol'].endswith('USDT'):  # Only USDT pairs
+                    leverage_filter = instrument.get('leverageFilter', {})
+                    symbol_data = {
+                        'symbol': instrument['symbol'],
+                        'base_currency': instrument['baseCoin'],
+                        'quote_currency': instrument['quoteCoin'],
+                        'status': 'active' if instrument['status'] == 'Trading' else 'inactive',
+                        'min_order_qty': float(instrument['lotSizeFilter']['minOrderQty']),
+                        'qty_step': float(instrument['lotSizeFilter']['qtyStep']),
+                        'min_leverage': float(leverage_filter.get('minLeverage', 1)),
+                        'max_leverage': float(leverage_filter.get('maxLeverage', 10))
+                    }
+                    symbols_data.append(symbol_data)
+            
+            # Save to database
+            self.database.refresh_supported_symbols(symbols_data)
+            self.console_logger.log('SUCCESS', f'✅ Refreshed {len(symbols_data)} symbols from ByBit')
+            
+        except Exception as e:
+            self.console_logger.log('ERROR', f'Failed to refresh symbols from ByBit: {str(e)}')
         
     def start(self):
         """Start the AI worker and resume on-hold trades"""
@@ -213,11 +271,15 @@ class AIWorker:
     def _train_model_comprehensive(self):
         """Comprehensive AI model training with batch processing"""
         try:
-            # Get enabled trading pairs
-            enabled_pairs = self.settings.bot.get('enabled_pairs', ['BTCUSDT', 'ETHUSDT'])
+            # Get supported symbols from database first, fallback to settings
+            enabled_pairs = self.get_supported_symbols()
             
             if not enabled_pairs:
-                self.console_logger.log('WARNING', 'No trading pairs enabled for training')
+                self.console_logger.log('WARNING', 'No supported symbols found in database, using settings fallback')
+                enabled_pairs = self.settings.bot.get('enabled_pairs', ['BTCUSDT', 'ETHUSDT'])
+            
+            if not enabled_pairs:
+                self.console_logger.log('ERROR', 'No trading pairs enabled for training')
                 return
             
             # Initialize training session

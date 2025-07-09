@@ -3903,7 +3903,9 @@ def refresh_symbols():
         return jsonify({
             'success': True,
             'message': f'Refreshed {len(symbols_data)} symbols',
-            'count': len(symbols_data)
+            'count': len(symbols_data),
+            'symbols_count': len(symbols_data),
+            'total_symbols': len(symbols_data)
         })
         
     except Exception as e:
@@ -3927,6 +3929,40 @@ def get_symbols_info():
             'symbols': symbols,
             'last_updated': last_updated.isoformat() if last_updated else None,
             'count': len(symbols)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/training_symbols')
+def get_training_symbols():
+    """Get symbols that will be used for training"""
+    try:
+        from database import TradingDatabase
+        db = TradingDatabase()
+        
+        # Get active symbols from database
+        symbols = db.get_supported_symbols()
+        active_symbols = [s for s in symbols if s.get('status') == 'active']
+        
+        # Get fallback symbols from settings
+        from utils.settings_loader import Settings
+        try:
+            settings = Settings.load('config/settings.yaml')
+            fallback_symbols = settings.bot.get('enabled_pairs', ['BTCUSDT', 'ETHUSDT'])
+        except:
+            fallback_symbols = ['BTCUSDT', 'ETHUSDT']
+        
+        return jsonify({
+            'success': True,
+            'active_symbols': [s['symbol'] for s in active_symbols],
+            'active_count': len(active_symbols),
+            'fallback_symbols': fallback_symbols,
+            'using_database': len(active_symbols) > 0,
+            'last_updated': db.get_symbols_last_updated().isoformat() if db.get_symbols_last_updated() else None
         })
         
     except Exception as e:

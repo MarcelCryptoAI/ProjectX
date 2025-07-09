@@ -655,6 +655,31 @@
                             </div>
                         </div>
                     </div>
+                    <div class="mt-4 p-4 border border-neon-green/30 rounded-lg bg-green-900/20">
+                        <div class="text-sm text-neon-green">
+                            <i class="fas fa-info-circle mr-2"></i><strong>Training Integration:</strong> AI model training now uses the supported coins list from this database instead of hardcoded settings. When you start training, only active coins will be included.
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button class="cyber-button py-2 px-4 rounded-lg" onclick="checkTrainingSymbols()" id="checkTrainingBtn">
+                            <i class="fas fa-eye mr-2"></i>Check Training Symbols
+                        </button>
+                        <div class="form-text mt-2">View which coins will be used for AI model training</div>
+                    </div>
+                    <div class="mt-4" id="trainingSymbolsInfo" style="display: none;">
+                        <div class="bg-dark-bg rounded-lg p-4 border border-neon-cyan/20">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-bold text-neon-cyan">Training Symbols Status</span>
+                                <span class="text-sm font-mono text-neon-yellow" id="trainingSymbolsCount">0</span>
+                            </div>
+                            <div class="text-sm text-gray-400 mb-2">
+                                <span id="trainingSymbolsStatus">Unknown</span>
+                            </div>
+                            <div class="max-h-40 overflow-y-auto">
+                                <div id="trainingSymbolsList" class="text-xs font-mono text-gray-300"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -967,10 +992,10 @@
                             clearInterval(progressInterval);
                             
                             // Update displays
-                            document.getElementById('symbolsCount').textContent = data.symbols_count || 'Updated';
+                            document.getElementById('symbolsCount').textContent = data.count || 'Updated';
                             document.getElementById('symbolsLastUpdated').textContent = new Date().toLocaleString();
                             
-                            showNotification(`Successfully refreshed ${data.symbols_count || 'symbols'} coins!`, 'success');
+                            showNotification(`Successfully refreshed ${data.count || 'symbols'} coins!`, 'success');
                             
                             // Hide progress after delay
                             setTimeout(() => {
@@ -1001,7 +1026,7 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        document.getElementById('symbolsCount').textContent = data.symbols_count || 'Unknown';
+                        document.getElementById('symbolsCount').textContent = data.count || 'Unknown';
                         document.getElementById('symbolsLastUpdated').textContent = 
                             data.last_updated ? new Date(data.last_updated).toLocaleString() : 'Never';
                     }
@@ -1010,6 +1035,53 @@
                     console.error('Error loading symbols info:', error);
                     document.getElementById('symbolsCount').textContent = 'Error';
                     document.getElementById('symbolsLastUpdated').textContent = 'Error';
+                });
+        }
+        
+        // Check training symbols
+        function checkTrainingSymbols() {
+            const btn = document.getElementById('checkTrainingBtn');
+            const info = document.getElementById('trainingSymbolsInfo');
+            const count = document.getElementById('trainingSymbolsCount');
+            const status = document.getElementById('trainingSymbolsStatus');
+            const list = document.getElementById('trainingSymbolsList');
+            
+            // Show loading
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Checking...';
+            info.style.display = 'block';
+            
+            fetch('/api/training_symbols')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.using_database) {
+                            count.textContent = data.active_count;
+                            status.textContent = `Using ${data.active_count} coins from database (last updated: ${data.last_updated ? new Date(data.last_updated).toLocaleString() : 'Never'})`;
+                            list.innerHTML = data.active_symbols.map(symbol => `<span class="inline-block bg-neon-cyan/20 text-neon-cyan px-2 py-1 rounded text-xs mr-1 mb-1">${symbol}</span>`).join('');
+                        } else {
+                            count.textContent = data.fallback_symbols.length;
+                            status.textContent = `Using ${data.fallback_symbols.length} fallback coins from settings (database is empty)`;
+                            list.innerHTML = data.fallback_symbols.map(symbol => `<span class="inline-block bg-neon-yellow/20 text-neon-yellow px-2 py-1 rounded text-xs mr-1 mb-1">${symbol}</span>`).join('');
+                        }
+                        
+                        showNotification('Training symbols checked successfully!', 'success');
+                    } else {
+                        showNotification('Failed to check training symbols: ' + data.error, 'error');
+                        status.textContent = 'Error checking training symbols';
+                        count.textContent = 'Error';
+                        list.innerHTML = '';
+                    }
+                })
+                .catch(error => {
+                    showNotification('Error checking training symbols: ' + error.message, 'error');
+                    status.textContent = 'Error checking training symbols';
+                    count.textContent = 'Error';
+                    list.innerHTML = '';
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-eye mr-2"></i>Check Training Symbols';
                 });
         }
         
