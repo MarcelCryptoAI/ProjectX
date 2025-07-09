@@ -205,20 +205,31 @@
         function loadOrderHistory() {
             const timeFilter = document.getElementById('timeFilter').value;
             
+            console.log('Loading order history with period:', timeFilter);
+            
             fetch(`/api/order_history?period=${timeFilter}`)
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Order history response:', data);
                     if (data.success) {
                         allOrders = data.orders || [];
                         updateStats(data.stats);
                         displayOrders();
+                        
+                        if (data.error) {
+                            console.warn('API warning:', data.error);
+                        }
                     } else {
-                        showError('Failed to load order history');
+                        console.error('Order history failed:', data.error);
+                        showError(`Failed to load order history: ${data.error || 'Unknown error'}`);
                     }
                 })
                 .catch(error => {
                     console.error('Error loading orders:', error);
-                    showError('Connection error');
+                    showError(`Connection error: ${error.message}`);
                 });
         }
         
@@ -238,16 +249,20 @@
             const tableBody = document.getElementById('ordersTableBody');
             let filteredOrders = [...allOrders];
             
+            console.log('Displaying orders:', filteredOrders.length, 'total orders');
+            
             // Apply filter
             if (currentFilter === 'filled') {
                 filteredOrders = filteredOrders.filter(order => order.status === 'Filled');
             } else if (currentFilter === 'cancelled') {
                 filteredOrders = filteredOrders.filter(order => order.status === 'Cancelled');
             } else if (currentFilter === 'profit') {
-                filteredOrders = filteredOrders.filter(order => order.pnl > 0);
+                filteredOrders = filteredOrders.filter(order => (order.pnl || 0) > 0);
             } else if (currentFilter === 'loss') {
-                filteredOrders = filteredOrders.filter(order => order.pnl < 0);
+                filteredOrders = filteredOrders.filter(order => (order.pnl || 0) < 0);
             }
+            
+            console.log('Filtered orders:', filteredOrders.length, 'with filter:', currentFilter);
             
             // Apply sorting
             filteredOrders.sort((a, b) => {
@@ -290,10 +305,16 @@
                                    order.status === 'Cancelled' ? 'bg-red-900/50 text-red-400' : 
                                    'bg-yellow-900/50 text-yellow-400';
                 
+                const timestamp = order.timestamp ? 
+                    (typeof order.timestamp === 'string' ? 
+                        new Date(parseInt(order.timestamp)).toLocaleString() : 
+                        new Date(order.timestamp).toLocaleString()) : 
+                    'Unknown';
+                
                 return `
                     <tr class="border-b border-dark-border hover:bg-dark-panel/30 transition-colors">
                         <td class="px-6 py-4">
-                            <div class="text-sm">${new Date(order.timestamp).toLocaleString()}</div>
+                            <div class="text-sm">${timestamp}</div>
                         </td>
                         <td class="px-6 py-4">
                             <div class="font-bold text-white">${order.symbol}</div>
