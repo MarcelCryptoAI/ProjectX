@@ -352,6 +352,16 @@
                                     <input type="number" class="form-input w-full" id="defaultStopLoss" step="0.1" min="0.1" max="20" value="1.5">
                                 </div>
                                 <div>
+                                    <label for="minTakeProfit" class="form-label">Min Take Profit (%)</label>
+                                    <input type="number" class="form-input w-full" id="minTakeProfit" step="0.1" min="0.1" max="50" value="1.0">
+                                    <div class="form-text">Minimum allowed AI take profit</div>
+                                </div>
+                                <div>
+                                    <label for="maxTakeProfit" class="form-label">Max Take Profit (%)</label>
+                                    <input type="number" class="form-input w-full" id="maxTakeProfit" step="0.1" min="0.1" max="100" value="10.0">
+                                    <div class="form-text">Maximum allowed AI take profit</div>
+                                </div>
+                                <div>
                                     <label for="trailingStopLoss" class="form-label">Enable Trailing Stop Loss</label>
                                     <label class="switch">
                                         <input type="checkbox" id="trailingStopLoss" onchange="toggleTrailingStopOptions()">
@@ -864,6 +874,8 @@
                 minTradeAmount: parseFloat(document.getElementById('minTradeAmount').value),
                 defaultTakeProfit: parseFloat(document.getElementById('defaultTakeProfit').value),
                 defaultStopLoss: parseFloat(document.getElementById('defaultStopLoss').value),
+                minTakeProfit: parseFloat(document.getElementById('minTakeProfit').value),
+                maxTakeProfit: parseFloat(document.getElementById('maxTakeProfit').value),
                 trailingStopLoss: document.getElementById('trailingStopLoss').checked,
                 trailingStopValue: parseFloat(document.getElementById('trailingStopValue').value),
                 dynamicTakeProfit: document.getElementById('dynamicTakeProfit').checked,

@@ -562,6 +562,54 @@ class AIWorker:
             self.console_logger.log('WARNING', f'Failed to analyze sentiment for {symbol}: {str(e)}')
             return {}
     
+    def _analyze_market_conditions(self):
+        """Analyze overall market conditions for AI prediction"""
+        try:
+            # Get market data for major pairs
+            conditions = {
+                'volatility': {},
+                'trends': {},
+                'volumes': {},
+                'correlations': {}
+            }
+            
+            major_pairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
+            
+            for symbol in major_pairs:
+                market_data = self._collect_market_data(symbol)
+                if market_data and len(market_data) > 20:
+                    closes = np.array([float(kline[4]) for kline in market_data])
+                    volumes = np.array([float(kline[5]) for kline in market_data])
+                    
+                    # Calculate volatility (standard deviation of returns)
+                    returns = np.diff(closes) / closes[:-1]
+                    volatility = np.std(returns) * 100  # As percentage
+                    
+                    # Trend strength (price change over period)
+                    trend = ((closes[-1] - closes[0]) / closes[0]) * 100
+                    
+                    # Volume trend
+                    vol_trend = ((volumes[-1] - np.mean(volumes[:-5])) / np.mean(volumes[:-5])) * 100
+                    
+                    conditions['volatility'][symbol] = volatility
+                    conditions['trends'][symbol] = trend
+                    conditions['volumes'][symbol] = vol_trend
+            
+            # Overall market conditions
+            conditions['avg_volatility'] = np.mean(list(conditions['volatility'].values()))
+            conditions['market_trend'] = 'bullish' if np.mean(list(conditions['trends'].values())) > 0 else 'bearish'
+            conditions['volume_strength'] = np.mean(list(conditions['volumes'].values()))
+            
+            return conditions
+            
+        except Exception as e:
+            self.console_logger.log('WARNING', f'Failed to analyze market conditions: {str(e)}')
+            return {
+                'avg_volatility': 2.0,
+                'market_trend': 'neutral',
+                'volume_strength': 0
+            }
+    
     def _train_symbol_model(self, symbol, indicators, sentiment):
         """Train AI model for specific symbol"""
         try:
@@ -596,8 +644,10 @@ class AIWorker:
             return
             
         try:
-            # Get AI prediction
-            prediction = self.ai_trader.get_prediction()
+            # Get AI prediction with enhanced market analysis
+            # Pass current market conditions to AI for better TP calculation
+            market_conditions = self._analyze_market_conditions()
+            prediction = self.ai_trader.get_prediction(market_conditions)
             
             if prediction:
                 confidence = prediction['confidence']
@@ -1007,6 +1057,13 @@ class AIWorker:
             # Calculate stop loss and take profit from signal (AI determined)
             stop_loss_pct = float(signal.get('stop_loss', 2.0))  # AI determines SL
             take_profit_pct = float(signal.get('take_profit', 3.0))  # AI determines TP
+            
+            # Ensure take profit is within configured bounds
+            min_tp = self.settings.min_take_profit_percent
+            max_tp = self.settings.max_take_profit_percent
+            take_profit_pct = max(min_tp, min(max_tp, take_profit_pct))
+            
+            self.console_logger.log('INFO', f'📊 Using AI-determined TP: {take_profit_pct:.2f}% (bounds: {min_tp}-{max_tp}%)')
             
             if side == 'Buy':
                 stop_loss_price = current_price * (1 - stop_loss_pct / 100)

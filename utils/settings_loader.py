@@ -23,6 +23,14 @@ class Settings:
         return self.bot.get('take_profit_percent', 3.0)
 
     @property
+    def min_take_profit_percent(self):
+        return self.bot.get('min_take_profit_percent', 1.0)
+
+    @property
+    def max_take_profit_percent(self):
+        return self.bot.get('max_take_profit_percent', 10.0)
+
+    @property
     def stop_loss_percent(self):
         return self.bot.get('stop_loss_percent', 2.0)
 

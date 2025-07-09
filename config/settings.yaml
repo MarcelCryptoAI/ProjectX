@@ -216,6 +216,8 @@ bot:
   risk_per_trade_percent: 2
   stop_loss_percent: 2
   take_profit_percent: 3
+  min_take_profit_percent: 1
+  max_take_profit_percent: 10
   trailing_stop_percent: 1
 dashboard:
   password: changeme123

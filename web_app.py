@@ -3720,7 +3720,8 @@ def save_settings():
         if len(settings_data) > 1:  # More than just autoExecute
             required_settings = [
                 'riskPerTrade', 'maxConcurrentTrades', 'minTradeAmount',
-                'defaultTakeProfit', 'defaultStopLoss', 'confidenceThreshold'
+                'defaultTakeProfit', 'defaultStopLoss', 'minTakeProfit', 
+                'maxTakeProfit', 'confidenceThreshold'
             ]
             
             for setting in required_settings:
@@ -3776,6 +3777,8 @@ def load_settings():
             'minTradeAmount': 19,  # Default $19 minimum
             'defaultTakeProfit': 3.0,
             'defaultStopLoss': 1.5,
+            'minTakeProfit': 1.0,
+            'maxTakeProfit': 10.0,
             'trailingStopLoss': False,
             'trailingStopValue': 1.0,
             'dynamicTakeProfit': True,
