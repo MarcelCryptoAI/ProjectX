@@ -9,7 +9,7 @@ class AITrader:
         self.logger = logging.getLogger(__name__)
         
     def get_prediction(self, market_conditions=None):
-        """Get AI prediction for trading with dynamic take profit within bounds"""
+        """Get AI prediction for trading with dynamic take profit within bounds and perfect entry price"""
         # Get take profit bounds from settings
         min_tp = self.settings.min_take_profit_percent
         max_tp = self.settings.max_take_profit_percent
@@ -24,14 +24,21 @@ class AITrader:
         # In a real implementation, this would use ML models
         symbol, side, confidence = self._generate_trading_signal(market_conditions)
         
-        # Placeholder implementation with dynamic TP
+        # Calculate perfect entry price based on market analysis
+        perfect_entry_price = self._calculate_perfect_entry_price(symbol, side, market_conditions)
+        
+        # Calculate AI-advised stop loss based on market conditions
+        ai_stop_loss = self._calculate_dynamic_stop_loss(market_conditions)
+        
+        # Placeholder implementation with dynamic TP and perfect entry
         return {
             'symbol': symbol,
             'side': side,
             'confidence': confidence,
             'timestamp': datetime.now(),
             'take_profit': ai_take_profit,
-            'stop_loss': self.settings.stop_loss_percent,
+            'stop_loss': ai_stop_loss,
+            'entry_price': perfect_entry_price,
             'leverage': self._calculate_dynamic_leverage(confidence, market_conditions),
             'amount': 100,
             'accuracy': 70 + random.uniform(0, 25)  # 70-95% range
@@ -116,6 +123,83 @@ class AITrader:
         confidence = max(60, min(95, confidence))
         
         return symbol, side, confidence
+    
+    def _calculate_perfect_entry_price(self, symbol, side, market_conditions=None):
+        """Calculate perfect entry price based on market analysis and support/resistance levels"""
+        # In a real implementation, this would analyze:
+        # - Support and resistance levels
+        # - Order book depth
+        # - Recent price action
+        # - Volume profile
+        # - Market microstructure
+        
+        # For now, simulate intelligent entry pricing
+        base_adjustment = 0.001  # 0.1% base adjustment
+        
+        if market_conditions:
+            volatility = market_conditions.get('avg_volatility', 2.0)
+            market_trend = market_conditions.get('market_trend', 'neutral')
+            volume_strength = market_conditions.get('volume_strength', 0)
+            
+            # Adjust entry based on volatility (higher volatility = more conservative entry)
+            volatility_factor = min(0.005, volatility * 0.001)  # Cap at 0.5%
+            
+            # Adjust for market trend alignment
+            trend_factor = 0
+            if market_trend == 'bullish' and side == 'Buy':
+                trend_factor = -0.001  # Slightly more aggressive on aligned trend
+            elif market_trend == 'bearish' and side == 'Sell':
+                trend_factor = -0.001  # Slightly more aggressive on aligned trend
+            else:
+                trend_factor = 0.001  # More conservative on counter-trend
+            
+            # Volume-based adjustment
+            volume_factor = 0
+            if volume_strength > 50:  # High volume = more aggressive entry
+                volume_factor = -0.0005
+            elif volume_strength < -50:  # Low volume = more conservative
+                volume_factor = 0.0005
+            
+            # Calculate final adjustment
+            final_adjustment = base_adjustment + volatility_factor + trend_factor + volume_factor
+            
+            # For buy orders, place slightly below market
+            # For sell orders, place slightly above market
+            if side == 'Buy':
+                price_adjustment = -abs(final_adjustment)  # Always negative for buy
+            else:
+                price_adjustment = abs(final_adjustment)   # Always positive for sell
+        else:
+            # Simple fallback
+            price_adjustment = -base_adjustment if side == 'Buy' else base_adjustment
+        
+        # Return the adjustment factor (will be applied to current market price)
+        return price_adjustment
+    
+    def _calculate_dynamic_stop_loss(self, market_conditions=None):
+        """Calculate AI-advised stop loss based on market conditions"""
+        base_sl = self.settings.stop_loss_percent
+        
+        if market_conditions:
+            volatility = market_conditions.get('avg_volatility', 2.0)
+            
+            # Adjust stop loss based on volatility
+            # Higher volatility = wider stop loss
+            volatility_adjustment = min(1.0, volatility * 0.3)  # Max 1% adjustment
+            
+            # Add some AI randomness for variation
+            ai_variation = random.uniform(-0.2, 0.2)
+            
+            ai_sl = base_sl + volatility_adjustment + ai_variation
+            
+            # Ensure reasonable bounds (0.5% - 5%)
+            ai_sl = max(0.5, min(5.0, ai_sl))
+        else:
+            # Simple variation
+            ai_sl = base_sl + random.uniform(-0.5, 0.5)
+            ai_sl = max(0.5, min(5.0, ai_sl))
+        
+        return round(ai_sl, 2)
     
     def _calculate_dynamic_leverage(self, confidence, market_conditions=None):
         """Calculate dynamic leverage based on confidence and market conditions"""
