@@ -549,6 +549,10 @@ def signals():
 def order_history():
     return render_template('order_history.html')
 
+@app.route('/performance')
+def performance():
+    return render_template('performance.html')
+
 @app.route('/api/order_history')
 def get_order_history():
     """Get order history for this app's trades with pagination"""
@@ -4101,6 +4105,159 @@ def get_leverage_symbols_count():
         return jsonify({
             'success': True,
             'count': len(symbols)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# Performance Analysis Endpoints
+@app.route('/api/performance/analyze')
+def analyze_performance():
+    """Run performance analysis and return report"""
+    try:
+        import asyncio
+        from performance_analyzer import PerformanceAnalyzer
+        
+        analyzer = PerformanceAnalyzer()
+        
+        # Run analysis in async context
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        report = loop.run_until_complete(analyzer.run_full_analysis())
+        loop.close()
+        
+        return jsonify({
+            'success': True,
+            'report': report
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Performance analysis error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/performance/quick_check')
+def quick_performance_check():
+    """Quick performance check for dashboard loading issues"""
+    try:
+        import time
+        from datetime import datetime
+        
+        metrics = {
+            'timestamp': datetime.now().isoformat(),
+            'checks': []
+        }
+        
+        # Check API response times
+        api_endpoints = [
+            '/api/balance',
+            '/api/analytics_data',
+            '/api/trading_status'
+        ]
+        
+        for endpoint in api_endpoints:
+            start_time = time.time()
+            try:
+                # Make internal request
+                with app.test_client() as client:
+                    response = client.get(endpoint)
+                    response_time = time.time() - start_time
+                    
+                    metrics['checks'].append({
+                        'endpoint': endpoint,
+                        'response_time': response_time,
+                        'status_code': response.status_code,
+                        'status': 'slow' if response_time > 1.0 else 'ok'
+                    })
+            except Exception as e:
+                metrics['checks'].append({
+                    'endpoint': endpoint,
+                    'error': str(e),
+                    'status': 'error'
+                })
+        
+        # Check database size
+        import os
+        if os.path.exists('trading_bot.db'):
+            db_size_mb = os.path.getsize('trading_bot.db') / (1024**2)
+            metrics['database_size_mb'] = db_size_mb
+            metrics['database_status'] = 'large' if db_size_mb > 100 else 'ok'
+        
+        # Dashboard optimization suggestions
+        metrics['optimization_suggestions'] = [
+            {
+                'issue': 'Heavy JavaScript Libraries',
+                'impact': 'Slow initial page load',
+                'solution': 'Bundle and minify JS files, use CDN with preload hints'
+            },
+            {
+                'issue': 'Frequent API Polling',
+                'impact': 'Unnecessary server load',
+                'solution': 'Use WebSocket for real-time updates'
+            },
+            {
+                'issue': 'No Response Caching',
+                'impact': 'Redundant API calls',
+                'solution': 'Implement client-side caching with 60s TTL'
+            },
+            {
+                'issue': 'Large Data Transfers',
+                'impact': 'Slow data loading',
+                'solution': 'Implement pagination and data compression'
+            }
+        ]
+        
+        return jsonify({
+            'success': True,
+            'metrics': metrics
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/performance/optimize_cache', methods=['POST'])
+def optimize_cache():
+    """Enable caching optimization for better performance"""
+    try:
+        # Add cache headers to responses
+        @app.after_request
+        def add_cache_headers(response):
+            # Cache static API responses
+            if request.path.startswith('/api/') and request.method == 'GET':
+                # Different cache times for different endpoints
+                if 'balance' in request.path:
+                    response.headers['Cache-Control'] = 'private, max-age=60'  # 1 minute
+                elif 'analytics' in request.path:
+                    response.headers['Cache-Control'] = 'private, max-age=300'  # 5 minutes
+                elif 'status' in request.path:
+                    response.headers['Cache-Control'] = 'private, max-age=30'  # 30 seconds
+                else:
+                    response.headers['Cache-Control'] = 'private, max-age=120'  # 2 minutes default
+                
+                # Add ETag for conditional requests
+                import hashlib
+                etag = hashlib.md5(response.get_data()).hexdigest()
+                response.headers['ETag'] = etag
+                
+            return response
+        
+        return jsonify({
+            'success': True,
+            'message': 'Caching optimization enabled',
+            'details': {
+                'balance_cache': '60 seconds',
+                'analytics_cache': '5 minutes',
+                'status_cache': '30 seconds',
+                'default_cache': '2 minutes'
+            }
         })
         
     except Exception as e:

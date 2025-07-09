@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Analysis - A.R.I.E Trading Bot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'neon-cyan': '#00D9FF',
+                        'neon-yellow': '#FFD700',
+                        'neon-pink': '#CC0000',
+                        'neon-green': '#008844',
+                        'neon-orange': '#FF6B00',
+                        'dark-bg': '#0A0A0F',
+                        'dark-panel': '#0F0F1A',
+                        'dark-border': '#1A1A2E',
+                        'dark-hover': '#16213E'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
+                        'mono': ['SF Mono', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: #0A0A0F;
+        }
+        
+        .glass-panel {
+            background: rgba(15, 15, 26, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 0 40px rgba(0, 217, 255, 0.1);
+        }
+        
+        .status-good {
+            color: #008844;
+            text-shadow: 0 0 10px #008844;
+        }
+        
+        .status-warning {
+            color: #FFD700;
+            text-shadow: 0 0 10px #FFD700;
+        }
+        
+        .status-critical {
+            color: #CC0000;
+            text-shadow: 0 0 10px #CC0000;
+        }
+        
+        .loading-spinner {
+            border: 3px solid rgba(0, 217, 255, 0.1);
+            border-radius: 50%;
+            border-top: 3px solid #00D9FF;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .progress-bar {
+            background: linear-gradient(90deg, #00D9FF 0%, #FFD700 50%, #CC0000 100%);
+            transition: width 0.5s ease;
+        }
+    </style>
+</head>
+<body class="bg-dark-bg text-white font-sans min-h-screen">
+    <!-- Include shared header -->
+    {% include 'includes/header.html' %}
+
+    <div class="container mx-auto px-4 py-8">
+        <!-- Page Title -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold text-white flex items-center">
+                <i class="fas fa-tachometer-alt mr-4 text-neon-cyan"></i>
+                Performance Analysis
+            </h1>
+            <p class="text-gray-400 mt-2">Comprehensive system performance monitoring and optimization</p>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <button onclick="runQuickCheck()" class="glass-panel rounded-xl p-6 hover:scale-105 transition-transform cursor-pointer">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">Quick Check</h3>
+                        <p class="text-sm text-gray-400 mt-1">Fast performance scan</p>
+                    </div>
+                    <i class="fas fa-bolt text-3xl text-neon-yellow"></i>
+                </div>
+            </button>
+
+            <button onclick="runFullAnalysis()" class="glass-panel rounded-xl p-6 hover:scale-105 transition-transform cursor-pointer">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">Full Analysis</h3>
+                        <p class="text-sm text-gray-400 mt-1">Comprehensive scan</p>
+                    </div>
+                    <i class="fas fa-microscope text-3xl text-neon-cyan"></i>
+                </div>
+            </button>
+
+            <button onclick="enableOptimizations()" class="glass-panel rounded-xl p-6 hover:scale-105 transition-transform cursor-pointer">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">Enable Cache</h3>
+                        <p class="text-sm text-gray-400 mt-1">Optimize performance</p>
+                    </div>
+                    <i class="fas fa-rocket text-3xl text-neon-green"></i>
+                </div>
+            </button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="hidden">
+            <div class="glass-panel rounded-xl p-8 text-center">
+                <div class="loading-spinner mx-auto mb-4"></div>
+                <p class="text-gray-400">Running performance analysis...</p>
+            </div>
+        </div>
+
+        <!-- Quick Check Results -->
+        <div id="quickResults" class="hidden space-y-6">
+            <!-- API Response Times -->
+            <div class="glass-panel rounded-xl p-6">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center">
+                    <i class="fas fa-network-wired mr-3 text-neon-cyan"></i>
+                    API Response Times
+                </h2>
+                <div id="apiMetrics" class="space-y-3"></div>
+            </div>
+
+            <!-- Database Status -->
+            <div class="glass-panel rounded-xl p-6">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center">
+                    <i class="fas fa-database mr-3 text-neon-yellow"></i>
+                    Database Status
+                </h2>
+                <div id="dbMetrics"></div>
+            </div>
+
+            <!-- Optimization Suggestions -->
+            <div class="glass-panel rounded-xl p-6">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center">
+                    <i class="fas fa-lightbulb mr-3 text-neon-green"></i>
+                    Optimization Suggestions
+                </h2>
+                <div id="suggestions" class="space-y-4"></div>
+            </div>
+        </div>
+
+        <!-- Full Analysis Results -->
+        <div id="fullResults" class="hidden space-y-6">
+            <!-- Overall Status -->
+            <div class="glass-panel rounded-xl p-6">
+                <h2 class="text-2xl font-bold text-white mb-4">System Performance Overview</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="text-center">
+                        <p class="text-gray-400 mb-2">Overall Status</p>
+                        <p id="overallStatus" class="text-3xl font-bold"></p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-gray-400 mb-2">Critical Issues</p>
+                        <p id="criticalCount" class="text-3xl font-bold text-neon-pink">0</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-gray-400 mb-2">Warnings</p>
+                        <p id="warningCount" class="text-3xl font-bold text-neon-yellow">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Resources -->
+            <div class="glass-panel rounded-xl p-6">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center">
+                    <i class="fas fa-server mr-3 text-neon-cyan"></i>
+                    System Resources
+                </h2>
+                <div id="systemResources" class="space-y-4"></div>
+            </div>
+
+            <!-- Performance Metrics -->
+            <div class="glass-panel rounded-xl p-6">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center">
+                    <i class="fas fa-chart-line mr-3 text-neon-yellow"></i>
+                    Performance Metrics
+                </h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full" id="metricsTable">
+                        <thead>
+                            <tr class="border-b border-dark-border">
+                                <th class="text-left py-3 text-gray-400">Metric</th>
+                                <th class="text-left py-3 text-gray-400">Value</th>
+                                <th class="text-left py-3 text-gray-400">Status</th>
+                                <th class="text-left py-3 text-gray-400">Recommendation</th>
+                            </tr>
+                        </thead>
+                        <tbody id="metricsBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Optimization Plan -->
+            <div class="glass-panel rounded-xl p-6">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center">
+                    <i class="fas fa-tasks mr-3 text-neon-green"></i>
+                    Optimization Plan
+                </h2>
+                <div id="optimizationPlan" class="space-y-6"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentReport = null;
+
+        function runQuickCheck() {
+            const loadingState = document.getElementById('loadingState');
+            const quickResults = document.getElementById('quickResults');
+            const fullResults = document.getElementById('fullResults');
+
+            loadingState.classList.remove('hidden');
+            quickResults.classList.add('hidden');
+            fullResults.classList.add('hidden');
+
+            fetch('/api/performance/quick_check')
+                .then(response => response.json())
+                .then(data => {
+                    loadingState.classList.add('hidden');
+                    
+                    if (data.success) {
+                        displayQuickResults(data.metrics);
+                        quickResults.classList.remove('hidden');
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    loadingState.classList.add('hidden');
+                    alert('Error running quick check: ' + error);
+                });
+        }
+
+        function displayQuickResults(metrics) {
+            // API Metrics
+            const apiMetrics = document.getElementById('apiMetrics');
+            apiMetrics.innerHTML = metrics.checks.map(check => `
+                <div class="flex items-center justify-between p-3 bg-dark-bg/50 rounded-lg">
+                    <span class="font-medium">${check.endpoint}</span>
+                    <div class="flex items-center space-x-3">
+                        ${check.response_time ? `
+                            <span class="text-gray-400">${(check.response_time * 1000).toFixed(0)}ms</span>
+                            <span class="status-${check.status === 'ok' ? 'good' : check.status === 'slow' ? 'warning' : 'critical'}">
+                                <i class="fas fa-circle text-xs"></i>
+                            </span>
+                        ` : `
+                            <span class="text-neon-pink">Error: ${check.error}</span>
+                        `}
+                    </div>
+                </div>
+            `).join('');
+
+            // Database Metrics
+            const dbMetrics = document.getElementById('dbMetrics');
+            dbMetrics.innerHTML = `
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-gray-400">Database Size</p>
+                        <p class="text-2xl font-bold">${metrics.database_size_mb ? metrics.database_size_mb.toFixed(2) + ' MB' : 'N/A'}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-400">Status</p>
+                        <p class="text-2xl font-bold status-${metrics.database_status === 'ok' ? 'good' : 'warning'}">
+                            ${metrics.database_status ? metrics.database_status.toUpperCase() : 'N/A'}
+                        </p>
+                    </div>
+                </div>
+            `;
+
+            // Optimization Suggestions
+            const suggestions = document.getElementById('suggestions');
+            suggestions.innerHTML = metrics.optimization_suggestions.map(suggestion => `
+                <div class="p-4 bg-dark-bg/50 rounded-lg border-l-4 border-neon-yellow">
+                    <h4 class="font-semibold text-neon-yellow mb-1">${suggestion.issue}</h4>
+                    <p class="text-sm text-gray-400 mb-2">Impact: ${suggestion.impact}</p>
+                    <p class="text-sm text-white">
+                        <i class="fas fa-lightbulb text-neon-green mr-2"></i>
+                        ${suggestion.solution}
+                    </p>
+                </div>
+            `).join('');
+        }
+
+        function runFullAnalysis() {
+            const loadingState = document.getElementById('loadingState');
+            const quickResults = document.getElementById('quickResults');
+            const fullResults = document.getElementById('fullResults');
+
+            loadingState.classList.remove('hidden');
+            quickResults.classList.add('hidden');
+            fullResults.classList.add('hidden');
+
+            fetch('/api/performance/analyze')
+                .then(response => response.json())
+                .then(data => {
+                    loadingState.classList.add('hidden');
+                    
+                    if (data.success) {
+                        currentReport = data.report;
+                        displayFullResults(data.report);
+                        fullResults.classList.remove('hidden');
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    loadingState.classList.add('hidden');
+                    alert('Error running full analysis: ' + error);
+                });
+        }
+
+        function displayFullResults(report) {
+            // Overall Status
+            const overallStatus = document.getElementById('overallStatus');
+            overallStatus.textContent = report.overall_status.toUpperCase();
+            overallStatus.className = `text-3xl font-bold status-${report.overall_status}`;
+
+            document.getElementById('criticalCount').textContent = report.critical_issues_count;
+            document.getElementById('warningCount').textContent = report.warning_issues_count;
+
+            // System Resources
+            const systemResources = document.getElementById('systemResources');
+            if (report.system_resources) {
+                const res = report.system_resources;
+                systemResources.innerHTML = `
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div class="p-4 bg-dark-bg/50 rounded-lg">
+                            <p class="text-gray-400 mb-1">CPU Usage</p>
+                            <p class="text-2xl font-bold">${res.cpu_percent}%</p>
+                            <div class="mt-2 w-full bg-gray-700 rounded-full h-2">
+                                <div class="progress-bar h-2 rounded-full" style="width: ${res.cpu_percent}%"></div>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-dark-bg/50 rounded-lg">
+                            <p class="text-gray-400 mb-1">Memory Usage</p>
+                            <p class="text-2xl font-bold">${res.memory_percent}%</p>
+                            <div class="mt-2 w-full bg-gray-700 rounded-full h-2">
+                                <div class="progress-bar h-2 rounded-full" style="width: ${res.memory_percent}%"></div>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-dark-bg/50 rounded-lg">
+                            <p class="text-gray-400 mb-1">Available Memory</p>
+                            <p class="text-2xl font-bold">${res.memory_available_gb.toFixed(2)} GB</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Performance Metrics Table
+            const metricsBody = document.getElementById('metricsBody');
+            if (report.metrics) {
+                metricsBody.innerHTML = report.metrics.map(metric => `
+                    <tr class="border-b border-dark-border">
+                        <td class="py-3">${metric.name.replace(/_/g, ' ')}</td>
+                        <td class="py-3">${metric.value.toFixed(2)} ${metric.unit}</td>
+                        <td class="py-3">
+                            <span class="status-${metric.status}">${metric.status.toUpperCase()}</span>
+                        </td>
+                        <td class="py-3 text-sm">${metric.recommendation || '-'}</td>
+                    </tr>
+                `).join('');
+            }
+
+            // Optimization Plan
+            const optimizationPlan = document.getElementById('optimizationPlan');
+            if (report.optimization_plan) {
+                const plan = report.optimization_plan;
+                
+                let planHTML = '';
+                
+                if (plan.immediate_actions && plan.immediate_actions.length > 0) {
+                    planHTML += `
+                        <div>
+                            <h3 class="text-lg font-semibold text-neon-pink mb-3">Immediate Actions</h3>
+                            <div class="space-y-2">
+                                ${plan.immediate_actions.map(action => `
+                                    <div class="p-3 bg-dark-bg/50 rounded-lg">
+                                        <p class="font-medium">${action.action}</p>
+                                        <p class="text-sm text-gray-400 mt-1">${action.details}</p>
+                                        <p class="text-sm text-neon-green mt-1">Expected: ${action.expected_improvement}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                if (plan.short_term_improvements && plan.short_term_improvements.length > 0) {
+                    planHTML += `
+                        <div>
+                            <h3 class="text-lg font-semibold text-neon-yellow mb-3">Short-term Improvements</h3>
+                            <div class="space-y-2">
+                                ${plan.short_term_improvements.map(action => `
+                                    <div class="p-3 bg-dark-bg/50 rounded-lg">
+                                        <p class="font-medium">${action.action}</p>
+                                        <p class="text-sm text-gray-400 mt-1">${action.details}</p>
+                                        <p class="text-sm text-neon-green mt-1">Expected: ${action.expected_improvement}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                if (plan.long_term_optimizations && plan.long_term_optimizations.length > 0) {
+                    planHTML += `
+                        <div>
+                            <h3 class="text-lg font-semibold text-neon-cyan mb-3">Long-term Optimizations</h3>
+                            <div class="space-y-2">
+                                ${plan.long_term_optimizations.map(action => `
+                                    <div class="p-3 bg-dark-bg/50 rounded-lg">
+                                        <p class="font-medium">${action.action}</p>
+                                        <p class="text-sm text-gray-400 mt-1">${action.details}</p>
+                                        <p class="text-sm text-neon-green mt-1">Expected: ${action.expected_improvement}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                optimizationPlan.innerHTML = planHTML;
+            }
+        }
+
+        function enableOptimizations() {
+            if (confirm('Enable caching optimizations? This will improve performance by caching API responses.')) {
+                fetch('/api/performance/optimize_cache', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Caching optimizations enabled!\n\n' + 
+                                  'Balance cache: ' + data.details.balance_cache + '\n' +
+                                  'Analytics cache: ' + data.details.analytics_cache + '\n' +
+                                  'Status cache: ' + data.details.status_cache + '\n' +
+                                  'Default cache: ' + data.details.default_cache);
+                        } else {
+                            alert('Error enabling optimizations: ' + data.error);
+                        }
+                    })
+                    .catch(error => {
+                        alert('Error: ' + error);
+                    });
+            }
+        }
+
+        // Auto-run quick check on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            runQuickCheck();
+        });
+    </script>
+</body>
+</html>
