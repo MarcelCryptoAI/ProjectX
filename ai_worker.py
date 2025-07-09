@@ -1031,6 +1031,7 @@ class AIWorker:
                 
                 # Store trade in active trades for monitoring
                 self.active_trades[order_id] = {
+                    'signal_id': signal.get('signal_id'),  # Add signal_id for P&L tracking
                     'symbol': symbol,
                     'side': side,
                     'quantity': total_qty,
@@ -1181,7 +1182,68 @@ class AIWorker:
                         break
                 
                 if not position_exists:
-                    # Position is closed, remove from active trades
+                    # Position is closed, calculate P&L and update signal
+                    try:
+                        # Get the signal_id from trade_data
+                        signal_id = trade_data.get('signal_id')
+                        entry_price = trade_data.get('entry_price')
+                        
+                        if signal_id and entry_price:
+                            # Get execution history to calculate actual P&L
+                            executions = self.bybit_session.get_executions(
+                                category="linear",
+                                symbol=symbol,
+                                limit=50
+                            )
+                            
+                            total_pnl = 0
+                            exit_price = 0
+                            exit_trades = []
+                            
+                            if executions and 'result' in executions:
+                                # Find recent executions for this symbol
+                                for execution in executions['result']['list']:
+                                    if execution.get('symbol') == symbol:
+                                        # Check if this execution is recent (within last hour)
+                                        exec_time = int(execution.get('execTime', 0))
+                                        current_time = int(datetime.now().timestamp() * 1000)
+                                        if current_time - exec_time < 3600000:  # 1 hour
+                                            if execution.get('side') != trade_data.get('side'):  # Exit trades
+                                                exit_trades.append(execution)
+                            
+                            if exit_trades:
+                                # Calculate weighted average exit price and total P&L
+                                total_qty = 0
+                                total_value = 0
+                                
+                                for exit_trade in exit_trades:
+                                    qty = float(exit_trade.get('execQty', 0))
+                                    price = float(exit_trade.get('execPrice', 0))
+                                    # Try different field names for realized PnL
+                                    pnl = float(exit_trade.get('closedPnl', 0)) or float(exit_trade.get('realizedPnl', 0))
+                                    
+                                    total_qty += qty
+                                    total_value += qty * price
+                                    total_pnl += pnl
+                                
+                                exit_price = total_value / total_qty if total_qty > 0 else 0
+                            
+                            # Update the signal with P&L data
+                            if total_pnl != 0 or exit_price != 0:
+                                self.database.update_signal_with_pnl(
+                                    signal_id=signal_id,
+                                    entry_price=entry_price,
+                                    exit_price=exit_price,
+                                    realized_pnl=total_pnl
+                                )
+                                
+                                win_loss = "WIN" if total_pnl > 0 else "LOSS"
+                                self.console_logger.log('SUCCESS', f'📊 Signal {signal_id} completed: {win_loss} ${total_pnl:.2f}')
+                    
+                    except Exception as pnl_error:
+                        self.console_logger.log('ERROR', f'❌ Error calculating P&L for {symbol}: {str(pnl_error)}')
+                    
+                    # Remove from active trades
                     self.console_logger.log('INFO', f'📊 Position closed for {symbol}, removing from active trades')
                     del self.active_trades[order_id]
                     

@@ -466,16 +466,37 @@
                     </button>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full">
+                    <table class="w-full" id="activePositionsTable">
                         <thead>
                             <tr class="border-b border-dark-border text-left">
-                                <th class="pb-3 text-gray-400 font-medium">Symbol</th>
-                                <th class="pb-3 text-gray-400 font-medium">Side</th>
-                                <th class="pb-3 text-gray-400 font-medium">Size</th>
-                                <th class="pb-3 text-gray-400 font-medium">Entry</th>
-                                <th class="pb-3 text-gray-400 font-medium">Current</th>
-                                <th class="pb-3 text-gray-400 font-medium">P&L</th>
-                                <th class="pb-3 text-gray-400 font-medium">ROI</th>
+                                <th class="pb-3 text-gray-400 font-medium cursor-pointer hover:text-neon-cyan transition-colors" onclick="sortTable('symbol')">
+                                    Symbol
+                                    <i class="fas fa-sort ml-1 text-xs" id="sort-icon-symbol"></i>
+                                </th>
+                                <th class="pb-3 text-gray-400 font-medium cursor-pointer hover:text-neon-cyan transition-colors" onclick="sortTable('side')">
+                                    Side
+                                    <i class="fas fa-sort ml-1 text-xs" id="sort-icon-side"></i>
+                                </th>
+                                <th class="pb-3 text-gray-400 font-medium cursor-pointer hover:text-neon-cyan transition-colors" onclick="sortTable('size')">
+                                    Size
+                                    <i class="fas fa-sort ml-1 text-xs" id="sort-icon-size"></i>
+                                </th>
+                                <th class="pb-3 text-gray-400 font-medium cursor-pointer hover:text-neon-cyan transition-colors" onclick="sortTable('entry')">
+                                    Entry
+                                    <i class="fas fa-sort ml-1 text-xs" id="sort-icon-entry"></i>
+                                </th>
+                                <th class="pb-3 text-gray-400 font-medium cursor-pointer hover:text-neon-cyan transition-colors" onclick="sortTable('current')">
+                                    Current
+                                    <i class="fas fa-sort ml-1 text-xs" id="sort-icon-current"></i>
+                                </th>
+                                <th class="pb-3 text-gray-400 font-medium cursor-pointer hover:text-neon-cyan transition-colors" onclick="sortTable('pnl')">
+                                    P&L
+                                    <i class="fas fa-sort ml-1 text-xs" id="sort-icon-pnl"></i>
+                                </th>
+                                <th class="pb-3 text-gray-400 font-medium cursor-pointer hover:text-neon-cyan transition-colors" onclick="sortTable('roi')">
+                                    ROI
+                                    <i class="fas fa-sort ml-1 text-xs" id="sort-icon-roi"></i>
+                                </th>
                                 <th class="pb-3 text-gray-400 font-medium">Actions</th>
                             </tr>
                         </thead>
@@ -553,6 +574,11 @@
         const socket = io();
         let roiChart, performanceChart;
         let currentROIPeriod = '1h';
+        
+        // Table sorting variables
+        let currentPositions = [];
+        let sortColumn = null;
+        let sortDirection = 'asc';
         
         // Initialize charts
         function initCharts() {
@@ -766,6 +792,7 @@
             const tbody = document.getElementById('positionsTable');
             
             if (!positions || positions.length === 0) {
+                currentPositions = [];
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="8" class="text-center py-8 text-gray-500">
@@ -774,6 +801,14 @@
                     </tr>
                 `;
                 return;
+            }
+            
+            // Store positions for sorting
+            currentPositions = positions;
+            
+            // Apply current sort if any
+            if (sortColumn) {
+                positions = sortPositions(positions, sortColumn, sortDirection);
             }
             
             tbody.innerHTML = positions.map(pos => {
@@ -1270,6 +1305,99 @@
                     .catch(error => {
                         addConsoleMessage('ERROR', `Error closing positions: ${error}`);
                     });
+            }
+        }
+        
+        // Table sorting functions
+        function sortTable(column) {
+            // If clicking the same column, toggle direction
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                // New column, default to ascending
+                sortColumn = column;
+                sortDirection = 'asc';
+            }
+            
+            // Update sort icons
+            updateSortIcons(column, sortDirection);
+            
+            // Re-render table with sorted data
+            updatePositionsTable(currentPositions);
+        }
+        
+        function sortPositions(positions, column, direction) {
+            const sortedPositions = [...positions];
+            
+            sortedPositions.sort((a, b) => {
+                let aVal, bVal;
+                
+                switch(column) {
+                    case 'symbol':
+                        aVal = a.symbol;
+                        bVal = b.symbol;
+                        break;
+                    case 'side':
+                        aVal = a.side;
+                        bVal = b.side;
+                        break;
+                    case 'size':
+                        aVal = parseFloat(a.size);
+                        bVal = parseFloat(b.size);
+                        break;
+                    case 'entry':
+                        aVal = parseFloat(a.avgPrice);
+                        bVal = parseFloat(b.avgPrice);
+                        break;
+                    case 'current':
+                        aVal = parseFloat(a.markPrice);
+                        bVal = parseFloat(b.markPrice);
+                        break;
+                    case 'pnl':
+                        aVal = parseFloat(a.unrealisedPnl || 0);
+                        bVal = parseFloat(b.unrealisedPnl || 0);
+                        break;
+                    case 'roi':
+                        aVal = parseFloat(a.percentage || 0);
+                        bVal = parseFloat(b.percentage || 0);
+                        break;
+                    default:
+                        return 0;
+                }
+                
+                // Handle string vs number comparison
+                if (typeof aVal === 'string' && typeof bVal === 'string') {
+                    return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                } else {
+                    if (direction === 'asc') {
+                        return aVal - bVal;
+                    } else {
+                        return bVal - aVal;
+                    }
+                }
+            });
+            
+            return sortedPositions;
+        }
+        
+        function updateSortIcons(activeColumn, direction) {
+            // Reset all sort icons
+            const columns = ['symbol', 'side', 'size', 'entry', 'current', 'pnl', 'roi'];
+            columns.forEach(col => {
+                const icon = document.getElementById(`sort-icon-${col}`);
+                if (icon) {
+                    icon.className = 'fas fa-sort ml-1 text-xs';
+                }
+            });
+            
+            // Update active column icon
+            const activeIcon = document.getElementById(`sort-icon-${activeColumn}`);
+            if (activeIcon) {
+                if (direction === 'asc') {
+                    activeIcon.className = 'fas fa-sort-up ml-1 text-xs text-neon-cyan';
+                } else {
+                    activeIcon.className = 'fas fa-sort-down ml-1 text-xs text-neon-cyan';
+                }
             }
         }
     </script>

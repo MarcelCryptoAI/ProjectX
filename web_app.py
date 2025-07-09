@@ -2342,49 +2342,52 @@ def get_analytics_data():
             db = TradingDatabase()
             signal_trades = db.get_trading_signals()
             
-            # Filter for executed/completed signal trades only
-            executed_signals = [s for s in signal_trades if s.get('status') == 'executed']
-            trades_data['total_trades'] = len(executed_signals)
+            # Filter for completed signal trades with P&L data
+            completed_signals = [s for s in signal_trades if s.get('status') == 'completed' and s.get('realized_pnl') is not None]
+            trades_data['total_trades'] = len(completed_signals)
             
-            # Get trade history for P&L calculation (but only count signal trades)
-            if history and 'result' in history and executed_signals:
-                trades_by_date = {}
+            # Calculate win/loss stats using stored P&L data
+            trades_by_date = {}
+            
+            for signal in completed_signals:
+                pnl = float(signal.get('realized_pnl', 0))
+                entry_price = float(signal.get('entry_price', 0)) if signal.get('entry_price') else 0
+                exit_price = float(signal.get('exit_price', 0)) if signal.get('exit_price') else 0
                 
-                # Match executed signals with actual trade history
-                for signal in executed_signals:
-                    signal_symbol = signal.get('symbol')
-                    signal_time = signal.get('updated_at')
-                    
-                    # Find corresponding trades in history
-                    for trade in history['result']['list']:
-                        if trade.get('symbol') == signal_symbol:
-                            trade_time = trade.get('execTime', '')
-                            
-                            # Track volume and fees for signal trades
-                            if trade_time:
-                                trade_value = float(trade.get('execQty', 0)) * float(trade.get('execPrice', 0))
-                                trades_data['total_volume'] += trade_value
-                                trades_data['total_fees'] += abs(float(trade.get('execFee', 0)))
-                                
-                                # Group by date
-                                trade_date = datetime.fromtimestamp(int(trade_time)/1000).strftime('%Y-%m-%d')
-                                if trade_date not in trades_by_date:
-                                    trades_by_date[trade_date] = {'volume': 0, 'pnl': 0, 'count': 0}
-                                trades_by_date[trade_date]['volume'] += trade_value
-                                trades_by_date[trade_date]['count'] += 1
-                                
-                                # Track P&L for signal trades
-                                pnl = float(trade.get('realizedPnl', 0)) if 'realizedPnl' in trade else 0
-                                if pnl > 0:
-                                    trades_data['winning_trades'] += 1
-                                    trades_data['total_profit'] += pnl
-                                    trades_data['largest_win'] = max(trades_data['largest_win'], pnl)
-                                elif pnl < 0:
-                                    trades_data['losing_trades'] += 1
-                                    trades_data['total_loss'] += abs(pnl)
-                                    trades_data['largest_loss'] = min(trades_data['largest_loss'], pnl)
+                # Track wins and losses
+                if pnl > 0:
+                    trades_data['winning_trades'] += 1
+                    trades_data['total_profit'] += pnl
+                    trades_data['largest_win'] = max(trades_data['largest_win'], pnl)
+                elif pnl < 0:
+                    trades_data['losing_trades'] += 1
+                    trades_data['total_loss'] += abs(pnl)
+                    trades_data['largest_loss'] = min(trades_data['largest_loss'], pnl)
                 
-                trades_data['trades_by_date'] = trades_by_date
+                # Calculate trade volume if we have entry/exit prices
+                if entry_price > 0 and signal.get('amount'):
+                    amount = float(signal.get('amount', 0))
+                    trade_value = amount * entry_price
+                    trades_data['total_volume'] += trade_value
+                
+                # Group by date using exit_time
+                if signal.get('exit_time'):
+                    try:
+                        exit_time = datetime.fromisoformat(str(signal.get('exit_time')).replace('Z', '+00:00'))
+                        trade_date = exit_time.strftime('%Y-%m-%d')
+                        
+                        if trade_date not in trades_by_date:
+                            trades_by_date[trade_date] = {'volume': 0, 'pnl': 0, 'count': 0}
+                        
+                        trades_by_date[trade_date]['pnl'] += pnl
+                        trades_by_date[trade_date]['count'] += 1
+                        
+                        if entry_price > 0 and signal.get('amount'):
+                            trades_by_date[trade_date]['volume'] += trade_value
+                    except:
+                        pass  # Skip if date parsing fails
+            
+            trades_data['trades_by_date'] = trades_by_date
                 
         except Exception as signal_error:
             # Fallback to empty data if signal database access fails

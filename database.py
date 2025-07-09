@@ -240,6 +240,10 @@ class TradingDatabase:
                     stop_loss DECIMAL(5,2),
                     status VARCHAR(20) DEFAULT 'waiting',
                     order_id VARCHAR(100),
+                    entry_price DECIMAL(20,8),
+                    exit_price DECIMAL(20,8),
+                    realized_pnl DECIMAL(20,8),
+                    exit_time TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -259,6 +263,10 @@ class TradingDatabase:
                     stop_loss REAL,
                     status TEXT DEFAULT 'waiting',
                     order_id TEXT,
+                    entry_price REAL,
+                    exit_price REAL,
+                    realized_pnl REAL,
+                    exit_time TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -320,6 +328,54 @@ class TradingDatabase:
         
         conn.commit()
         conn.close()
+        
+        # Run migration for existing tables
+        self.migrate_trading_signals_table()
+    
+    def migrate_trading_signals_table(self):
+        """Add new columns to existing trading_signals table"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Check if columns exist and add them if they don't
+            new_columns = [
+                ('entry_price', 'DECIMAL(20,8)' if self.use_postgres else 'REAL'),
+                ('exit_price', 'DECIMAL(20,8)' if self.use_postgres else 'REAL'),
+                ('realized_pnl', 'DECIMAL(20,8)' if self.use_postgres else 'REAL'),
+                ('exit_time', 'TIMESTAMP')
+            ]
+            
+            for column_name, column_type in new_columns:
+                try:
+                    if self.use_postgres:
+                        cursor.execute(f'''
+                            ALTER TABLE trading_signals 
+                            ADD COLUMN IF NOT EXISTS {column_name} {column_type}
+                        ''')
+                    else:
+                        # SQLite doesn't support IF NOT EXISTS for ALTER TABLE
+                        # First check if column exists
+                        cursor.execute("PRAGMA table_info(trading_signals)")
+                        columns = [col[1] for col in cursor.fetchall()]
+                        
+                        if column_name not in columns:
+                            cursor.execute(f'''
+                                ALTER TABLE trading_signals 
+                                ADD COLUMN {column_name} {column_type}
+                            ''')
+                except Exception as e:
+                    # Column might already exist, ignore the error
+                    pass
+            
+            conn.commit()
+            
+        except Exception as e:
+            print(f"Error migrating trading_signals table: {e}")
+            conn.rollback()
+        
+        finally:
+            conn.close()
     
     def load_settings(self):
         """Load settings from database"""
@@ -771,6 +827,34 @@ class TradingDatabase:
         
         conn.close()
     
+    def update_signal_with_pnl(self, signal_id, entry_price, exit_price, realized_pnl, exit_time=None):
+        """Update signal with P&L data when position is closed"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            placeholder = '%s' if self.use_postgres else '?'
+            
+            if exit_time is None:
+                exit_time = datetime.now()
+            
+            cursor.execute(f'''
+                UPDATE trading_signals 
+                SET entry_price = {placeholder}, exit_price = {placeholder}, 
+                    realized_pnl = {placeholder}, exit_time = {placeholder},
+                    status = 'completed', updated_at = CURRENT_TIMESTAMP
+                WHERE signal_id = {placeholder}
+            ''', (entry_price, exit_price, realized_pnl, exit_time, signal_id))
+            
+            conn.commit()
+            
+        except Exception as e:
+            print(f"Error updating signal with P&L: {e}")
+            conn.rollback()
+        
+        finally:
+            conn.close()
+    
     def get_trading_signals(self):
         """Get all trading signals"""
         conn = self.get_connection()
@@ -779,7 +863,8 @@ class TradingDatabase:
         try:
             cursor.execute('''
                 SELECT signal_id, symbol, side, confidence, accuracy, amount, leverage, 
-                       take_profit, stop_loss, status, order_id, created_at, updated_at
+                       take_profit, stop_loss, status, order_id, entry_price, exit_price, 
+                       realized_pnl, exit_time, created_at, updated_at
                 FROM trading_signals
                 ORDER BY created_at DESC
             ''')
@@ -800,8 +885,12 @@ class TradingDatabase:
                     'stop_loss': float(row[8]) if row[8] else 0,
                     'status': row[9],
                     'order_id': row[10],
-                    'created_at': row[11],
-                    'updated_at': row[12]
+                    'entry_price': float(row[11]) if row[11] else None,
+                    'exit_price': float(row[12]) if row[12] else None,
+                    'realized_pnl': float(row[13]) if row[13] else None,
+                    'exit_time': row[14],
+                    'created_at': row[15],
+                    'updated_at': row[16]
                 }
                 signals.append(signal)
             
