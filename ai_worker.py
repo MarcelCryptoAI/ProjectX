@@ -634,8 +634,11 @@ class AIWorker:
             
             # Execute signals until we reach max concurrent trades or run out of signals
             for signal in waiting_signals:
-                if active_trades_count >= self.max_concurrent_trades:
-                    self.console_logger.log('INFO', f'🚫 Max concurrent trades reached, stopping signal execution')
+                # Check current active count BEFORE each execution
+                current_active_count = self.get_active_positions_count()
+                
+                if current_active_count >= self.max_concurrent_trades:
+                    self.console_logger.log('INFO', f'🚫 Max concurrent trades reached ({current_active_count}/{self.max_concurrent_trades}), stopping signal execution')
                     break
                     
                 signals_processed += 1
@@ -664,9 +667,11 @@ class AIWorker:
                 if trade_result:
                     # Update signal status to executed
                     db.update_signal_status(signal['signal_id'], 'executed')
-                    active_trades_count += 1
                     trades_executed += 1
-                    self.console_logger.log('SUCCESS', f'✅ Signal executed for {signal["symbol"]} ({active_trades_count}/{self.max_concurrent_trades} trades active)')
+                    
+                    # Get updated count after execution
+                    new_active_count = self.get_active_positions_count()
+                    self.console_logger.log('SUCCESS', f'✅ Signal executed for {signal["symbol"]} ({new_active_count}/{self.max_concurrent_trades} trades active)')
                 else:
                     # Update signal status to failed and continue to next signal
                     db.update_signal_status(signal['signal_id'], 'failed')
@@ -739,22 +744,43 @@ class AIWorker:
             return 75.0  # Default fallback
     
     def get_active_positions_count(self):
-        """Get count of active positions"""
+        """Get count of active positions AND pending orders"""
         try:
             if not self.bybit_session:
                 return 0
             
+            # Count active positions
             positions = self.bybit_session.get_positions(
                 category="linear",
                 settleCoin="USDT"
             )
+            
+            positions_count = 0
             if positions and 'result' in positions and 'list' in positions['result']:
-                active_count = 0
                 for pos in positions['result']['list']:
                     if float(pos.get('size', 0)) > 0:
-                        active_count += 1
-                return active_count
-            return 0
+                        positions_count += 1
+            
+            # Count pending orders that are not yet filled
+            orders = self.bybit_session.get_open_orders(
+                category="linear",
+                settleCoin="USDT"
+            )
+            
+            pending_orders_count = 0
+            if orders and 'result' in orders and 'list' in orders['result']:
+                for order in orders['result']['list']:
+                    # Count only main entry orders (not TP/SL orders)
+                    # Skip if it's a TP or SL order by checking if reduceOnly is True
+                    if not order.get('reduceOnly', False):
+                        # This is a main entry order
+                        pending_orders_count += 1
+            
+            total_active = positions_count + pending_orders_count
+            self.console_logger.log('INFO', f'📊 Active count: {positions_count} positions + {pending_orders_count} pending orders = {total_active}')
+            
+            return total_active
+            
         except Exception as e:
             self.console_logger.log('ERROR', f'❌ Failed to get positions count: {str(e)}')
             return 0
