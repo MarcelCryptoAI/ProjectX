@@ -235,6 +235,11 @@
         socket.on('trading_signal', function(signal) {
             addSignal(signal);
             updateStats();
+            
+            // Check for auto-execute on new signals
+            if (document.getElementById('autoExecute').checked) {
+                setTimeout(checkForAutoExecuteSignals, 1000); // Small delay to let UI update
+            }
         });
         
         socket.on('signal_executed', function(data) {
@@ -252,12 +257,24 @@
                 .then(data => {
                     if (data.success) {
                         allSignals = data.signals || [];
+                        
+                        // Update auto-execute toggle state
+                        const autoExecuteToggle = document.getElementById('autoExecute');
+                        if (autoExecuteToggle) {
+                            autoExecuteToggle.checked = data.auto_execute || false;
+                        }
+                        
                         updateStats();
                         displaySignals();
                         
                         // Show message if no signals but API worked
                         if (allSignals.length === 0 && data.message) {
                             showNoSignalsWithMessage(data.message);
+                        }
+                        
+                        // Check for auto-execute if enabled
+                        if (data.auto_execute) {
+                            checkForAutoExecuteSignals();
                         }
                     } else {
                         console.error('Failed to load signals:', data.error);
@@ -548,7 +565,82 @@
         
         function toggleAutoExecute() {
             const checked = document.getElementById('autoExecute').checked;
-            showNotification(`Auto-execute ${checked ? 'enabled' : 'disabled'}`, 'info');
+            
+            // Save the auto-execute state to database
+            fetch('/api/save_settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    autoExecute: checked
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(`Auto-execute ${checked ? 'enabled' : 'disabled'}`, 'success');
+                    
+                    // If auto-execute is enabled, check for new high-confidence signals
+                    if (checked) {
+                        checkForAutoExecuteSignals();
+                    }
+                } else {
+                    showNotification(`Failed to save auto-execute setting: ${data.error}`, 'error');
+                    // Revert the toggle state
+                    document.getElementById('autoExecute').checked = !checked;
+                }
+            })
+            .catch(error => {
+                showNotification(`Error saving auto-execute setting: ${error.message}`, 'error');
+                // Revert the toggle state
+                document.getElementById('autoExecute').checked = !checked;
+            });
+        }
+        
+        function checkForAutoExecuteSignals() {
+            // Check if auto-execute is enabled
+            if (!document.getElementById('autoExecute').checked) {
+                return;
+            }
+            
+            // Find signals that meet auto-execute criteria (not already executed)
+            const highConfidenceSignals = allSignals.filter(signal => 
+                signal.confidence >= 80 && // High confidence threshold
+                signal.status !== 'executed' &&
+                signal.analysis.accuracy >= 75 // Additional accuracy requirement
+            );
+            
+            // Auto-execute the highest confidence signal
+            if (highConfidenceSignals.length > 0) {
+                const bestSignal = highConfidenceSignals[0]; // Already sorted by confidence
+                executeAutoSignal(bestSignal);
+            }
+        }
+        
+        function executeAutoSignal(signal) {
+            fetch('/api/execute_ai_trade', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    signal_id: signal.id,
+                    symbol: signal.symbol,
+                    side: signal.side,
+                    amount: signal.amount,
+                    takeProfit: signal.take_profit,
+                    stopLoss: signal.stop_loss
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateSignalStatus(signal.id, 'executed');
+                    showNotification(`🤖 Auto-executed: ${signal.symbol} ${signal.side} (${signal.confidence}% confidence)`, 'success');
+                } else {
+                    showNotification(`🤖 Auto-execute failed: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification(`🤖 Auto-execute error: ${error.message}`, 'error');
+            });
         }
         
         function showNotification(message, type) {
@@ -576,6 +668,13 @@
             
             // Auto-refresh every 30 seconds
             setInterval(loadSignals, 30000);
+            
+            // Check for auto-execute every 60 seconds if enabled
+            setInterval(function() {
+                if (document.getElementById('autoExecute').checked) {
+                    checkForAutoExecuteSignals();
+                }
+            }, 60000);
         });
     </script>
 </body>

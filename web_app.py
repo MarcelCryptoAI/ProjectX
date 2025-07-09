@@ -2666,42 +2666,62 @@ def save_settings():
     try:
         settings_data = request.get_json()
         
-        # Validate required settings
-        required_settings = [
-            'riskPerTrade', 'maxConcurrentTrades', 'minTradeAmount',
-            'defaultTakeProfit', 'defaultStopLoss', 'confidenceThreshold'
-        ]
+        # Load existing settings first
+        existing_settings = {}
+        try:
+            from database import TradingDatabase
+            db = TradingDatabase()
+            existing_settings = db.load_settings()
+        except Exception as db_error:
+            print(f"Database settings load failed, using file fallback: {db_error}")
+            # Fallback to file if database fails
+            try:
+                with open(settings_file, 'r') as f:
+                    existing_settings = json.load(f)
+            except:
+                existing_settings = {}
         
-        for setting in required_settings:
-            if setting not in settings_data:
-                return jsonify({
-                    'success': False,
-                    'error': f'Missing required setting: {setting}'
-                })
+        # Merge new settings with existing ones
+        merged_settings = existing_settings.copy()
+        merged_settings.update(settings_data)
+        
+        # Only validate required settings if this is a full settings update
+        if len(settings_data) > 1:  # More than just autoExecute
+            required_settings = [
+                'riskPerTrade', 'maxConcurrentTrades', 'minTradeAmount',
+                'defaultTakeProfit', 'defaultStopLoss', 'confidenceThreshold'
+            ]
+            
+            for setting in required_settings:
+                if setting not in merged_settings:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Missing required setting: {setting}'
+                    })
         
         # Save to database
         try:
             from database import TradingDatabase
             db = TradingDatabase()
-            db.save_settings(settings_data)
+            db.save_settings(merged_settings)
         except Exception as db_error:
             print(f"Database settings save failed, using file fallback: {db_error}")
             # Fallback to file if database fails
             with open(settings_file, 'w') as f:
-                json.dump(settings_data, f, indent=2)
+                json.dump(merged_settings, f, indent=2)
         
         # Update environment variables for immediate effect
-        os.environ['AI_CONFIDENCE_THRESHOLD'] = str(settings_data.get('confidenceThreshold', 75))
-        os.environ['RISK_PER_TRADE'] = str(settings_data.get('riskPerTrade', 2.0))
-        os.environ['MAX_LEVERAGE'] = str(settings_data.get('maxLeverage', 10))
-        os.environ['LEVERAGE_MODE'] = settings_data.get('leverageMode', 'cross')
-        os.environ['AUTO_EXECUTE'] = 'true' if settings_data.get('autoExecute', False) else 'false'
+        os.environ['AI_CONFIDENCE_THRESHOLD'] = str(merged_settings.get('confidenceThreshold', 75))
+        os.environ['RISK_PER_TRADE'] = str(merged_settings.get('riskPerTrade', 2.0))
+        os.environ['MAX_LEVERAGE'] = str(merged_settings.get('maxLeverage', 10))
+        os.environ['LEVERAGE_MODE'] = merged_settings.get('leverageMode', 'cross')
+        os.environ['AUTO_EXECUTE'] = 'true' if merged_settings.get('autoExecute', False) else 'false'
         
         # Update AI worker if running
         global ai_worker_instance
         if ai_worker_instance:
-            ai_worker_instance.auto_execute = settings_data.get('autoExecute', False)
-            app.logger.info(f"Updated AI worker auto_execute to: {settings_data.get('autoExecute', False)}")
+            ai_worker_instance.auto_execute = merged_settings.get('autoExecute', False)
+            app.logger.info(f"Updated AI worker auto_execute to: {merged_settings.get('autoExecute', False)}")
         
         return jsonify({
             'success': True,
