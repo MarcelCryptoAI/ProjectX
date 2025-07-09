@@ -14,7 +14,7 @@
                     colors: {
                         'neon-cyan': '#00D9FF',
                         'neon-yellow': '#FFD700',
-                        'neon-pink': '#FF00C1',
+                        'neon-red': '#CC0000',
                         'neon-green': '#00FF88',
                         'neon-yellow': '#FFD700',
                         'neon-orange': '#FF6B00',
@@ -244,7 +244,7 @@
     {% include 'includes/header.html' %}
     
     <!-- Main Content -->
-    <div class="mx-auto px-4 py-8 relative z-10 max-w-full">
+    <div class="w-full max-w-none px-4 py-8 relative z-10">
         <!-- Page Header -->
         <div class="mb-8">
             <h1 class="text-4xl font-cyber font-bold text-neon-cyan mb-2 animate-glow">
@@ -390,7 +390,7 @@
                     document.getElementById('coinsTableBody').innerHTML = `
                         <tr>
                             <td colspan="9" class="text-center py-16">
-                                <i class="fas fa-exclamation-triangle text-4xl text-neon-pink mb-4"></i>
+                                <i class="fas fa-exclamation-triangle text-4xl text-neon-red mb-4"></i>
                                 <div class="text-gray-400">Failed to load coin analysis data</div>
                             </td>
                         </tr>
@@ -473,7 +473,7 @@
                     <td class="px-6 py-4">
                         <div class="text-xs">
                             <div class="text-neon-green">TP: ${coin.takeProfit}%</div>
-                            <div class="text-neon-pink">SL: ${coin.stopLoss}%</div>
+                            <div class="text-neon-red">SL: ${coin.stopLoss}%</div>
                         </div>
                     </td>
                     <td class="px-6 py-4">
@@ -613,7 +613,7 @@
                                 </div>
                                 <div>
                                     <div class="text-xs text-gray-500">Stop Loss</div>
-                                    <div class="font-bold text-neon-pink">${coin.stopLoss}%</div>
+                                    <div class="font-bold text-neon-red">${coin.stopLoss}%</div>
                                 </div>
                             </div>
                         </div>

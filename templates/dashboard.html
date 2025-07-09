@@ -18,10 +18,10 @@
     <!-- Include shared header -->
     {% include 'includes/header.html' %}
     
-    <div class="min-h-screen p-8">
+    <div class="min-h-screen w-full px-4 py-8">
         <!-- Header -->
         <div class="mb-8">
-            <h1 class="text-4xl font-bold bg-gradient-to-r from-yellow-400 to-pink-500 bg-clip-text text-transparent">
+            <h1 class="text-4xl font-bold bg-gradient-to-r from-yellow-400 to-red-500 bg-clip-text text-transparent">
                 AI Trading Dashboard
             </h1>
             <p class="text-gray-400 mt-2">ByBit Perpetual Trading Bot</p>
@@ -393,10 +393,10 @@
         }
 
         function executeSignal(symbol, signal, confidence) {
-            fetch('/api/execute_trade', {
+            fetch('/api/execute_ai_trade', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ symbol, signal, confidence })
+                body: JSON.stringify({ symbol: symbol, side: signal, confidence: confidence, amount: 100 })
             })
             .then(response => response.json())
             .then(data => {

@@ -1964,8 +1964,23 @@ def get_trading_signals():
         ensure_components_initialized()
         ai_worker = get_ai_worker(socketio, bybit_session)
         
-        # Get AI confidence threshold from settings
-        ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
+        # Get AI confidence threshold and auto_execute from saved settings first, then env var
+        ai_confidence_threshold = 75  # Default
+        auto_execute = False  # Default
+        try:
+            if os.path.exists(settings_file):
+                with open(settings_file, 'r') as f:
+                    saved_settings = json.load(f)
+                    ai_confidence_threshold = float(saved_settings.get('confidenceThreshold', 75))
+                    auto_execute = saved_settings.get('autoExecute', False)
+        except:
+            pass
+        
+        # Also check environment variable as fallback
+        if not ai_confidence_threshold:
+            ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
+        if not auto_execute:
+            auto_execute = os.getenv('AUTO_EXECUTE', 'false').lower() == 'true'
         
         signals = []
         
@@ -2048,6 +2063,8 @@ def get_trading_signals():
                 'signals': [],
                 'count': 0,
                 'message': 'No training data available - please run AI training on this server',
+                'auto_execute': auto_execute,
+                'ai_threshold': ai_confidence_threshold,
                 'last_updated': datetime.now().isoformat()
             })
         
@@ -2062,6 +2079,7 @@ def get_trading_signals():
                 'signals': [],
                 'count': 0,
                 'message': message,
+                'auto_execute': auto_execute,
                 'ai_threshold': ai_confidence_threshold,
                 'last_updated': datetime.now().isoformat()
             })
@@ -2073,6 +2091,7 @@ def get_trading_signals():
             'success': True,
             'signals': signals,
             'count': len(signals),
+            'auto_execute': auto_execute,
             'ai_threshold': ai_confidence_threshold,
             'last_updated': datetime.now().isoformat()
         })
