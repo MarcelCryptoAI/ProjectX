@@ -497,12 +497,24 @@
                                     ROI
                                     <i class="fas fa-sort ml-1 text-xs" id="sort-icon-roi"></i>
                                 </th>
+                                <th class="pb-3 text-gray-400 font-medium cursor-pointer hover:text-neon-cyan transition-colors" onclick="sortTable('leverage')">
+                                    Leverage
+                                    <i class="fas fa-sort ml-1 text-xs" id="sort-icon-leverage"></i>
+                                </th>
+                                <th class="pb-3 text-gray-400 font-medium cursor-pointer hover:text-neon-cyan transition-colors" onclick="sortTable('im')">
+                                    IM
+                                    <i class="fas fa-sort ml-1 text-xs" id="sort-icon-im"></i>
+                                </th>
+                                <th class="pb-3 text-gray-400 font-medium cursor-pointer hover:text-neon-cyan transition-colors" onclick="sortTable('mm')">
+                                    MM
+                                    <i class="fas fa-sort ml-1 text-xs" id="sort-icon-mm"></i>
+                                </th>
                                 <th class="pb-3 text-gray-400 font-medium">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="positionsTable">
                             <tr>
-                                <td colspan="8" class="text-center py-8 text-gray-500">
+                                <td colspan="11" class="text-center py-8 text-gray-500">
                                     No active positions
                                 </td>
                             </tr>
@@ -795,7 +807,7 @@
                 currentPositions = [];
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="text-center py-8 text-gray-500">
+                        <td colspan="11" class="text-center py-8 text-gray-500">
                             No active positions
                         </td>
                     </tr>
@@ -815,6 +827,9 @@
                 const pnl = parseFloat(pos.unrealisedPnl || 0);
                 const pnlPercent = parseFloat(pos.percentage || 0);
                 const pnlClass = pnl >= 0 ? 'profit-text' : 'loss-text';
+                const leverage = parseFloat(pos.leverage || 1);
+                const positionIM = parseFloat(pos.positionIM || 0);
+                const positionMM = parseFloat(pos.positionMM || 0);
                 
                 return `
                     <tr class="border-b border-dark-border hover:bg-dark-hover transition-colors">
@@ -832,6 +847,15 @@
                         </td>
                         <td class="py-3 ${pnlClass}">
                             ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%
+                        </td>
+                        <td class="py-3 text-neon-yellow">
+                            ${leverage.toFixed(1)}x
+                        </td>
+                        <td class="py-3 text-gray-300">
+                            $${positionIM.toFixed(2)}
+                        </td>
+                        <td class="py-3 text-gray-300">
+                            $${positionMM.toFixed(2)}
                         </td>
                         <td class="py-3">
                             <button class="cyber-button py-1 px-3 rounded text-xs" onclick="closePosition('${pos.symbol}', '${pos.side}', '${pos.size}')">
@@ -1361,6 +1385,18 @@
                         aVal = parseFloat(a.percentage || 0);
                         bVal = parseFloat(b.percentage || 0);
                         break;
+                    case 'leverage':
+                        aVal = parseFloat(a.leverage || 1);
+                        bVal = parseFloat(b.leverage || 1);
+                        break;
+                    case 'im':
+                        aVal = parseFloat(a.positionIM || 0);
+                        bVal = parseFloat(b.positionIM || 0);
+                        break;
+                    case 'mm':
+                        aVal = parseFloat(a.positionMM || 0);
+                        bVal = parseFloat(b.positionMM || 0);
+                        break;
                     default:
                         return 0;
                 }
@@ -1382,7 +1418,7 @@
         
         function updateSortIcons(activeColumn, direction) {
             // Reset all sort icons
-            const columns = ['symbol', 'side', 'size', 'entry', 'current', 'pnl', 'roi'];
+            const columns = ['symbol', 'side', 'size', 'entry', 'current', 'pnl', 'roi', 'leverage', 'im', 'mm'];
             columns.forEach(col => {
                 const icon = document.getElementById(`sort-icon-${col}`);
                 if (icon) {

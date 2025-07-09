@@ -1447,6 +1447,18 @@ def get_positions():
                     # Get trailing stop info from active trades
                     trailing_stop_info = get_trailing_stop_info(symbol, side)
                     
+                    # Get margin information
+                    position_im = float(pos.get('positionIM', 0))  # Initial Margin
+                    position_mm = float(pos.get('positionMM', 0))  # Maintenance Margin
+                    leverage = float(pos.get('leverage', 1))
+                    
+                    # Calculate ROI based on actual margin invested
+                    # ROI = (realized PnL + unrealized PnL) / Initial Margin * 100
+                    roi_percentage = 0
+                    if position_im > 0:
+                        total_pnl = realized_pnl + unrealized_pnl
+                        roi_percentage = (total_pnl / position_im) * 100
+                    
                     active_positions.append({
                         'symbol': symbol,
                         'side': side,
@@ -1455,14 +1467,16 @@ def get_positions():
                         'markPrice': mark_price,
                         'unrealisedPnl': unrealized_pnl,
                         'realizedPnl': realized_pnl,
-                        'leverage': float(pos.get('leverage', 1)),
+                        'leverage': leverage,
                         'positionValue': float(pos.get('positionValue', 0)),
+                        'positionIM': position_im,  # Initial Margin
+                        'positionMM': position_mm,  # Maintenance Margin
                         'stopLoss': stop_loss,
                         'takeProfit': take_profit,
                         'targetInfo': target_info,
                         'trailingStopInfo': trailing_stop_info,
-                        # Calculate ROI percentage properly
-                        'pnlPercentage': ((mark_price - avg_price) / avg_price * 100) if side == 'Buy' and avg_price > 0 else ((avg_price - mark_price) / avg_price * 100) if side == 'Sell' and avg_price > 0 else 0
+                        # Calculate ROI percentage based on actual margin invested
+                        'pnlPercentage': roi_percentage
                     })
             
             return jsonify({
@@ -2418,32 +2432,37 @@ def get_analytics_data():
         
         for pos in active_positions:
             symbol = pos.get('symbol')
+            
+            # Get margin information
+            position_im = float(pos.get('positionIM', 0))  # Initial Margin
+            position_mm = float(pos.get('positionMM', 0))  # Maintenance Margin
+            leverage = float(pos.get('leverage', 1))
+            unrealized_pnl = float(pos.get('unrealisedPnl', 0))
+            
+            # Calculate ROI based on actual margin invested
+            # ROI = unrealized PnL / Initial Margin * 100
+            roi_percentage = 0
+            if position_im > 0:
+                roi_percentage = (unrealized_pnl / position_im) * 100
+            
             position_data = {
                 'symbol': symbol,
                 'side': pos.get('side'),
                 'size': float(pos.get('size', 0)),
                 'avgPrice': float(pos.get('avgPrice', 0)),
                 'markPrice': float(pos.get('markPrice', 0)),
-                'unrealisedPnl': float(pos.get('unrealisedPnl', 0)),
-                # Calculate ROI manually since ByBit doesn't provide unrealisedPnlPcnt
-                'percentage': 0,  # Will calculate below
+                'unrealisedPnl': unrealized_pnl,
+                # Calculate ROI based on actual margin invested
+                'percentage': roi_percentage,
                 'positionValue': float(pos.get('positionValue', 0)),
-                'leverage': float(pos.get('leverage', 1)),
+                'leverage': leverage,
+                'positionIM': position_im,  # Initial Margin
+                'positionMM': position_mm,  # Maintenance Margin
                 'tp_levels': [],
                 'tp1_hit': False,
                 'sl_moved_to_breakeven': False,
                 'distance_to_tp1': 0
             }
-            
-            # Calculate ROI percentage manually
-            avg_price = position_data['avgPrice']
-            mark_price = position_data['markPrice']
-            if avg_price > 0 and mark_price > 0:
-                if pos.get('side') == 'Buy':
-                    roi = ((mark_price - avg_price) / avg_price) * 100
-                else:  # Sell position
-                    roi = ((avg_price - mark_price) / avg_price) * 100
-                position_data['percentage'] = roi
             
             # Add TP level information from AI worker if available
             if ai_worker and hasattr(ai_worker, 'active_trades'):
