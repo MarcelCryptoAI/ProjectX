@@ -448,14 +448,15 @@ class AIWorker:
                 
                 # Get current threshold
                 try:
-                    from utils.settings_loader import SettingsLoader
-                    settings = SettingsLoader()
+                    from utils.settings_loader import Settings
+                    settings = Settings.load('config/settings.yaml')
                     ai_threshold = settings.ai_confidence_threshold
                 except:
-                    ai_threshold = 75  # Default fallback
+                    ai_threshold = self.settings.bot.get('ai_confidence_threshold', 75)  # Use settings with fallback
                 
                 # If signal still meets requirements, reset to waiting
-                if confidence >= ai_threshold and accuracy > 60:  # Basic quality check
+                accuracy_threshold = self.settings.bot.get('ai_accuracy_threshold', 70)
+                if confidence >= ai_threshold and accuracy > accuracy_threshold:  # Basic quality check
                     db.update_signal_status(signal['signal_id'], 'waiting')
                     reset_count += 1
                     self.console_logger.log('INFO', f'🔄 Reset failed signal {signal["symbol"]} to waiting (Confidence: {confidence:.1f}%)')
@@ -630,7 +631,7 @@ class AIWorker:
                         'symbol': symbol,
                         'side': side,
                         'confidence': confidence,
-                        'accuracy': prediction.get('accuracy', 70),
+                        'accuracy': prediction.get('accuracy', self.settings.bot.get('ai_accuracy_threshold', 70)),
                         'amount': prediction.get('amount', 100),
                         'leverage': prediction.get('leverage', 1),
                         'stop_loss': prediction.get('stop_loss', 2.0),
@@ -683,11 +684,11 @@ class AIWorker:
             
             # Get confidence threshold
             try:
-                from utils.settings_loader import SettingsLoader
-                settings = SettingsLoader()
+                from utils.settings_loader import Settings
+                settings = Settings.load('config/settings.yaml')
                 ai_threshold = settings.ai_confidence_threshold
             except:
-                ai_threshold = 75  # Default fallback
+                ai_threshold = self.settings.bot.get('ai_confidence_threshold', 75)  # Use settings with fallback
             
             signals_processed = 0
             trades_executed = 0
@@ -799,11 +800,11 @@ class AIWorker:
     def get_ai_confidence_threshold(self):
         """Get AI confidence threshold from settings"""
         try:
-            from utils.settings_loader import SettingsLoader
-            settings = SettingsLoader()
+            from utils.settings_loader import Settings
+            settings = Settings.load('config/settings.yaml')
             return settings.ai_confidence_threshold
         except:
-            return 75.0  # Default fallback
+            return self.settings.bot.get('ai_confidence_threshold', 75.0)  # Use settings with fallback
     
     def get_active_positions_count(self):
         """Get count of active positions AND pending orders"""

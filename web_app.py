@@ -2807,7 +2807,14 @@ def get_coin_analysis():
         ai_worker = get_ai_worker(socketio, bybit_session)
         
         # Get AI confidence threshold from settings
-        ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
+        try:
+            from utils.settings_loader import Settings
+            settings = Settings.load('config/settings.yaml')
+            ai_confidence_threshold = settings.ai_confidence_threshold
+            ai_accuracy_threshold = settings.ai_accuracy_threshold
+        except:
+            ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 80))
+            ai_accuracy_threshold = float(os.getenv('AI_ACCURACY_THRESHOLD', 70))
         
         # Get training results from database
         coins_analysis = []
@@ -2838,7 +2845,7 @@ def get_coin_analysis():
                     if confidence >= ai_confidence_threshold:
                         status = "high"
                         status_class = "status-high"
-                    elif confidence >= 60:
+                    elif confidence >= (ai_confidence_threshold * 0.75):  # 75% of threshold
                         status = "medium"
                         status_class = "status-medium" 
                     else:
@@ -2846,8 +2853,8 @@ def get_coin_analysis():
                         status_class = "status-low"
                     
                     # Generate AI analysis based on training data
-                    analysis = "Bullish" if result['accuracy'] > 70 and confidence > 75 else "Bearish"
-                    if confidence < 60:
+                    analysis = "Bullish" if result['accuracy'] > ai_accuracy_threshold and confidence > ai_confidence_threshold else "Bearish"
+                    if confidence < (ai_confidence_threshold * 0.75):  # 75% of threshold for neutral
                         analysis = "Neutral"
                     
                     # Calculate take profit and stop loss based on confidence
@@ -2912,19 +2919,27 @@ def get_trading_signals():
     """Get trading signals ONLY above AI confidence threshold"""
     try:
         # Get AI confidence threshold and auto_execute from database first
-        ai_confidence_threshold = 75  # Default
+        # Get AI confidence threshold from settings
+        try:
+            from utils.settings_loader import Settings
+            settings = Settings.load('config/settings.yaml')
+            ai_confidence_threshold = settings.ai_confidence_threshold
+            ai_accuracy_threshold = settings.ai_accuracy_threshold
+        except:
+            ai_confidence_threshold = 75  # Default fallback
+            ai_accuracy_threshold = 70  # Default fallback
         auto_execute = False  # Default
         
         try:
             from database import TradingDatabase
             db = TradingDatabase()
             db_settings = db.load_settings()
-            ai_confidence_threshold = float(db_settings.get('confidenceThreshold', 75))
+            ai_confidence_threshold = float(db_settings.get('confidenceThreshold', 80))
             auto_execute = db_settings.get('autoExecute', False)
         except Exception as settings_error:
             app.logger.warning(f"Could not load settings from database: {settings_error}")
             # Fallback to environment variables
-            ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
+            ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 80))
             auto_execute = os.getenv('AUTO_EXECUTE', 'true').lower() == 'true'
             db_settings = {}  # Empty dict for fallback
         
@@ -2982,7 +2997,7 @@ def get_trading_signals():
                         signal_time = datetime.fromisoformat(result.get('timestamp', datetime.now().isoformat()).replace('Z', '+00:00'))
                         
                         # Determine side based on analysis
-                        side = "Buy" if result['accuracy'] > 70 else "Sell"
+                        side = "Buy" if result['accuracy'] > ai_accuracy_threshold else "Sell"
                         
                         # Calculate position size based on settings from database
                         try:
@@ -3185,7 +3200,7 @@ def get_trading_signals():
             'count': 0,
             'message': f'Service temporarily unavailable: {str(e)}',
             'auto_execute': False,
-            'ai_threshold': 75,
+            'ai_threshold': 80,
             'last_updated': datetime.now().isoformat()
         })
 
@@ -3199,7 +3214,7 @@ def get_config():
             db = TradingDatabase()
             db_settings = db.load_settings()
             
-            ai_confidence_threshold = float(db_settings.get('confidenceThreshold', 75))
+            ai_confidence_threshold = float(db_settings.get('confidenceThreshold', 80))
             auto_execute = db_settings.get('autoExecute', False)
             max_positions = int(db_settings.get('maxConcurrentTrades', 20))
             risk_per_trade = float(db_settings.get('riskPerTrade', 2.0))
@@ -3210,7 +3225,7 @@ def get_config():
             
         except Exception as db_error:
             # Fallback to environment variables if database fails
-            ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
+            ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 80))
             auto_execute = os.getenv('AUTO_EXECUTE', 'true').lower() == 'true'
             max_positions = int(os.getenv('MAX_CONCURRENT_TRADES', 20))
             risk_per_trade = float(os.getenv('RISK_PER_TRADE', 2.0))
@@ -3257,7 +3272,7 @@ def update_config():
         if os.path.exists(settings_file):
             with open(settings_file, 'r') as f:
                 saved_settings = json.load(f)
-            saved_settings['confidenceThreshold'] = data.get('ai_confidence_threshold', saved_settings.get('confidenceThreshold', 75))
+            saved_settings['confidenceThreshold'] = data.get('ai_confidence_threshold', saved_settings.get('confidenceThreshold', 80))
             saved_settings['autoExecute'] = data.get('auto_execute', saved_settings.get('autoExecute', False))
             with open(settings_file, 'w') as f:
                 json.dump(saved_settings, f, indent=2)
@@ -3727,7 +3742,7 @@ def save_settings():
                 json.dump(merged_settings, f, indent=2)
         
         # Update environment variables for immediate effect
-        os.environ['AI_CONFIDENCE_THRESHOLD'] = str(merged_settings.get('confidenceThreshold', 75))
+        os.environ['AI_CONFIDENCE_THRESHOLD'] = str(merged_settings.get('confidenceThreshold', 80))
         os.environ['RISK_PER_TRADE'] = str(merged_settings.get('riskPerTrade', 2.0))
         os.environ['MAX_LEVERAGE'] = str(merged_settings.get('maxLeverage', 10))
         os.environ['LEVERAGE_MODE'] = merged_settings.get('leverageMode', 'cross')
@@ -3782,7 +3797,7 @@ def load_settings():
             'apiSecret': '',
             'testnetMode': False,
             'apiTimeout': 30,
-            'confidenceThreshold': 75,
+            'confidenceThreshold': 80,
             'accuracyThreshold': 80,
             'modelUpdateFreq': '4h',
             'technicalIndicators': 15,

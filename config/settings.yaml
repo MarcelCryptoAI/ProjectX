@@ -10,6 +10,7 @@ api_keys:
   cryptopanic_api_key: defb6fad0b3f58d8369f3cbcafea0c0e8727025f
 bot:
   ai_confidence_threshold: 80
+  ai_accuracy_threshold: 70
   auto_tpsl: true
   cooldown_period: 1
   default_leverage: 5

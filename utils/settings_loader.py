@@ -32,7 +32,11 @@ class Settings:
 
     @property
     def ai_confidence_threshold(self):
-        return self.bot.get('ai_confidence_threshold', 75)
+        return self.bot.get('ai_confidence_threshold', 80)
+
+    @property
+    def ai_accuracy_threshold(self):
+        return self.bot.get('ai_accuracy_threshold', 70)
 
     @property
     def max_daily_loss_percent(self):
