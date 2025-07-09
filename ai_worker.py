@@ -519,7 +519,7 @@ class AIWorker:
                         side=side,
                         confidence=confidence,
                         accuracy=prediction.get('accuracy', 70),
-                        amount=max(prediction.get('amount', 100), 10.0),
+                        amount=prediction.get('amount', 100),
                         stop_loss=prediction.get('stop_loss', 2.0),
                         take_profit=prediction.get('take_profit', 3.0),
                         status='waiting'
@@ -782,8 +782,8 @@ class AIWorker:
             current_price = float(ticker['result']['list'][0]['lastPrice'])
             
             # Use the amount from signal, or fallback to default
-            # Ensure minimum $10 to meet ByBit requirements (minimum is $5, use $10 for safety)
-            trade_amount_usd = max(float(signal.get('amount', 100)), 10.0)
+            # User can set minimum trade amount in settings
+            trade_amount_usd = float(signal.get('amount', 100))
             
             # Calculate raw quantity
             raw_qty = trade_amount_usd / current_price
@@ -813,7 +813,7 @@ class AIWorker:
                 stop_loss_price = current_price * (1 + stop_loss_pct / 100)
                 take_profit_price = current_price * (1 - take_profit_pct / 100)
             
-            # Place market order with pybit including TP/SL
+            # Place main market order with stop loss only
             order_params = {
                 'category': 'linear',
                 'symbol': symbol,
@@ -821,9 +821,23 @@ class AIWorker:
                 'orderType': 'Market',
                 'qty': str(qty),
                 'timeInForce': 'IOC',  # Immediate or Cancel
-                'takeProfit': str(take_profit_price),
                 'stopLoss': str(stop_loss_price)
             }
+            
+            # Calculate 4 TP levels (TP1, TP2, TP3 as limit orders, TP4 as close)
+            tp_levels = []
+            for i in range(1, 5):
+                if side == 'Buy':
+                    tp_price = current_price * (1 + (take_profit_pct * i / 4) / 100)
+                else:  # Sell
+                    tp_price = current_price * (1 - (take_profit_pct * i / 4) / 100)
+                
+                tp_levels.append({
+                    'level': i,
+                    'price': tp_price,
+                    'qty': qty / 4,  # Split quantity across 4 levels
+                    'type': 'Limit' if i <= 3 else 'Market'  # TP4 as market close
+                })
             
             self.console_logger.log('INFO', f'📤 Placing {side} order: {qty} {symbol} @ market (~${current_price:.4f})')
             
@@ -837,19 +851,52 @@ class AIWorker:
                 self.console_logger.log('SUCCESS', f'✅ Order placed: {order_id}')
                 self.console_logger.log('INFO', f'📊 Details: {qty} {symbol}, SL: ${stop_loss_price:.4f}, TP: ${take_profit_price:.4f}')
                 
-                # TP/SL are now integrated in main order - no separate orders needed
-                self.console_logger.log('SUCCESS', f'✅ TP/SL integrated in main order')
+                # Place multiple TP levels after main order
+                tp_order_ids = []
+                for tp_level in tp_levels:
+                    try:
+                        tp_order_params = {
+                            'category': 'linear',
+                            'symbol': symbol,
+                            'side': 'Sell' if side == 'Buy' else 'Buy',
+                            'orderType': tp_level['type'],
+                            'qty': str(tp_level['qty']),
+                            'timeInForce': 'GTC'
+                        }
+                        
+                        if tp_level['type'] == 'Limit':
+                            tp_order_params['price'] = str(tp_level['price'])
+                        else:
+                            # TP4 as conditional market order
+                            tp_order_params['triggerPrice'] = str(tp_level['price'])
+                        
+                        tp_result = self.bybit_session.place_order(**tp_order_params)
+                        
+                        if tp_result and 'result' in tp_result:
+                            tp_order_id = tp_result['result']['orderId']
+                            tp_order_ids.append(tp_order_id)
+                            self.console_logger.log('SUCCESS', f'✅ TP{tp_level["level"]} set: {tp_order_id} @ ${tp_level["price"]:.4f}')
+                        else:
+                            self.console_logger.log('WARNING', f'⚠️ TP{tp_level["level"]} failed: {tp_result.get("retMsg", "Unknown error")}')
+                            
+                    except Exception as tp_error:
+                        self.console_logger.log('ERROR', f'❌ TP{tp_level["level"]} error: {str(tp_error)}')
                 
-                # Store trade in active trades for monitoring
+                # Store trade in active trades for monitoring (including trailing SL)
                 self.active_trades[order_id] = {
                     'symbol': symbol,
                     'side': side,
                     'quantity': qty,
                     'entry_price': current_price,
                     'stop_loss': stop_loss_price,
-                    'take_profit': take_profit_price,
+                    'take_profit_levels': tp_levels,
+                    'tp_order_ids': tp_order_ids,
+                    'trailing_stop_enabled': signal.get('trailing_stop_enabled', True),
+                    'trailing_stop_distance': signal.get('trailing_stop_distance', 1.0),
                     'timestamp': datetime.now().isoformat()
                 }
+                
+                self.console_logger.log('SUCCESS', f'✅ Trade setup complete: {len(tp_order_ids)}/4 TP levels active')
                 
                 return True
             else:

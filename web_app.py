@@ -1386,6 +1386,32 @@ def get_realized_pnl_for_position(symbol, side):
     except Exception as e:
         return 0
 
+def get_trailing_stop_info(symbol, side):
+    """Get trailing stop information for a position"""
+    try:
+        # Get AI worker instance to check active trades
+        ai_worker = get_ai_worker(socketio=socketio, bybit_session=bybit_session)
+        
+        if not ai_worker or not hasattr(ai_worker, 'active_trades'):
+            return None
+            
+        # Find matching active trade
+        for order_id, trade_info in ai_worker.active_trades.items():
+            if trade_info.get('symbol') == symbol and trade_info.get('side') == side:
+                return {
+                    'enabled': trade_info.get('trailing_stop_enabled', False),
+                    'distance': trade_info.get('trailing_stop_distance', 1.0),
+                    'current_stop': trade_info.get('stop_loss', 0),
+                    'tp_levels': trade_info.get('take_profit_levels', []),
+                    'tp_order_ids': trade_info.get('tp_order_ids', []),
+                    'entry_price': trade_info.get('entry_price', 0)
+                }
+        
+        return None
+        
+    except Exception as e:
+        return None
+
 @app.route('/api/positions')
 def get_positions():
     ensure_components_initialized()
@@ -1417,6 +1443,9 @@ def get_positions():
                     # Get realized P&L for this position
                     realized_pnl = get_realized_pnl_for_position(symbol, side)
                     
+                    # Get trailing stop info from active trades
+                    trailing_stop_info = get_trailing_stop_info(symbol, side)
+                    
                     active_positions.append({
                         'symbol': symbol,
                         'side': side,
@@ -1430,6 +1459,7 @@ def get_positions():
                         'stopLoss': stop_loss,
                         'takeProfit': take_profit,
                         'targetInfo': target_info,
+                        'trailingStopInfo': trailing_stop_info,
                         'pnlPercentage': (unrealized_pnl / (size * avg_price) * 100) if size > 0 and avg_price > 0 else 0
                     })
             
