@@ -1222,14 +1222,21 @@
                         const leverageStrategy = data.leverage_strategy || 'confidence_based';
                         document.getElementById('leverage').textContent = `${minLeverage}x-${maxLeverage}x (${leverageStrategy})`;
                         
-                        // Update strategy mode based on leverage strategy
-                        let strategyMode = 'BALANCED';
-                        if (leverageStrategy === 'confidence_based') {
-                            strategyMode = 'AI ADAPTIVE';
-                        } else if (leverageStrategy === 'fixed') {
-                            strategyMode = 'CONSERVATIVE';
+                        // Update strategy mode based on actual setting
+                        const actualStrategyMode = data.strategy_mode || 'balanced';
+                        let displayStrategyMode = actualStrategyMode.toUpperCase();
+                        
+                        // Special display names for strategy modes
+                        switch(actualStrategyMode) {
+                            case 'conservative': displayStrategyMode = 'CONSERVATIVE'; break;
+                            case 'balanced': displayStrategyMode = 'BALANCED'; break;
+                            case 'aggressive': displayStrategyMode = 'AGGRESSIVE'; break;
+                            case 'scalping': displayStrategyMode = 'SCALPING'; break;
+                            case 'swing': displayStrategyMode = 'SWING TRADING'; break;
+                            default: displayStrategyMode = actualStrategyMode.toUpperCase();
                         }
-                        document.getElementById('strategyMode').textContent = strategyMode;
+                        
+                        document.getElementById('strategyMode').textContent = displayStrategyMode;
                         
                         // Update dynamic TP (always ON for 4-level TP)
                         document.getElementById('dynamicTP').textContent = 'ON (4 levels)';
