@@ -537,11 +537,21 @@ class AIWorker:
             prediction = self.ai_trader.get_prediction()
             
             if prediction:
-                self.signal_count += 1
                 confidence = prediction['confidence']
                 symbol = prediction['symbol']
                 side = prediction['side']
                 
+                # Ensure confidence is in percentage format (0-100)
+                if confidence < 1.0:  # If it's a fraction (0.0-1.0), convert to percentage
+                    confidence = confidence * 100
+                
+                # Check if prediction meets minimum confidence threshold FIRST
+                ai_threshold = self.get_ai_confidence_threshold()
+                if confidence < ai_threshold:
+                    self.console_logger.log('INFO', f'⏭️ Signal {symbol} below threshold ({confidence:.1f}% < {ai_threshold}%) - not saving')
+                    return  # Don't save or process low confidence signals
+                
+                self.signal_count += 1
                 self.console_logger.log('INFO', 
                     f'🎯 Signal #{self.signal_count}: {side} {symbol} (Confidence: {confidence:.1f}%)')
                 
@@ -716,6 +726,15 @@ class AIWorker:
             'active_trades': self.get_active_positions_count(),
             'max_trades': self.max_concurrent_trades
         }
+    
+    def get_ai_confidence_threshold(self):
+        """Get AI confidence threshold from settings"""
+        try:
+            from utils.settings_loader import SettingsLoader
+            settings = SettingsLoader()
+            return settings.ai_confidence_threshold
+        except:
+            return 75.0  # Default fallback
     
     def get_active_positions_count(self):
         """Get count of active positions"""

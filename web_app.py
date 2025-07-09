@@ -1600,12 +1600,12 @@ def start_trading():
     if not is_trading:
         is_trading = True
         
-        # Start AI worker
+        # Start AI worker (includes signal generation and execution)
         ai_worker = get_ai_worker(socketio, bybit_session)
         ai_worker.start()
         
-        # Start trading loop
-        threading.Thread(target=trading_loop, daemon=True).start()
+        # Legacy trading loop disabled - AI worker handles all trading now
+        # threading.Thread(target=trading_loop, daemon=True).start()
         
         return jsonify({'success': True, 'message': 'Trading and AI worker started'})
     return jsonify({'success': False, 'message': 'Trading already active'})
