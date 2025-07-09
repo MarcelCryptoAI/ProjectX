@@ -283,6 +283,8 @@ class TradingDatabase:
                     status VARCHAR(20) DEFAULT 'active',
                     min_order_qty DECIMAL(20,8),
                     qty_step DECIMAL(20,8),
+                    min_leverage DECIMAL(10,2),
+                    max_leverage DECIMAL(10,2),
                     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
@@ -296,12 +298,18 @@ class TradingDatabase:
                     status TEXT DEFAULT 'active',
                     min_order_qty REAL,
                     qty_step REAL,
+                    min_leverage REAL,
+                    max_leverage REAL,
                     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
         
         conn.commit()
         conn.close()
+        
+        # Run migration for existing tables
+        self.migrate_trading_signals_table()
+        self.migrate_supported_symbols_table()
     
     def save_settings(self, settings_dict):
         """Save settings to database"""
@@ -328,9 +336,6 @@ class TradingDatabase:
         
         conn.commit()
         conn.close()
-        
-        # Run migration for existing tables
-        self.migrate_trading_signals_table()
     
     def migrate_trading_signals_table(self):
         """Add new columns to existing trading_signals table"""
@@ -372,6 +377,49 @@ class TradingDatabase:
             
         except Exception as e:
             print(f"Error migrating trading_signals table: {e}")
+            conn.rollback()
+        
+        finally:
+            conn.close()
+    
+    def migrate_supported_symbols_table(self):
+        """Add leverage columns to existing supported_symbols table"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Check if columns exist and add them if they don't
+            new_columns = [
+                ('min_leverage', 'DECIMAL(10,2)' if self.use_postgres else 'REAL'),
+                ('max_leverage', 'DECIMAL(10,2)' if self.use_postgres else 'REAL')
+            ]
+            
+            for column_name, column_type in new_columns:
+                try:
+                    if self.use_postgres:
+                        cursor.execute(f'''
+                            ALTER TABLE supported_symbols 
+                            ADD COLUMN IF NOT EXISTS {column_name} {column_type}
+                        ''')
+                    else:
+                        # SQLite doesn't support IF NOT EXISTS for ALTER TABLE
+                        # First check if column exists
+                        cursor.execute("PRAGMA table_info(supported_symbols)")
+                        columns = [col[1] for col in cursor.fetchall()]
+                        
+                        if column_name not in columns:
+                            cursor.execute(f'''
+                                ALTER TABLE supported_symbols 
+                                ADD COLUMN {column_name} {column_type}
+                            ''')
+                except Exception as e:
+                    # Column might already exist, ignore the error
+                    pass
+            
+            conn.commit()
+            
+        except Exception as e:
+            print(f"Error migrating supported_symbols table: {e}")
             conn.rollback()
         
         finally:
@@ -957,15 +1005,17 @@ class TradingDatabase:
             for symbol_data in symbols_data:
                 cursor.execute(f'''
                     INSERT INTO supported_symbols 
-                    (symbol, base_currency, quote_currency, status, min_order_qty, qty_step)
-                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                    (symbol, base_currency, quote_currency, status, min_order_qty, qty_step, min_leverage, max_leverage)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
                 ''', (
                     symbol_data['symbol'],
                     symbol_data.get('base_currency', ''),
                     symbol_data.get('quote_currency', ''),
                     symbol_data.get('status', 'active'),
                     symbol_data.get('min_order_qty', 0),
-                    symbol_data.get('qty_step', 0)
+                    symbol_data.get('qty_step', 0),
+                    symbol_data.get('min_leverage', 1),
+                    symbol_data.get('max_leverage', 10)
                 ))
             
             conn.commit()
@@ -982,7 +1032,7 @@ class TradingDatabase:
         cursor = conn.cursor()
         
         try:
-            cursor.execute('SELECT symbol, status, last_updated FROM supported_symbols ORDER BY symbol')
+            cursor.execute('SELECT symbol, status, last_updated, min_leverage, max_leverage FROM supported_symbols ORDER BY symbol')
             results = cursor.fetchall()
             
             symbols = []
@@ -990,7 +1040,9 @@ class TradingDatabase:
                 symbols.append({
                     'symbol': row[0],
                     'status': row[1],
-                    'last_updated': row[2]
+                    'last_updated': row[2],
+                    'min_leverage': float(row[3]) if row[3] else 1,
+                    'max_leverage': float(row[4]) if row[4] else 10
                 })
             
             return symbols

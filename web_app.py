@@ -3880,13 +3880,20 @@ def refresh_symbols():
         symbols_data = []
         for instrument in instruments['result']['list']:
             if instrument['symbol'].endswith('USDT'):  # Only USDT pairs
+                # Extract leverage information from leverageFilter
+                leverage_filter = instrument.get('leverageFilter', {})
+                min_leverage = float(leverage_filter.get('minLeverage', 1))
+                max_leverage = float(leverage_filter.get('maxLeverage', 10))
+                
                 symbol_data = {
                     'symbol': instrument['symbol'],
                     'base_currency': instrument['baseCoin'],
                     'quote_currency': instrument['quoteCoin'],
                     'status': 'active' if instrument['status'] == 'Trading' else 'inactive',
                     'min_order_qty': float(instrument['lotSizeFilter']['minOrderQty']),
-                    'qty_step': float(instrument['lotSizeFilter']['qtyStep'])
+                    'qty_step': float(instrument['lotSizeFilter']['qtyStep']),
+                    'min_leverage': min_leverage,
+                    'max_leverage': max_leverage
                 }
                 symbols_data.append(symbol_data)
         
