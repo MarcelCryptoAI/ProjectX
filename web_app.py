@@ -2021,7 +2021,8 @@ def get_trading_status():
                     'enabled': trading_enabled,
                     'active_orders': active_positions,
                     'worker_running': ai_worker.is_running,
-                    'max_trades': ai_worker.max_concurrent_trades
+                    'max_trades': ai_worker.max_concurrent_trades,
+                    'maxConcurrentTrades': ai_worker.max_concurrent_trades
                 }
             })
         else:
@@ -2898,7 +2899,7 @@ def get_config():
             
             ai_confidence_threshold = float(db_settings.get('confidenceThreshold', 75))
             auto_execute = db_settings.get('autoExecute', False)
-            max_positions = int(db_settings.get('maxConcurrentTrades', 5))
+            max_positions = int(db_settings.get('maxConcurrentTrades', 20))
             risk_per_trade = float(db_settings.get('riskPerTrade', 2.0))
             min_leverage = int(db_settings.get('minLeverage', 1))
             max_leverage = int(db_settings.get('maxLeverage', 10))
@@ -2909,7 +2910,7 @@ def get_config():
             # Fallback to environment variables if database fails
             ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
             auto_execute = os.getenv('AUTO_EXECUTE', 'true').lower() == 'true'
-            max_positions = int(os.getenv('MAX_CONCURRENT_TRADES', 5))
+            max_positions = int(os.getenv('MAX_CONCURRENT_TRADES', 20))
             risk_per_trade = float(os.getenv('RISK_PER_TRADE', 2.0))
             min_leverage = 1
             max_leverage = 10
@@ -2920,6 +2921,7 @@ def get_config():
             'success': True,
             'ai_confidence_threshold': ai_confidence_threshold,
             'max_positions': max_positions,
+            'maxConcurrentTrades': max_positions,  # Add this for consistency
             'risk_per_trade': risk_per_trade,
             'auto_execute': auto_execute,
             'min_leverage': min_leverage,

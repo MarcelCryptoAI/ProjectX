@@ -96,7 +96,7 @@ class AIWorker:
         self.console_logger = ConsoleLogger()
         self.database = TradingDatabase()
         # Direct pybit integration - no separate executor needed
-        self.max_concurrent_trades = int(os.getenv('MAX_CONCURRENT_TRADES', 5))
+        self.max_concurrent_trades = int(os.getenv('MAX_CONCURRENT_TRADES', 20))
         self.active_trades = {}  # Track active trades for SL management
         if bybit_session:
             self.console_logger.log('INFO', '✅ Direct pybit trading ready')
@@ -563,17 +563,19 @@ class AIWorker:
                     
                     # Save signal to database with waiting status
                     signal_id = f'signal_{self.signal_count}_{symbol}'
-                    db.save_trading_signal(
-                        signal_id=signal_id,
-                        symbol=symbol,
-                        side=side,
-                        confidence=confidence,
-                        accuracy=prediction.get('accuracy', 70),
-                        amount=prediction.get('amount', 100),
-                        stop_loss=prediction.get('stop_loss', 2.0),
-                        take_profit=prediction.get('take_profit', 3.0),
-                        status='waiting'
-                    )
+                    signal_data = {
+                        'signal_id': signal_id,
+                        'symbol': symbol,
+                        'side': side,
+                        'confidence': confidence,
+                        'accuracy': prediction.get('accuracy', 70),
+                        'amount': prediction.get('amount', 100),
+                        'leverage': prediction.get('leverage', 1),
+                        'stop_loss': prediction.get('stop_loss', 2.0),
+                        'take_profit': prediction.get('take_profit', 3.0),
+                        'status': 'waiting'
+                    }
+                    db.save_trading_signal(signal_data)
                     
                     self.console_logger.log('SUCCESS', f'✅ Signal saved to database: {signal_id}')
                     
@@ -832,7 +834,7 @@ class AIWorker:
                 min_trade_amount = float(db_settings.get('minTradeAmount', 5.0))  # Minimum $5
                 
                 # User concurrent trades setting
-                max_concurrent_trades = int(db_settings.get('maxConcurrentTrades', 5))
+                max_concurrent_trades = int(db_settings.get('maxConcurrentTrades', 20))
                 
                 # Update AI worker's max concurrent trades from user settings
                 self.max_concurrent_trades = max_concurrent_trades
@@ -844,7 +846,7 @@ class AIWorker:
                 leverage_strategy = 'confidence_based'
                 risk_per_trade = 2.0
                 min_trade_amount = 5.0
-                max_concurrent_trades = 5
+                max_concurrent_trades = 20
                 self.max_concurrent_trades = max_concurrent_trades
             
             # Calculate leverage based on user settings and AI confidence
