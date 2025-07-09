@@ -1155,63 +1155,6 @@ class AIWorker:
                     
         except Exception as e:
             self.console_logger.log('ERROR', f'❌ Trade monitoring error: {str(e)}')
-                side = position['side']
-                unrealized_pnl = float(position['unrealisedPnl'])
-                
-                # Find matching active trade
-                for order_id, trade_info in list(self.active_trades.items()):
-                    if (trade_info['symbol'] == symbol and 
-                        trade_info['side'] == side and 
-                        trade_info['move_sl_to_breakeven'] and 
-                        unrealized_pnl > 0):  # Position is in profit
-                        
-                        # Move stop loss to breakeven
-                        entry_price = trade_info['entry_price']
-                        sl_order_id = trade_info.get('sl_order_id')
-                        
-                        if sl_order_id:
-                            try:
-                                # Cancel existing stop loss
-                                cancel_result = self.bybit_session.cancel_order(
-                                    category='linear',
-                                    symbol=symbol,
-                                    orderId=sl_order_id
-                                )
-                                
-                                if cancel_result and 'result' in cancel_result:
-                                    self.console_logger.log('SUCCESS', f'✅ Cancelled old SL: {sl_order_id}')
-                                    
-                                    # Place new stop loss at breakeven
-                                    new_sl_result = self.bybit_session.place_order(
-                                        category='linear',
-                                        symbol=symbol,
-                                        side='Sell' if side == 'Buy' else 'Buy',
-                                        orderType='Market',
-                                        qty=position['size'],
-                                        triggerPrice=str(entry_price),
-                                        timeInForce='IOC'
-                                    )
-                                    
-                                    if new_sl_result and 'result' in new_sl_result:
-                                        new_sl_id = new_sl_result['result']['orderId']
-                                        self.console_logger.log('SUCCESS', f'✅ Moved SL to breakeven: {new_sl_id} @ ${entry_price:.4f}')
-                                        
-                                        # Update trade info
-                                        trade_info['sl_order_id'] = new_sl_id
-                                        trade_info['move_sl_to_breakeven'] = False  # Don't move again
-                                        
-                                    else:
-                                        self.console_logger.log('WARNING', f'⚠️ Failed to set new SL at breakeven')
-                                        
-                            except Exception as sl_error:
-                                self.console_logger.log('ERROR', f'❌ Failed to move SL to breakeven: {str(sl_error)}')
-                        
-                        # Remove from active monitoring once moved
-                        if not trade_info['move_sl_to_breakeven']:
-                            del self.active_trades[order_id]
-                            
-        except Exception as e:
-            self.console_logger.log('ERROR', f'❌ Trade monitoring error: {str(e)}')
 
 # Global worker instance
 ai_worker = None
