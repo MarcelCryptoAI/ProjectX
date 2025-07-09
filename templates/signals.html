@@ -243,7 +243,7 @@
         });
         
         socket.on('signal_executed', function(data) {
-            updateSignalStatus(data.signalId, 'executed');
+            updateSignalStatus(data.signalId, 'open');
         });
         
         function loadSignals() {
@@ -290,7 +290,7 @@
         function updateStats() {
             const total = allSignals.length;
             const highConfidence = allSignals.filter(s => s.confidence >= 75).length;
-            const activeTrades = allSignals.filter(s => s.status === 'executed').length;
+            const activeTrades = allSignals.filter(s => s.status === 'open').length;
             const successfulTrades = allSignals.filter(s => s.status === 'completed' && s.profit > 0).length;
             const successRate = total > 0 ? (successfulTrades / total * 100) : 0;
             
@@ -298,6 +298,16 @@
             document.getElementById('highConfidenceSignals').textContent = highConfidence;
             document.getElementById('activeTrades').textContent = activeTrades;
             document.getElementById('successRate').textContent = `${successRate.toFixed(1)}%`;
+            
+            // Also fetch real active positions count from API
+            fetch('/api/positions')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('activeTrades').textContent = data.count || activeTrades;
+                    }
+                })
+                .catch(error => console.error('Error fetching positions:', error));
         }
         
         function displaySignals() {
@@ -382,6 +392,24 @@
                             <div class="text-neon-yellow font-bold">${leverage}x</div>
                         </td>
                         <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full ${
+                                signal.status === 'open' ? 'bg-green-900/50 text-green-400' :
+                                signal.status === 'waiting' ? 'bg-yellow-900/50 text-yellow-400' :
+                                signal.status === 'failed' ? 'bg-red-900/50 text-red-400' :
+                                signal.status === 'on_hold' ? 'bg-gray-900/50 text-gray-400' :
+                                'bg-blue-900/50 text-blue-400'
+                            }">
+                                <i class="fas fa-${
+                                    signal.status === 'open' ? 'play' :
+                                    signal.status === 'waiting' ? 'clock' :
+                                    signal.status === 'failed' ? 'times' :
+                                    signal.status === 'on_hold' ? 'pause' :
+                                    'circle'
+                                } mr-1"></i>
+                                ${signal.status === 'on_hold' ? 'ON HOLD' : (signal.status || 'ready').toUpperCase()}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
                             <div class="text-xs">
                                 ${signal.partial_take_profit ? 
                                     signal.take_profit_levels.map(level => 
@@ -414,9 +442,15 @@
                             <div class="flex gap-2">
                                 <button class="cyber-button py-1 px-3 rounded text-xs" 
                                         onclick="executeSignal('${signal.id}', '${signal.symbol}', '${signal.side}', ${takeProfit}, ${stopLoss})"
-                                        ${signal.status === 'executed' ? 'disabled' : ''}>
+                                        ${signal.status === 'open' || signal.status === 'failed' || signal.status === 'on_hold' ? 'disabled' : ''}>
                                     <i class="fas fa-rocket mr-1"></i>
-                                    ${signal.status === 'executed' ? 'EXECUTED' : 'EXECUTE'}
+                                    ${
+                                        signal.status === 'open' ? 'OPEN' :
+                                        signal.status === 'failed' ? 'FAILED' :
+                                        signal.status === 'waiting' ? 'WAITING' :
+                                        signal.status === 'on_hold' ? 'ON HOLD' :
+                                        'EXECUTE'
+                                    }
                                 </button>
                                 <button class="cyber-button py-1 px-3 rounded text-xs" 
                                         onclick="analyzeSignal('${signal.symbol}')">
@@ -463,7 +497,7 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        updateSignalStatus(signalId, 'executed');
+                        updateSignalStatus(signalId, 'open');
                         showNotification(`Trade executed: ${symbol} ${side}`, 'success');
                     } else {
                         showNotification(`Trade failed: ${data.message}`, 'error');

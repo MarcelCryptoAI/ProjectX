@@ -120,9 +120,27 @@ class AIWorker:
         }
         
     def start(self):
-        """Start the AI worker"""
+        """Start the AI worker and resume on-hold trades"""
         if not self.is_running:
             self.is_running = True
+            
+            # Resume on-hold signals back to waiting status
+            try:
+                from database import TradingDatabase
+                db = TradingDatabase()
+                on_hold_signals = db.get_trading_signals()
+                resumed_count = 0
+                
+                for signal in on_hold_signals:
+                    if signal.get('status') == 'on_hold':
+                        db.update_signal_status(signal['signal_id'], 'waiting')
+                        resumed_count += 1
+                
+                if resumed_count > 0:
+                    self.console_logger.log('INFO', f'▶️ Resumed {resumed_count} on-hold trades')
+            except Exception as e:
+                self.console_logger.log('WARNING', f'⚠️ Could not resume on-hold trades: {str(e)}')
+            
             self.worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
             self.worker_thread.start()
             self.console_logger.log('SUCCESS', '🚀 AI WORKER STARTED - Ready for training and signal generation!')

@@ -545,6 +545,93 @@ def coin_status():
 def signals():
     return render_template('signals.html')
 
+@app.route('/order_history')
+def order_history():
+    return render_template('order_history.html')
+
+@app.route('/api/order_history')
+def get_order_history():
+    """Get order history for this app's trades"""
+    try:
+        ensure_components_initialized()
+        
+        # Get period from query params
+        period = request.args.get('period', '7d')
+        
+        # Calculate time range
+        now = datetime.now()
+        if period == '1d':
+            start_time = now - timedelta(days=1)
+        elif period == '7d':
+            start_time = now - timedelta(days=7)
+        elif period == '30d':
+            start_time = now - timedelta(days=30)
+        else:  # all
+            start_time = now - timedelta(days=365)  # 1 year max
+        
+        # Get orders from ByBit
+        orders = bybit_session.get_order_history(
+            category="linear",
+            startTime=int(start_time.timestamp() * 1000),
+            limit=200
+        )
+        
+        formatted_orders = []
+        stats = {
+            'total_orders': 0,
+            'completed_orders': 0,
+            'cancelled_orders': 0,
+            'total_volume': 0,
+            'total_pnl': 0
+        }
+        
+        if orders and 'result' in orders and 'list' in orders['result']:
+            for order in orders['result']['list']:
+                # Only include orders from this app (could filter by orderLinkId if we set it)
+                formatted_order = {
+                    'orderId': order.get('orderId', ''),
+                    'symbol': order.get('symbol', ''),
+                    'side': order.get('side', ''),
+                    'type': order.get('orderType', ''),
+                    'quantity': float(order.get('qty', 0)),
+                    'price': float(order.get('avgPrice', 0)) or float(order.get('price', 0)),
+                    'status': order.get('orderStatus', ''),
+                    'timestamp': order.get('createdTime', ''),
+                    'pnl': float(order.get('cumRealisedPnl', 0))
+                }
+                
+                formatted_orders.append(formatted_order)
+                
+                # Update stats
+                stats['total_orders'] += 1
+                if formatted_order['status'] == 'Filled':
+                    stats['completed_orders'] += 1
+                    stats['total_volume'] += formatted_order['quantity'] * formatted_order['price']
+                    stats['total_pnl'] += formatted_order['pnl']
+                elif formatted_order['status'] == 'Cancelled':
+                    stats['cancelled_orders'] += 1
+        
+        return jsonify({
+            'success': True,
+            'orders': formatted_orders,
+            'stats': stats
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Order history error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'orders': [],
+            'stats': {
+                'total_orders': 0,
+                'completed_orders': 0,
+                'cancelled_orders': 0,
+                'total_volume': 0,
+                'total_pnl': 0
+            }
+        })
+
 @app.route('/api/balance')
 def get_balance():
     ensure_components_initialized()
@@ -937,8 +1024,18 @@ def get_system_status():
     except Exception as e:
         status['dns'] = {'status': 'offline', 'message': f'DNS failed: {str(e)[:50]}'}
     
-    # Test Dyno (always online if we can respond)
-    status['dyno'] = {'status': 'online', 'message': 'Dyno responsive'}
+    # Test AI Worker status
+    try:
+        global ai_worker_instance
+        ai_worker = ai_worker_instance or get_ai_worker(socketio, bybit_session)
+        if ai_worker and ai_worker.is_running:
+            status['dyno'] = {'status': 'online', 'message': 'AI Worker active'}
+        elif ai_worker:
+            status['dyno'] = {'status': 'warning', 'message': 'AI Worker stopped'}
+        else:
+            status['dyno'] = {'status': 'offline', 'message': 'AI Worker not initialized'}
+    except Exception as e:
+        status['dyno'] = {'status': 'offline', 'message': f'AI error: {str(e)[:50]}'}
     
     return jsonify({
         'success': True,
@@ -1818,18 +1915,72 @@ def get_analytics_data():
                     total_position_value += float(pos.get('positionValue', 0))
         
         # Process trading history for statistics
-        trades_data = {'total_trades': 0, 'winning_trades': 0, 'total_volume': 0, 'total_fees': 0}
+        trades_data = {
+            'total_trades': 0, 
+            'winning_trades': 0, 
+            'losing_trades': 0,
+            'total_volume': 0, 
+            'total_fees': 0,
+            'trades_by_date': [],
+            'largest_win': 0,
+            'largest_loss': 0,
+            'total_profit': 0,
+            'total_loss': 0
+        }
+        
         if history and 'result' in history:
             trades_data['total_trades'] = len(history['result']['list'])
+            
+            # Group trades by date for time series
+            trades_by_date = {}
             
             for trade in history['result']['list']:
                 trades_data['total_volume'] += float(trade.get('execQty', 0)) * float(trade.get('execPrice', 0))
                 trades_data['total_fees'] += abs(float(trade.get('execFee', 0)))
+                
+                # Parse trade date
+                trade_time = trade.get('execTime', '')
+                if trade_time:
+                    trade_date = datetime.fromtimestamp(int(trade_time)/1000).strftime('%Y-%m-%d')
+                    if trade_date not in trades_by_date:
+                        trades_by_date[trade_date] = {'volume': 0, 'pnl': 0, 'count': 0}
+                    trades_by_date[trade_date]['volume'] += float(trade.get('execQty', 0)) * float(trade.get('execPrice', 0))
+                    trades_by_date[trade_date]['count'] += 1
+                    
+                # Track P&L for individual trades (simplified)
+                pnl = float(trade.get('realizedPnl', 0)) if 'realizedPnl' in trade else 0
+                if pnl > 0:
+                    trades_data['winning_trades'] += 1
+                    trades_data['total_profit'] += pnl
+                    trades_data['largest_win'] = max(trades_data['largest_win'], pnl)
+                elif pnl < 0:
+                    trades_data['losing_trades'] += 1
+                    trades_data['total_loss'] += abs(pnl)
+                    trades_data['largest_loss'] = min(trades_data['largest_loss'], pnl)
+            
+            trades_data['trades_by_date'] = trades_by_date
         
         # Calculate performance metrics
-        win_rate = 0  # Simplified calculation
+        win_rate = 0
         if trades_data['total_trades'] > 0:
-            win_rate = min(max(50 + (unrealized_pnl / 100), 0), 100)  # Rough estimate
+            win_rate = (trades_data['winning_trades'] / trades_data['total_trades']) * 100
+        elif unrealized_pnl > 0:
+            win_rate = min(max(50 + (unrealized_pnl / 100), 0), 100)  # Rough estimate if no trades
+        
+        # Format positions for frontend
+        formatted_positions = []
+        for pos in active_positions:
+            formatted_positions.append({
+                'symbol': pos.get('symbol'),
+                'side': pos.get('side'),
+                'size': float(pos.get('size', 0)),
+                'avgPrice': float(pos.get('avgPrice', 0)),
+                'markPrice': float(pos.get('markPrice', 0)),
+                'unrealisedPnl': float(pos.get('unrealisedPnl', 0)),
+                'percentage': float(pos.get('unrealisedPnlPcnt', 0)) * 100,
+                'positionValue': float(pos.get('positionValue', 0)),
+                'leverage': float(pos.get('leverage', 1))
+            })
         
         return jsonify({
             'success': True,
@@ -1837,13 +1988,21 @@ def get_analytics_data():
             'unrealized_pnl': unrealized_pnl,
             'total_position_value': total_position_value,
             'active_positions_count': len(active_positions),
+            'positions': formatted_positions,  # Add the positions array
             'total_trades': trades_data['total_trades'],
+            'winning_trades': trades_data['winning_trades'],
+            'losing_trades': trades_data['losing_trades'],
             'win_rate': win_rate,
             'total_volume': trades_data['total_volume'],
             'total_fees': trades_data['total_fees'],
+            'largest_win': trades_data['largest_win'],
+            'largest_loss': trades_data['largest_loss'],
+            'total_profit': trades_data['total_profit'],
+            'total_loss': trades_data['total_loss'],
             'sharpe_ratio': max(0.5, min(2.0, 1.0 + (unrealized_pnl / 1000))),  # Simplified
             'max_drawdown': max(0, min(20, abs(unrealized_pnl) / 100)) if unrealized_pnl < 0 else 0,
-            'profit_factor': max(0.8, min(3.0, 1.5 + (unrealized_pnl / 500))) if trades_data['total_trades'] > 0 else 1.0
+            'profit_factor': trades_data['total_profit'] / trades_data['total_loss'] if trades_data['total_loss'] > 0 else max(0.8, min(3.0, 1.5 + (unrealized_pnl / 500))),
+            'trades_by_date': trades_data['trades_by_date']
         })
         
     except Exception as e:

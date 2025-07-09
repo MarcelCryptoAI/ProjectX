@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order History - A.R.I.E AI Trading Bot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'neon-cyan': '#00D9FF',
+                        'neon-yellow': '#FFD700',
+                        'neon-red': '#CC0000',
+                        'neon-green': '#008844',
+                        'neon-orange': '#FF6B00',
+                        'dark-bg': '#0A0A0F',
+                        'dark-panel': '#0F0F1A',
+                        'dark-border': '#1A1A2E',
+                        'dark-hover': '#16213E'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
+                        'mono': ['SF Mono', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: #0A0A0F;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        .glass-card {
+            background: rgba(15, 15, 26, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 0 40px rgba(0, 217, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cyber-button {
+            position: relative;
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(255, 215, 0, 0.1));
+            border: 1px solid rgba(0, 217, 255, 0.5);
+            color: #00D9FF;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.3s;
+            overflow: hidden;
+        }
+        
+        .cyber-button:hover {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(255, 215, 0, 0.2));
+            border-color: #00D9FF;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.5), inset 0 0 20px rgba(0, 217, 255, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .cyber-button.active {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.3), rgba(255, 215, 0, 0.3));
+            border-color: #00D9FF;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-dark-bg text-white font-sans min-h-screen relative">
+    <!-- Include shared header -->
+    {% include 'includes/header.html' %}
+    
+    <!-- Main Content -->
+    <div class="w-full max-w-none px-4 py-8 relative z-10">
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold text-neon-cyan mb-2">
+                <i class="fas fa-history mr-3"></i>ORDER HISTORY
+            </h1>
+            <p class="text-gray-400">Complete trade execution history from this application</p>
+        </div>
+        
+        <!-- Stats Summary -->
+        <div class="grid grid-cols-5 gap-6 mb-8">
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">TOTAL ORDERS</h3>
+                <div class="text-3xl font-bold text-white" id="totalOrders">0</div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">COMPLETED</h3>
+                <div class="text-3xl font-bold text-neon-green" id="completedOrders">0</div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">CANCELLED</h3>
+                <div class="text-3xl font-bold text-neon-red" id="cancelledOrders">0</div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">TOTAL VOLUME</h3>
+                <div class="text-3xl font-bold text-neon-yellow" id="totalVolume">$0</div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">TOTAL P&L</h3>
+                <div class="text-3xl font-bold" id="totalPnl">$0.00</div>
+            </div>
+        </div>
+        
+        <!-- Filters -->
+        <div class="glass-card rounded-xl p-6 mb-8">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div class="flex items-center gap-4">
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm active" onclick="filterOrders('all')" data-filter="all">
+                        <i class="fas fa-th mr-2"></i>ALL ORDERS
+                    </button>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="filterOrders('filled')" data-filter="filled">
+                        <i class="fas fa-check-circle mr-2"></i>FILLED
+                    </button>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="filterOrders('cancelled')" data-filter="cancelled">
+                        <i class="fas fa-times-circle mr-2"></i>CANCELLED
+                    </button>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="filterOrders('profit')" data-filter="profit">
+                        <i class="fas fa-arrow-up mr-2"></i>PROFIT
+                    </button>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="filterOrders('loss')" data-filter="loss">
+                        <i class="fas fa-arrow-down mr-2"></i>LOSS
+                    </button>
+                </div>
+                <div class="flex items-center gap-4">
+                    <select class="bg-dark-bg/50 border border-neon-cyan/30 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-neon-cyan" id="timeFilter" onchange="loadOrderHistory()">
+                        <option value="1d">Last 24 Hours</option>
+                        <option value="7d" selected>Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                        <option value="all">All Time</option>
+                    </select>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="refreshOrders()">
+                        <i class="fas fa-sync-alt mr-2"></i>REFRESH
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Orders Table -->
+        <div class="glass-card rounded-xl overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-dark-panel/50 border-b border-neon-cyan/20">
+                        <tr>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('timestamp')">
+                                Time <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('symbol')">
+                                Symbol <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('side')">
+                                Side <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('type')">
+                                Type <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('quantity')">
+                                Quantity <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('price')">
+                                Price <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('status')">
+                                Status <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('pnl')">
+                                P&L <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan">Order ID</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersTableBody">
+                        <!-- Loading state -->
+                        <tr>
+                            <td colspan="9" class="text-center py-16">
+                                <i class="fas fa-spinner fa-spin text-4xl text-neon-cyan mb-4"></i>
+                                <div class="text-gray-400">Loading order history...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let allOrders = [];
+        let currentFilter = 'all';
+        let sortColumn = 'timestamp';
+        let sortDirection = 'desc';
+        
+        function loadOrderHistory() {
+            const timeFilter = document.getElementById('timeFilter').value;
+            
+            fetch(`/api/order_history?period=${timeFilter}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        allOrders = data.orders || [];
+                        updateStats(data.stats);
+                        displayOrders();
+                    } else {
+                        showError('Failed to load order history');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading orders:', error);
+                    showError('Connection error');
+                });
+        }
+        
+        function updateStats(stats) {
+            document.getElementById('totalOrders').textContent = stats.total_orders || 0;
+            document.getElementById('completedOrders').textContent = stats.completed_orders || 0;
+            document.getElementById('cancelledOrders').textContent = stats.cancelled_orders || 0;
+            document.getElementById('totalVolume').textContent = `$${(stats.total_volume || 0).toLocaleString()}`;
+            
+            const pnlElement = document.getElementById('totalPnl');
+            const totalPnl = stats.total_pnl || 0;
+            pnlElement.textContent = `${totalPnl >= 0 ? '+' : ''}$${Math.abs(totalPnl).toFixed(2)}`;
+            pnlElement.className = `text-3xl font-bold ${totalPnl >= 0 ? 'text-neon-green' : 'text-neon-red'}`;
+        }
+        
+        function displayOrders() {
+            const tableBody = document.getElementById('ordersTableBody');
+            let filteredOrders = [...allOrders];
+            
+            // Apply filter
+            if (currentFilter === 'filled') {
+                filteredOrders = filteredOrders.filter(order => order.status === 'Filled');
+            } else if (currentFilter === 'cancelled') {
+                filteredOrders = filteredOrders.filter(order => order.status === 'Cancelled');
+            } else if (currentFilter === 'profit') {
+                filteredOrders = filteredOrders.filter(order => order.pnl > 0);
+            } else if (currentFilter === 'loss') {
+                filteredOrders = filteredOrders.filter(order => order.pnl < 0);
+            }
+            
+            // Apply sorting
+            filteredOrders.sort((a, b) => {
+                let aVal = a[sortColumn];
+                let bVal = b[sortColumn];
+                
+                if (sortColumn === 'timestamp') {
+                    aVal = new Date(aVal).getTime();
+                    bVal = new Date(bVal).getTime();
+                }
+                
+                if (typeof aVal === 'string') {
+                    aVal = aVal.toLowerCase();
+                    bVal = bVal.toLowerCase();
+                }
+                
+                if (sortDirection === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+            
+            if (filteredOrders.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="text-center py-12">
+                            <i class="fas fa-inbox text-4xl text-gray-600 mb-4"></i>
+                            <div class="text-gray-400">No orders found</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tableBody.innerHTML = filteredOrders.map(order => {
+                const pnl = order.pnl || 0;
+                const pnlClass = pnl >= 0 ? 'text-neon-green' : 'text-neon-red';
+                const statusClass = order.status === 'Filled' ? 'bg-green-900/50 text-green-400' : 
+                                   order.status === 'Cancelled' ? 'bg-red-900/50 text-red-400' : 
+                                   'bg-yellow-900/50 text-yellow-400';
+                
+                return `
+                    <tr class="border-b border-dark-border hover:bg-dark-panel/30 transition-colors">
+                        <td class="px-6 py-4">
+                            <div class="text-sm">${new Date(order.timestamp).toLocaleString()}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="font-bold text-white">${order.symbol}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full ${order.side === 'Buy' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}">
+                                <i class="fas fa-arrow-${order.side === 'Buy' ? 'up' : 'down'} mr-1"></i>
+                                ${order.side}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm">${order.type}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div>${order.quantity}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div>$${order.price.toFixed(4)}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full ${statusClass}">
+                                ${order.status}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="${pnlClass} font-bold">
+                                ${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-xs text-gray-400 font-mono">${order.orderId}</div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        function filterOrders(filter) {
+            currentFilter = filter;
+            
+            // Update button states
+            document.querySelectorAll('[data-filter]').forEach(btn => {
+                if (btn.dataset.filter === filter) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            displayOrders();
+        }
+        
+        function sortTable(column) {
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'desc';
+            }
+            
+            displayOrders();
+        }
+        
+        function refreshOrders() {
+            document.getElementById('ordersTableBody').innerHTML = `
+                <tr>
+                    <td colspan="9" class="text-center py-16">
+                        <i class="fas fa-spinner fa-spin text-4xl text-neon-cyan mb-4"></i>
+                        <div class="text-gray-400">Refreshing order history...</div>
+                    </td>
+                </tr>
+            `;
+            loadOrderHistory();
+        }
+        
+        function showError(message) {
+            document.getElementById('ordersTableBody').innerHTML = `
+                <tr>
+                    <td colspan="9" class="text-center py-16">
+                        <i class="fas fa-exclamation-triangle text-4xl text-neon-red mb-4"></i>
+                        <div class="text-gray-400">${message}</div>
+                    </td>
+                </tr>
+            `;
+        }
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set active nav
+            document.getElementById('nav-dashboard')?.classList.remove('active');
+            
+            loadOrderHistory();
+            
+            // Auto-refresh every 30 seconds
+            setInterval(loadOrderHistory, 30000);
+        });
+    </script>
+</body>
+</html>
