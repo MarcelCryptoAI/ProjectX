@@ -578,8 +578,38 @@ class AIWorker:
         """Execute trading signal directly with pybit"""
         try:
             symbol = signal['symbol']
-            side = signal['side'].upper()  # Buy or Sell
+            side = signal['side']  # Keep as 'Buy' or 'Sell' - don't uppercase
             confidence = signal['confidence']
+            
+            # List of most liquid symbols that are definitely supported
+            supported_symbols = [
+                'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
+                'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'TRXUSDT', 'LINKUSDT',
+                'DOTUSDT', 'MATICUSDT', 'LTCUSDT', 'BCHUSDT', 'NEARUSDT',
+                'ATOMUSDT', 'UNIUSDT', 'FILUSDT', 'ETCUSDT', 'XLMUSDT',
+                'VETUSDT', 'ICPUSDT', 'APTUSDT', 'HBARUSDT', 'ALGOUSDT',
+                'QNTUSDT', 'LDOUSDT', 'OPUSDT', 'ARBUSDT', 'INJUSDT'
+            ]
+            
+            # Check if symbol is in our supported list
+            if symbol not in supported_symbols:
+                self.console_logger.log('WARNING', f'⚠️ Symbol {symbol} not in supported list, skipping trade')
+                return False
+            
+            # First check if symbol is tradeable by getting instrument info
+            try:
+                instruments = self.bybit_session.get_instruments_info(category="linear", symbol=symbol)
+                if not instruments or 'result' not in instruments or not instruments['result']['list']:
+                    self.console_logger.log('ERROR', f'❌ Symbol {symbol} not found or not tradeable')
+                    return False
+                
+                instrument = instruments['result']['list'][0]
+                min_order_qty = float(instrument['lotSizeFilter']['minOrderQty'])
+                qty_step = float(instrument['lotSizeFilter']['qtyStep'])
+                
+            except Exception as instrument_error:
+                self.console_logger.log('ERROR', f'❌ Failed to get instrument info for {symbol}: {str(instrument_error)}')
+                return False
             
             # Get current market price
             ticker = self.bybit_session.get_tickers(category="linear", symbol=symbol)
@@ -589,18 +619,28 @@ class AIWorker:
             
             current_price = float(ticker['result']['list'][0]['lastPrice'])
             
-            # Calculate position size (default $100 per trade, adjustable)
-            trade_amount_usd = float(os.getenv('DEFAULT_TRADE_AMOUNT', 100))
-            qty = round(trade_amount_usd / current_price, 6)
+            # Use the amount from signal, or fallback to default
+            trade_amount_usd = float(signal.get('amount', 100))
             
-            # Calculate stop loss and take profit
-            stop_loss_pct = float(os.getenv('DEFAULT_STOP_LOSS_PCT', 2.0))  # 2%
-            take_profit_pct = float(os.getenv('DEFAULT_TAKE_PROFIT_PCT', 3.0))  # 3%
+            # Calculate raw quantity
+            raw_qty = trade_amount_usd / current_price
             
-            if side == 'BUY':
+            # Round to proper step size and ensure minimum
+            qty = max(min_order_qty, round(raw_qty / qty_step) * qty_step)
+            
+            # Double-check minimum quantity
+            if qty < min_order_qty:
+                self.console_logger.log('ERROR', f'❌ Calculated quantity {qty} is below minimum {min_order_qty} for {symbol}')
+                return False
+            
+            # Calculate stop loss and take profit from signal
+            stop_loss_pct = float(signal.get('stop_loss', 2.0))  # Default 2%
+            take_profit_pct = float(signal.get('take_profit', 3.0))  # Default 3%
+            
+            if side == 'Buy':
                 stop_loss_price = current_price * (1 - stop_loss_pct / 100)
                 take_profit_price = current_price * (1 + take_profit_pct / 100)
-            else:  # SELL
+            else:  # Sell
                 stop_loss_price = current_price * (1 + stop_loss_pct / 100)
                 take_profit_price = current_price * (1 - take_profit_pct / 100)
             
@@ -608,7 +648,7 @@ class AIWorker:
             order_params = {
                 'category': 'linear',
                 'symbol': symbol,
-                'side': side,
+                'side': side,  # Use exact case: 'Buy' or 'Sell'
                 'orderType': 'Market',
                 'qty': str(qty),
                 'timeInForce': 'IOC'  # Immediate or Cancel
@@ -628,22 +668,22 @@ class AIWorker:
                 
                 # Set stop loss and take profit (optional - can be done later)
                 try:
-                    # Place stop loss order
+                    # Place stop loss order (conditional order)
                     sl_params = {
                         'category': 'linear',
                         'symbol': symbol,
-                        'side': 'Sell' if side == 'BUY' else 'Buy',
+                        'side': 'Sell' if side == 'Buy' else 'Buy',
                         'orderType': 'Market',
                         'qty': str(qty),
                         'triggerPrice': str(stop_loss_price),
                         'timeInForce': 'IOC'
                     }
                     
-                    # Place take profit order  
+                    # Place take profit order (limit order)
                     tp_params = {
                         'category': 'linear',
                         'symbol': symbol,
-                        'side': 'Sell' if side == 'BUY' else 'Buy',
+                        'side': 'Sell' if side == 'Buy' else 'Buy',
                         'orderType': 'Limit',
                         'qty': str(qty),
                         'price': str(take_profit_price),
@@ -657,7 +697,14 @@ class AIWorker:
                 
                 return True
             else:
-                self.console_logger.log('ERROR', f'❌ Order failed: {order_result}')
+                # Check if there's an error message in the response
+                error_msg = "Unknown error"
+                if order_result and 'retMsg' in order_result:
+                    error_msg = order_result['retMsg']
+                elif order_result and 'ret_msg' in order_result:
+                    error_msg = order_result['ret_msg']
+                
+                self.console_logger.log('ERROR', f'❌ Order failed: {error_msg}')
                 return False
                 
         except Exception as e:
