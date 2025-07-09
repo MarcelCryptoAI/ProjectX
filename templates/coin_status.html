@@ -658,7 +658,9 @@
         }
         
         function executeTrade(symbol, side, takeProfit, stopLoss) {
-            if (confirm(`Execute ${side} trade for ${symbol}?\n\nTake Profit: ${takeProfit}%\nStop Loss: ${stopLoss}%`)) {
+            const confirmMessage = `Execute ${side} trade for ${symbol}?\n\nTake Profit: ${takeProfit}%\nStop Loss: ${stopLoss}%\n\nNote: Will be blocked if same direction position exists.`;
+            
+            if (confirm(confirmMessage)) {
                 fetch('/api/execute_ai_trade', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -675,7 +677,11 @@
                     if (data.success) {
                         alert(`Trade executed successfully!\n\n${data.message}`);
                     } else {
-                        alert(`Trade execution failed:\n\n${data.message}`);
+                        if (data.message.includes('same direction')) {
+                            alert(`Trade blocked: ${symbol} - same direction position already exists`);
+                        } else {
+                            alert(`Trade execution failed:\n\n${data.message}`);
+                        }
                     }
                 })
                 .catch(error => {

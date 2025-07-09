@@ -600,6 +600,27 @@ class AIWorker:
                 self.console_logger.log('WARNING', f'⚠️ Symbol {symbol} not in supported list, skipping trade')
                 return False
             
+            # Check for existing positions in the same direction
+            try:
+                positions = self.bybit_session.get_positions(category="linear", symbol=symbol)
+                if positions and 'result' in positions:
+                    for position in positions['result']['list']:
+                        if position['symbol'] == symbol and float(position['size']) > 0:
+                            existing_side = position['side']
+                            
+                            # If same direction, block the trade
+                            if existing_side == side:
+                                self.console_logger.log('WARNING', f'⚠️ Already have {existing_side} position for {symbol}, blocking same direction trade')
+                                return False
+                            
+                            # If opposite direction, allow it (will close existing position)
+                            elif existing_side != side:
+                                self.console_logger.log('INFO', f'📊 Existing {existing_side} position for {symbol}, new {side} trade will reverse position')
+                                
+            except Exception as position_error:
+                self.console_logger.log('ERROR', f'❌ Failed to check existing positions for {symbol}: {str(position_error)}')
+                return False
+            
             # First check if symbol is tradeable by getting instrument info
             try:
                 instruments = self.bybit_session.get_instruments_info(category="linear", symbol=symbol)

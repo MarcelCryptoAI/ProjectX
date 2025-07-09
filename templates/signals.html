@@ -445,7 +445,9 @@
         }
         
         function executeSignal(signalId, symbol, side, takeProfit, stopLoss) {
-            if (confirm(`Execute ${side} signal for ${symbol}?\\n\\nTake Profit: ${takeProfit}%\\nStop Loss: ${stopLoss}%`)) {
+            const confirmMessage = `Execute ${side} signal for ${symbol}?\\n\\nTake Profit: ${takeProfit}%\\nStop Loss: ${stopLoss}%\\n\\nNote: Will be blocked if same direction position exists.`;
+            
+            if (confirm(confirmMessage)) {
                 fetch('/api/execute_ai_trade', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -635,7 +637,12 @@
                     updateSignalStatus(signal.id, 'executed');
                     showNotification(`🤖 Auto-executed: ${signal.symbol} ${signal.side} (${signal.confidence}% confidence)`, 'success');
                 } else {
-                    showNotification(`🤖 Auto-execute failed: ${data.message}`, 'error');
+                    // Check if blocked due to same direction position
+                    if (data.message.includes('same direction')) {
+                        showNotification(`🤖 Auto-execute blocked: ${signal.symbol} - same direction position exists`, 'info');
+                    } else {
+                        showNotification(`🤖 Auto-execute failed: ${data.message}`, 'error');
+                    }
                 }
             })
             .catch(error => {
