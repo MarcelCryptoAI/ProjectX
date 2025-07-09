@@ -306,12 +306,12 @@
                     
                     <!-- Control Buttons -->
                     <div class="space-y-4">
-                        <button class="w-full cyber-button py-4 px-6 rounded-lg flex items-center justify-center group" onclick="startBot()" id="startBtn" style="background: linear-gradient(135deg, rgba(0, 136, 68, 0.2), rgba(0, 217, 255, 0.1)); border-color: #008844; color: #008844;">
+                        <button class="w-full cyber-button py-4 px-6 rounded-lg flex items-center justify-center group bg-dark-bg/50" onclick="startBot()" id="startBtn" style="border-color: #008844; color: #008844;">
                             <i class="fas fa-play mr-3 text-lg group-hover:animate-pulse"></i>
                             <span class="font-bold text-lg">START BOT</span>
                         </button>
                         
-                        <button class="w-full cyber-button py-4 px-6 rounded-lg flex items-center justify-center group" onclick="stopBot()" id="stopBtn" style="background: linear-gradient(135deg, rgba(204, 0, 0, 0.2), rgba(255, 107, 0, 0.1)); border-color: #CC0000; color: #CC0000;">
+                        <button class="w-full cyber-button py-4 px-6 rounded-lg flex items-center justify-center group bg-dark-bg/50" onclick="stopBot()" id="stopBtn" style="border-color: #CC0000; color: #CC0000;">
                             <i class="fas fa-stop mr-3 text-lg group-hover:animate-pulse"></i>
                             <span class="font-bold text-lg">STOP BOT</span>
                         </button>
@@ -331,7 +331,7 @@
                         <div class="space-y-2 text-xs">
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Risk Level:</span>
-                                <span class="text-neon-green" id="riskLevel">MODERATE</span>
+                                <span class="text-neon-yellow" id="riskLevel">MODERATE</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Max Positions:</span>
@@ -343,19 +343,19 @@
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Amount per Trade:</span>
-                                <span class="text-neon-cyan" id="amountPerTrade">$100</span>
+                                <span class="text-neon-yellow" id="amountPerTrade">$100</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Leverage:</span>
-                                <span class="text-neon-cyan" id="leverage">10x</span>
+                                <span class="text-neon-yellow" id="leverage">10x</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Dynamic TP:</span>
-                                <span class="text-neon-green" id="dynamicTP">OFF</span>
+                                <span class="text-neon-yellow" id="dynamicTP">OFF</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Trailing SL:</span>
-                                <span class="text-neon-green" id="trailingSL">OFF</span>
+                                <span class="text-neon-yellow" id="trailingSL">OFF</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Trailing %:</span>
@@ -1076,12 +1076,12 @@
                         // Update dynamic take profit
                         const dynamicTP = data.settings.dynamicTakeProfit || false;
                         document.getElementById('dynamicTP').textContent = dynamicTP ? 'ON' : 'OFF';
-                        document.getElementById('dynamicTP').className = dynamicTP ? 'text-neon-green' : 'text-neon-yellow';
+                        document.getElementById('dynamicTP').className = 'text-neon-yellow';
                         
                         // Update trailing stop loss
                         const trailingSL = data.settings.trailingStopLoss || false;
                         document.getElementById('trailingSL').textContent = trailingSL ? 'ON' : 'OFF';
-                        document.getElementById('trailingSL').className = trailingSL ? 'text-neon-green' : 'text-neon-yellow';
+                        document.getElementById('trailingSL').className = 'text-neon-yellow';
                         
                         // Update trailing percentage
                         const trailingPercent = data.settings.trailingStopValue || 1.0;
