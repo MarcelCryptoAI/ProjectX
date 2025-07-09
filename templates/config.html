@@ -39,31 +39,7 @@
             overflow-x: hidden;
         }
         
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                repeating-linear-gradient(
-                    0deg,
-                    transparent,
-                    transparent 2px,
-                    rgba(0, 217, 255, 0.03) 2px,
-                    rgba(0, 217, 255, 0.03) 4px
-                ),
-                repeating-linear-gradient(
-                    90deg,
-                    transparent,
-                    transparent 2px,
-                    rgba(255, 215, 0, 0.03) 2px,
-                    rgba(255, 215, 0, 0.03) 4px
-                );
-            pointer-events: none;
-            z-index: 1;
-        }
+        /* Removed animated background lines */
         
         .glass-card {
             background: rgba(15, 15, 26, 0.6);

@@ -39,31 +39,7 @@
             overflow-x: hidden;
         }
         
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                repeating-linear-gradient(
-                    0deg,
-                    transparent,
-                    transparent 2px,
-                    rgba(0, 217, 255, 0.03) 2px,
-                    rgba(0, 217, 255, 0.03) 4px
-                ),
-                repeating-linear-gradient(
-                    90deg,
-                    transparent,
-                    transparent 2px,
-                    rgba(255, 215, 0, 0.03) 2px,
-                    rgba(255, 215, 0, 0.03) 4px
-                );
-            pointer-events: none;
-            z-index: 1;
-        }
+        /* Removed animated background lines */
         
         .glass-card {
             background: rgba(15, 15, 26, 0.6);
@@ -182,9 +158,6 @@
                     </button>
                     <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="filterSignals('sell')" data-filter="sell">
                         <i class="fas fa-arrow-down mr-2"></i>SELL SIGNALS
-                    </button>
-                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="filterSignals('high')" data-filter="high">
-                        <i class="fas fa-star mr-2"></i>HIGH CONFIDENCE
                     </button>
                 </div>
                 <div class="flex items-center gap-4">

@@ -40,31 +40,7 @@
             overflow-x: hidden;
         }
         
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                repeating-linear-gradient(
-                    0deg,
-                    transparent,
-                    transparent 2px,
-                    rgba(0, 217, 255, 0.03) 2px,
-                    rgba(0, 217, 255, 0.03) 4px
-                ),
-                repeating-linear-gradient(
-                    90deg,
-                    transparent,
-                    transparent 2px,
-                    rgba(255, 215, 0, 0.03) 2px,
-                    rgba(255, 215, 0, 0.03) 4px
-                );
-            pointer-events: none;
-            z-index: 1;
-        }
+        /* Removed animated background lines */
         
         .glass-card {
             background: rgba(15, 15, 26, 0.6);
@@ -105,8 +81,8 @@
             font-weight: 500;
         }
         
-        .profit { color: #00FF88; text-shadow: 0 0 10px #00FF88; }
-        .loss { color: #FF00C1; text-shadow: 0 0 10px #FF00C1; }
+        .profit { color: #008844; text-shadow: 0 0 10px #008844; }
+        .loss { color: #CC0000; text-shadow: 0 0 10px #CC0000; }
         
         .cyber-button {
             position: relative;
@@ -653,7 +629,7 @@
                 values: [analyticsData.winningTrades, analyticsData.losingTrades],
                 labels: ['Winning Trades', 'Losing Trades'],
                 type: 'pie',
-                marker: { colors: ['#00FF88', '#FF00C1'] },
+                marker: { colors: ['#008844', '#CC0000'] },
                 textfont: { color: '#ffffff', family: 'Inter' }
             }];
             
@@ -678,7 +654,7 @@
                 type: 'bar',
                 marker: {
                     color: analyticsData.monthlyReturns.map(d => 
-                        d.return >= 0 ? '#00FF88' : '#FF00C1')
+                        d.return >= 0 ? '#008844' : '#CC0000')
                 }
             }];
             

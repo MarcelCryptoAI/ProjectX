@@ -2034,7 +2034,8 @@ def get_trading_signals():
                                 'threshold': ai_confidence_threshold,
                                 'status': 'ready_to_trade',
                                 'leverage_strategy': leverage_strategy,
-                                'position_size_method': 'fixed_percentage'
+                                'position_size_method': 'fixed_percentage',
+                                'auto_execute': os.getenv('AUTO_EXECUTE', 'false').lower() == 'true'
                             }
                         }
                         signals.append(signal)
@@ -2084,10 +2085,18 @@ def get_trading_signals():
 def get_config():
     """Get current configuration"""
     try:
-        ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
+        # Load from settings file if exists
+        if os.path.exists(settings_file):
+            with open(settings_file, 'r') as f:
+                saved_settings = json.load(f)
+                ai_confidence_threshold = saved_settings.get('confidenceThreshold', 75)
+                auto_execute = saved_settings.get('autoExecute', False)
+        else:
+            ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
+            auto_execute = os.getenv('AUTO_EXECUTE', 'false').lower() == 'true'
+            
         max_positions = int(os.getenv('MAX_CONCURRENT_TRADES', 5))
         risk_per_trade = float(os.getenv('RISK_PER_TRADE', 2.0))
-        auto_execute = os.getenv('AUTO_EXECUTE', 'false').lower() == 'true'
         
         return jsonify({
             'success': True,
@@ -2117,6 +2126,21 @@ def update_config():
             os.environ['RISK_PER_TRADE'] = str(data['risk_per_trade'])
         if 'auto_execute' in data:
             os.environ['AUTO_EXECUTE'] = 'true' if data['auto_execute'] else 'false'
+            
+        # Also update settings file if exists
+        if os.path.exists(settings_file):
+            with open(settings_file, 'r') as f:
+                saved_settings = json.load(f)
+            saved_settings['confidenceThreshold'] = data.get('ai_confidence_threshold', saved_settings.get('confidenceThreshold', 75))
+            saved_settings['autoExecute'] = data.get('auto_execute', saved_settings.get('autoExecute', False))
+            with open(settings_file, 'w') as f:
+                json.dump(saved_settings, f, indent=2)
+                
+        # Update AI worker if running
+        global ai_worker_instance
+        if ai_worker_instance and data.get('auto_execute') is not None:
+            ai_worker_instance.auto_execute = data['auto_execute']
+            app.logger.info(f"Updated AI worker auto_execute to: {data['auto_execute']}")
         
         return jsonify({'success': True, 'message': 'Configuration updated'})
     except Exception as e:
@@ -2233,6 +2257,37 @@ def balance_header():
             'pnl_24h': 0.0,
             'pnl_24h_percent': 0.0,
             'status': 'offline',
+            'error': str(e)
+        })
+
+@app.route('/api/balance_settings')
+def balance_settings():
+    """Get balance data for settings page display"""
+    try:
+        ensure_components_initialized()
+        
+        # Use the improved balance function
+        balance_result = get_bybit_balance()
+        
+        if balance_result['success']:
+            return jsonify({
+                'success': True,
+                'balance': balance_result['total_wallet_balance'],
+                'available_balance': balance_result['available_balance'],
+                'used_margin': balance_result['used_margin'],
+                'coin_balances': balance_result['coin_balances']
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'balance': 0.0,
+                'error': balance_result['error']
+            })
+    except Exception as e:
+        app.logger.error(f"Settings balance error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'balance': 0.0,
             'error': str(e)
         })
 
@@ -2360,7 +2415,8 @@ def execute_ai_trade():
             'amount': amount,
             'take_profit': take_profit,
             'stop_loss': stop_loss,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'signal_coin': symbol  # Add the correct coin symbol for logging
         }
         
         app.logger.info(f"Executing trade signal: {trade_signal}")
@@ -2521,6 +2577,13 @@ def save_settings():
         os.environ['RISK_PER_TRADE'] = str(settings_data.get('riskPerTrade', 2.0))
         os.environ['MAX_LEVERAGE'] = str(settings_data.get('maxLeverage', 10))
         os.environ['LEVERAGE_MODE'] = settings_data.get('leverageMode', 'cross')
+        os.environ['AUTO_EXECUTE'] = 'true' if settings_data.get('autoExecute', False) else 'false'
+        
+        # Update AI worker if running
+        global ai_worker_instance
+        if ai_worker_instance:
+            ai_worker_instance.auto_execute = settings_data.get('autoExecute', False)
+            app.logger.info(f"Updated AI worker auto_execute to: {settings_data.get('autoExecute', False)}")
         
         return jsonify({
             'success': True,
@@ -2572,7 +2635,8 @@ def load_settings():
             'notifyTrades': True,
             'notifyErrors': True,
             'notifyProfits': True,
-            'dailySummary': True
+            'dailySummary': True,
+            'autoExecute': False  # Added autoExecute field
         }
         
         # Try to load from file
