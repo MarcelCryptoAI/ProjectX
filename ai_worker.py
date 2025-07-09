@@ -519,7 +519,7 @@ class AIWorker:
                         side=side,
                         confidence=confidence,
                         accuracy=prediction.get('accuracy', 70),
-                        amount=prediction.get('amount', 100),
+                        amount=max(prediction.get('amount', 100), 10.0),
                         stop_loss=prediction.get('stop_loss', 2.0),
                         take_profit=prediction.get('take_profit', 3.0),
                         status='waiting'
@@ -782,7 +782,8 @@ class AIWorker:
             current_price = float(ticker['result']['list'][0]['lastPrice'])
             
             # Use the amount from signal, or fallback to default
-            trade_amount_usd = float(signal.get('amount', 100))
+            # Ensure minimum $10 to meet ByBit requirements (minimum is $5, use $10 for safety)
+            trade_amount_usd = max(float(signal.get('amount', 100)), 10.0)
             
             # Calculate raw quantity
             raw_qty = trade_amount_usd / current_price
@@ -793,6 +794,12 @@ class AIWorker:
             # Double-check minimum quantity
             if qty < min_order_qty:
                 self.console_logger.log('ERROR', f'❌ Calculated quantity {qty} is below minimum {min_order_qty} for {symbol}')
+                return False
+            
+            # Verify minimum order value (ByBit requires $5 minimum)
+            order_value = qty * current_price
+            if order_value < 5.0:
+                self.console_logger.log('ERROR', f'❌ Order value ${order_value:.2f} is below ByBit minimum $5.00 for {symbol}')
                 return False
             
             # Calculate stop loss and take profit from signal
