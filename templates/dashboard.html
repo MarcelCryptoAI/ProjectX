@@ -1,830 +1,1191 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Trading Dashboard - ByBit Bot</title>
-    
-    <!-- External Libraries -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <title>A.R.I.E - AI Trading Bot Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.29.1.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Custom Styles -->
-    <link rel="stylesheet" href="/static/styles.css">
-    <link rel="stylesheet" href="/static/styles_dashboard.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'neon-cyan': '#00D9FF',
+                        'neon-yellow': '#FFD700',
+                        'neon-pink': '#CC0000',
+                        'neon-green': '#008844',
+                        'neon-orange': '#FF6B00',
+                        'matrix-green': '#00FF41',
+                        'dark-bg': '#0A0A0F',
+                        'dark-panel': '#0F0F1A',
+                        'dark-border': '#1A1A2E',
+                        'dark-hover': '#16213E'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
+                        'mono': ['SF Mono', 'Consolas', 'monospace']
+                    },
+                    animation: {
+                        'pulse-neon': 'pulse-neon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                        'float': 'float 6s ease-in-out infinite',
+                        'matrix': 'matrix 20s linear infinite'
+                    },
+                    backdropBlur: {
+                        xs: '2px',
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        @keyframes pulse-neon {
+            0%, 100% { opacity: 1; filter: brightness(1) drop-shadow(0 0 20px currentColor); }
+            50% { opacity: 0.8; filter: brightness(1.2) drop-shadow(0 0 40px currentColor); }
+        }
+        @keyframes glow {
+            from { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+            to { text-shadow: 0 0 20px currentColor, 0 0 30px currentColor, 0 0 40px currentColor; }
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            33% { transform: translateY(-10px) rotate(1deg); }
+            66% { transform: translateY(5px) rotate(-1deg); }
+        }
+        @keyframes matrix {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(100%); }
+        }
+        
+        body {
+            background: #0A0A0F;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        /* Removed animated background lines */
+        
+        
+        .glass-panel {
+            background: rgba(15, 15, 26, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 0 40px rgba(0, 217, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .glass-panel::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent 30%,
+                rgba(0, 217, 255, 0.1) 50%,
+                transparent 70%
+            );
+            transform: rotate(45deg);
+            transition: all 0.5s;
+            opacity: 0;
+        }
+        
+        .glass-panel:hover::before {
+            opacity: 1;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .neon-text {
+            text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+            letter-spacing: 0.05em;
+        }
+        
+        .neon-border {
+            position: relative;
+            border: 2px solid transparent;
+            background: linear-gradient(#0F0F1A, #0F0F1A) padding-box,
+                        linear-gradient(45deg, #FFD700, #FFED4E, #FFA500, #FFD700) border-box;
+        }
+        
+        .neon-border::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #FFD700, #FFED4E, #FFA500, #FFD700);
+            z-index: -1;
+            filter: blur(10px);
+            opacity: 0.5;
+            animation: float 4s ease-in-out infinite;
+        }
+        
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 0;
+            opacity: 0.05;
+        }
+        
+        .matrix-bg::before {
+            content: '101010110101001010101101010010101011010100101010110101001010101101010010101011010100';
+            position: absolute;
+            top: -100%;
+            left: 0;
+            width: 100%;
+            height: 200%;
+            color: #00FF41;
+            font-family: 'Fira Code', monospace;
+            font-size: 20px;
+            line-height: 1.2;
+            animation: matrix 20s linear infinite;
+            word-break: break-all;
+        }
+        
+        .cyber-button {
+            position: relative;
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(161, 0, 255, 0.1));
+            border: 1px solid rgba(0, 217, 255, 0.5);
+            color: #00D9FF;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.3s;
+            overflow: hidden;
+        }
+        
+        .cyber-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: radial-gradient(circle, rgba(0, 217, 255, 0.5), transparent);
+            transform: translate(-50%, -50%);
+            transition: width 0.5s, height 0.5s;
+        }
+        
+        .cyber-button:hover {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(161, 0, 255, 0.2));
+            border-color: #00D9FF;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.5), inset 0 0 20px rgba(0, 217, 255, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .cyber-button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .cyber-button:active {
+            transform: translateY(0);
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            position: relative;
+        }
+        
+        .status-indicator.online {
+            background: #00FF88;
+            box-shadow: 0 0 10px #00FF88, 0 0 20px #00FF88;
+        }
+        
+        .status-indicator.offline {
+            background: #FF00C1;
+            box-shadow: 0 0 10px #FF00C1, 0 0 20px #FF00C1;
+        }
+        
+        .status-indicator.processing {
+            background: #FFD700;
+            box-shadow: 0 0 10px #FFD700, 0 0 20px #FFD700;
+            animation: pulse-neon 1s infinite;
+        }
+        
+        .profit-text { color: #00FF88; text-shadow: 0 0 10px #00FF88; }
+        .loss-text { color: #FF00C1; text-shadow: 0 0 10px #FF00C1; }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            background: rgba(10, 10, 15, 0.8);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .trading-view-widget {
+            background: rgba(15, 15, 26, 0.9);
+            border: 1px solid rgba(0, 217, 255, 0.3);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(to bottom, #00D9FF, #A100FF);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(to bottom, #00D9FF, #FF00C1);
+        }
+    </style>
 </head>
-<body class="bg-gray-900 text-white">
+<body class="bg-dark-bg text-white font-sans min-h-screen relative">
+    <!-- Matrix Background -->
+    <div class="matrix-bg"></div>
+    
+    
     <!-- Include shared header -->
     {% include 'includes/header.html' %}
-    
-    <div class="min-h-screen w-full px-4 py-8">
-        <!-- Header -->
-        <div class="mb-8">
-            <h1 class="text-4xl font-bold bg-gradient-to-r from-yellow-400 to-red-500 bg-clip-text text-transparent">
-                AI Trading Dashboard
-            </h1>
-            <p class="text-gray-400 mt-2">ByBit Perpetual Trading Bot</p>
-        </div>
 
-        <!-- Control Panel -->
-        <div class="glass-card rounded-xl p-6 mb-8">
-            <div class="flex justify-between items-center">
-                <div>
-                    <h2 class="text-2xl font-bold text-neon-cyan mb-2">
-                        <i class="fas fa-robot mr-2"></i>Bot Control
-                    </h2>
-                    <p class="text-gray-400">Manage your trading bot operations</p>
+    <div class="flex min-h-screen relative z-10">
+        <!-- AI Control Sidebar -->
+        <div class="w-96 bg-gradient-to-b from-dark-panel to-dark-bg p-6 border-r border-dark-border">
+            <div class="space-y-6">
+                <!-- Neural Control Center -->
+                <div class="glass-panel rounded-xl p-6 neon-border">
+                    <h3 class="text-2xl font-bold text-neon-cyan mb-6 flex items-center animate-glow">
+                        <i class="fas fa-robot mr-3"></i> A.R.I.E CONTROL CENTER
+                    </h3>
                     
-                    <!-- Status Indicators -->
-                    <div class="flex items-center gap-6 mt-4">
-                        <div class="flex items-center gap-2">
-                            <div class="status-dot status-online" id="apiStatus"></div>
-                            <span class="text-sm text-gray-400">API</span>
+                    <!-- System Status -->
+                    <div class="mb-6 p-4 bg-dark-bg/50 rounded-lg border border-neon-cyan/20">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-gray-400 text-sm">SYSTEM STATUS</span>
+                            <span id="systemStatus" class="flex items-center">
+                                <span class="status-indicator offline" id="statusDot"></span>
+                                <span class="text-sm font-medium" id="statusText">OFFLINE</span>
+                            </span>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <div class="status-dot status-online" id="dbStatus"></div>
-                            <span class="text-sm text-gray-400">Database</span>
+                        <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                                <span class="text-gray-500">API:</span>
+                                <span id="apiStatus" class="ml-1 text-neon-green">CONNECTED</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">AI:</span>
+                                <span id="aiStatus" class="ml-1 text-neon-yellow">TRAINING</span>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <div class="status-dot status-online" id="aiStatus"></div>
-                            <span class="text-sm text-gray-400">AI Model</span>
+                    </div>
+                    
+                    <!-- Control Buttons -->
+                    <div class="space-y-4">
+                        <button class="w-full cyber-button py-4 px-6 rounded-lg flex items-center justify-center group" onclick="startBot()" id="startBtn" style="background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 217, 255, 0.1)); border-color: #00FF88; color: #00FF88;">
+                            <i class="fas fa-play mr-3 text-lg group-hover:animate-pulse"></i>
+                            <span class="font-bold text-lg">START BOT</span>
+                        </button>
+                        
+                        <button class="w-full cyber-button py-4 px-6 rounded-lg flex items-center justify-center group" onclick="stopBot()" id="stopBtn" style="background: linear-gradient(135deg, rgba(255, 0, 193, 0.2), rgba(255, 107, 0, 0.1)); border-color: #FF00C1; color: #FF00C1;">
+                            <i class="fas fa-stop mr-3 text-lg group-hover:animate-pulse"></i>
+                            <span class="font-bold text-lg">STOP BOT</span>
+                        </button>
+                        
+                        <div class="mt-4 p-3 bg-dark-bg/50 rounded-lg border border-neon-yellow/30">
+                            <div class="text-xs text-neon-yellow text-center">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                START: Trains AI + Starts Live Trading<br>
+                                STOP: Stops all trading activities
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Trading Parameters -->
+                    <div class="mt-6 p-4 bg-dark-bg/50 rounded-lg border border-neon-yellow/20">
+                        <h4 class="text-sm font-bold text-neon-yellow mb-3">TRADING PARAMETERS</h4>
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Risk Level:</span>
+                                <span class="text-neon-green">MODERATE</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Max Positions:</span>
+                                <span class="text-neon-yellow" id="maxPositions">20</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">AI Confidence:</span>
+                                <span class="text-neon-yellow" id="aiConfidence">85%</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="flex items-center gap-4">
-                    <button id="startBotBtn" onclick="startBot()" class="cyber-button px-6 py-3 rounded-lg">
-                        <i class="fas fa-play mr-2"></i>START
-                    </button>
-                    <button id="stopBotBtn" onclick="stopBot()" class="cyber-button px-6 py-3 rounded-lg">
-                        <i class="fas fa-stop mr-2"></i>STOP
-                    </button>
+                
+                <!-- Training Progress -->
+                <div class="glass-panel rounded-xl p-6" id="trainingProgressPanel" style="display: none;">
+                    <h4 class="text-lg font-bold text-neon-yellow mb-4 flex items-center">
+                        <i class="fas fa-brain mr-2 animate-pulse"></i> AI TRAINING
+                    </h4>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>Progress</span>
+                                <span id="trainingPercent">0%</span>
+                            </div>
+                            <div class="w-full bg-dark-bg rounded-full h-3 overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-neon-yellow to-neon-orange transition-all duration-500" 
+                                     style="width: 0%" id="trainingProgressBar"></div>
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-400">
+                            <div>Symbol: <span id="currentSymbol" class="text-neon-cyan">-</span></div>
+                            <div>Batch: <span id="currentBatch" class="text-neon-yellow">0/0</span></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Activity Log -->
+                <div class="glass-panel rounded-xl p-6">
+                    <h4 class="text-lg font-bold text-neon-green mb-4 flex items-center">
+                        <i class="fas fa-terminal mr-2"></i> SYSTEM LOG
+                    </h4>
+                    <div class="h-64 overflow-y-auto bg-dark-bg/50 rounded-lg p-3 font-mono text-xs" id="consoleOutput">
+                        <div class="text-neon-green">System initialized...</div>
+                        <div class="text-gray-400">Waiting for commands...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 p-8">
+            <!-- Top Stats Grid -->
+            <div class="grid grid-cols-4 gap-6 mb-8">
+                <!-- Total Balance -->
+                <div class="glass-panel rounded-xl p-6 hover:scale-105 transition-transform">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-sm font-medium text-gray-400">TOTAL BALANCE</h4>
+                        <i class="fas fa-wallet text-neon-cyan text-xl"></i>
+                    </div>
+                    <div class="text-3xl font-bold font-bold text-white" id="totalBalance">$0.00</div>
+                    <div class="text-sm mt-2 text-gray-500">USDT</div>
+                </div>
+                
+                <!-- Active Positions -->
+                <div class="glass-panel rounded-xl p-6 hover:scale-105 transition-transform">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-sm font-medium text-gray-400">ACTIVE POSITIONS</h4>
+                        <i class="fas fa-chart-line text-neon-yellow text-xl"></i>
+                    </div>
+                    <div class="text-3xl font-bold font-bold text-white" id="activePositions">0</div>
+                    <div class="text-sm mt-2 text-gray-500">TRADES</div>
+                </div>
+                
+                <!-- Daily P&L -->
+                <div class="glass-panel rounded-xl p-6 hover:scale-105 transition-transform">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-sm font-medium text-gray-400">24H P&L</h4>
+                        <i class="fas fa-chart-area text-neon-yellow text-xl"></i>
+                    </div>
+                    <div class="text-3xl font-bold font-bold" id="dailyPnL">
+                        <span class="profit-text">+$0.00</span>
+                    </div>
+                    <div class="text-sm mt-2" id="dailyPnLPercent">
+                        <span class="profit-text">+0.00%</span>
+                    </div>
+                </div>
+                
+                <!-- Win Rate -->
+                <div class="glass-panel rounded-xl p-6 hover:scale-105 transition-transform">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-sm font-medium text-gray-400">WIN RATE</h4>
+                        <i class="fas fa-trophy text-neon-yellow text-xl"></i>
+                    </div>
+                    <div class="text-3xl font-bold font-bold text-white" id="winRate">0%</div>
+                    <div class="text-sm mt-2 text-gray-500" id="totalTrades">0 TRADES</div>
                 </div>
             </div>
             
-            <!-- Balance Display -->
-            <div class="mt-6 grid grid-cols-3 gap-4">
-                <div class="text-center">
-                    <div class="text-sm text-gray-400">Total Balance</div>
-                    <div class="text-2xl font-bold text-neon-yellow" id="balance">$0.00</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-sm text-gray-400">Unrealized PnL</div>
-                    <div class="text-2xl font-bold" id="unrealizedPnl">$0.00</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-sm text-gray-400">24h Volume</div>
-                    <div class="text-2xl font-bold text-neon-cyan" id="volume24h">$0.00</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Time Period Selector -->
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold">Performance Analytics</h2>
-            <div class="flex items-center gap-2">
-                <button class="cyber-button py-2 px-4 rounded-lg text-sm active" onclick="changePeriod('1d')" data-period="1d">1D</button>
-                <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="changePeriod('1w')" data-period="1w">1W</button>
-                <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="changePeriod('1m')" data-period="1m">1M</button>
-                <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="changePeriod('3m')" data-period="3m">3M</button>
-                <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="changePeriod('1y')" data-period="1y">1Y</button>
-                <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="changePeriod('all')" data-period="all">ALL</button>
-            </div>
-        </div>
-
-        <!-- Key Metrics Grid -->
-        <div class="grid grid-cols-6 gap-6 mb-8">
-            <div class="metric-card glass-card rounded-xl p-6 text-center">
-                <div class="metric-number" id="totalReturn">+0.00%</div>
-                <div class="metric-label">Total Return</div>
-            </div>
-            <div class="metric-card glass-card rounded-xl p-6 text-center">
-                <div class="metric-number" id="sharpeRatio">0.00</div>
-                <div class="metric-label">Sharpe Ratio</div>
-            </div>
-            <div class="metric-card glass-card rounded-xl p-6 text-center">
-                <div class="metric-number" id="maxDrawdown">0.00%</div>
-                <div class="metric-label">Max Drawdown</div>
-            </div>
-            <div class="metric-card glass-card rounded-xl p-6 text-center">
-                <div class="metric-number" id="winRate">0.00%</div>
-                <div class="metric-label">Win Rate</div>
-            </div>
-            <div class="metric-card glass-card rounded-xl p-6 text-center">
-                <div class="metric-number" id="avgTrade">$0.00</div>
-                <div class="metric-label">Avg Trade</div>
-            </div>
-            <div class="metric-card glass-card rounded-xl p-6 text-center">
-                <div class="metric-number" id="profitFactor">0.00</div>
-                <div class="metric-label">Profit Factor</div>
-            </div>
-        </div>
-
-        <!-- Performance Overview -->
-        <div class="glass-card rounded-xl p-6 mb-8">
-            <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                <i class="fas fa-trophy mr-2"></i>Performance Overview
-            </h3>
-            <div class="grid grid-cols-4 gap-6">
-                <div class="text-center">
-                    <h6 class="text-sm text-gray-400 mb-2">Strategy Performance</h6>
-                    <span class="performance-badge performance-good" id="strategyRating">Good</span>
-                </div>
-                <div class="text-center">
-                    <h6 class="text-sm text-gray-400 mb-2">Risk Management</h6>
-                    <span class="performance-badge performance-excellent" id="riskRating">Excellent</span>
-                </div>
-                <div class="text-center">
-                    <h6 class="text-sm text-gray-400 mb-2">Consistency</h6>
-                    <span class="performance-badge performance-average" id="consistencyRating">Average</span>
-                </div>
-                <div class="text-center">
-                    <h6 class="text-sm text-gray-400 mb-2">Overall Score</h6>
-                    <span class="performance-badge performance-good" id="overallRating">7.5/10</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Charts Grid -->
-        <div class="grid grid-cols-3 gap-6 mb-8">
-            <div class="col-span-2">
-                <div class="glass-card rounded-xl p-6">
-                    <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                        <i class="fas fa-chart-line mr-2"></i>Portfolio Performance & Drawdown
+            <!-- Open Positions -->
+            <div class="glass-panel rounded-xl p-6 mb-8">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold font-bold text-white flex items-center">
+                        <i class="fas fa-rocket mr-3 text-neon-cyan animate-pulse"></i>
+                        ACTIVE POSITIONS
                     </h3>
-                    <div id="performanceChart" class="chart-container"></div>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="closeAllPositions()">
+                        <i class="fas fa-times-circle mr-2"></i> CLOSE ALL
+                    </button>
                 </div>
-            </div>
-            <div class="col-span-1">
-                <div class="glass-card rounded-xl p-6">
-                    <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                        <i class="fas fa-pie-chart mr-2"></i>Trade Distribution
-                    </h3>
-                    <div id="tradeDistChart" class="chart-container"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Second Charts Row -->
-        <div class="grid grid-cols-2 gap-6 mb-8">
-            <div class="glass-card rounded-xl p-6">
-                <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                    <i class="fas fa-calendar-alt mr-2"></i>Monthly Returns
-                </h3>
-                <div id="monthlyReturnsChart" class="chart-container"></div>
-            </div>
-            <div class="glass-card rounded-xl p-6">
-                <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                    <i class="fas fa-clock mr-2"></i>Trade Duration Analysis
-                </h3>
-                <div id="durationChart" class="chart-container"></div>
-            </div>
-        </div>
-
-        <!-- Statistics Tables -->
-        <div class="grid grid-cols-2 gap-6 mb-8">
-            <div class="glass-card rounded-xl p-6">
-                <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                    <i class="fas fa-list-alt mr-2"></i>Detailed Statistics
-                </h3>
-                <div class="stat-table">
+                <div class="overflow-x-auto">
                     <table class="w-full">
-                        <tbody>
-                            <tr><td>Total Trades</td><td id="statTotalTrades">0</td></tr>
-                            <tr><td>Winning Trades</td><td id="statWinningTrades">0</td></tr>
-                            <tr><td>Losing Trades</td><td id="statLosingTrades">0</td></tr>
-                            <tr><td>Largest Win</td><td id="statLargestWin">$0.00</td></tr>
-                            <tr><td>Largest Loss</td><td id="statLargestLoss">$0.00</td></tr>
-                            <tr><td>Average Win</td><td id="statAverageWin">$0.00</td></tr>
-                            <tr><td>Average Loss</td><td id="statAverageLoss">$0.00</td></tr>
-                            <tr><td>Consecutive Wins</td><td id="statConsecutiveWins">0</td></tr>
-                            <tr><td>Consecutive Losses</td><td id="statConsecutiveLosses">0</td></tr>
+                        <thead>
+                            <tr class="border-b border-dark-border text-left">
+                                <th class="pb-3 text-gray-400 font-medium">Symbol</th>
+                                <th class="pb-3 text-gray-400 font-medium">Side</th>
+                                <th class="pb-3 text-gray-400 font-medium">Size</th>
+                                <th class="pb-3 text-gray-400 font-medium">Entry</th>
+                                <th class="pb-3 text-gray-400 font-medium">Current</th>
+                                <th class="pb-3 text-gray-400 font-medium">P&L</th>
+                                <th class="pb-3 text-gray-400 font-medium">ROI</th>
+                                <th class="pb-3 text-gray-400 font-medium">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positionsTable">
+                            <tr>
+                                <td colspan="8" class="text-center py-8 text-gray-500">
+                                    No active positions
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-            <div class="glass-card rounded-xl p-6">
-                <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                    <i class="fas fa-shield-alt mr-2"></i>Risk Metrics
-                </h3>
-                <div class="stat-table">
-                    <table class="w-full">
-                        <tbody>
-                            <tr><td>Volatility (Annualized)</td><td id="statVolatility">0.00%</td></tr>
-                            <tr><td>Value at Risk (95%)</td><td id="statVaR">$0.00</td></tr>
-                            <tr><td>Beta</td><td id="statBeta">0.00</td></tr>
-                            <tr><td>Alpha</td><td id="statAlpha">0.00%</td></tr>
-                            <tr><td>Calmar Ratio</td><td id="statCalmarRatio">0.00</td></tr>
-                            <tr><td>Sortino Ratio</td><td id="statSortinoRatio">0.00</td></tr>
-                            <tr><td>Recovery Factor</td><td id="statRecoveryFactor">0.00</td></tr>
-                            <tr><td>Payoff Ratio</td><td id="statPayoffRatio">0.00</td></tr>
-                        </tbody>
-                    </table>
+            
+            <!-- Charts Row -->
+            <div class="grid grid-cols-2 gap-6 mb-8">
+                <!-- ROI Chart -->
+                <div class="glass-panel rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold font-bold text-white">CUMULATIVE ROI</h3>
+                        <div class="flex space-x-2">
+                            <button class="cyber-button py-1 px-3 rounded text-xs active" onclick="changeROIPeriod('1h', this)">1H</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('4h', this)">4H</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('12h', this)">12H</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('1d', this)">1D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('3d', this)">3D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('7d', this)">7D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('30d', this)">30D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('3m', this)">3M</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('1y', this)">1Y</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeROIPeriod('all', this)">ALL</button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="roiChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Performance Analytics -->
+                <div class="glass-panel rounded-xl p-6">
+                    <h3 class="text-lg font-bold font-bold text-white mb-4">PERFORMANCE ANALYTICS</h3>
+                    <div class="chart-container">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Trading Signals -->
-        <div class="glass-card rounded-xl p-6 mb-8">
-            <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                <i class="fas fa-chart-line mr-2"></i>Live Trading Signals
-            </h3>
-            <div id="tradingSignals" class="space-y-4">
-                <!-- Signals will be populated here -->
+            
+            <!-- AI Signals -->
+            <div class="glass-panel rounded-xl p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold font-bold text-white flex items-center">
+                        <i class="fas fa-robot mr-3 text-neon-yellow"></i>
+                        AI TRADING SIGNALS
+                    </h3>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-400">Auto-Execute:</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" class="sr-only peer" id="autoExecute" onchange="toggleAutoExecute()">
+                            <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-neon-green"></div>
+                        </label>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4" id="signalsGrid">
+                    <div class="text-center py-12 text-gray-500 col-span-3">
+                        <i class="fas fa-brain text-6xl mb-4 opacity-20"></i>
+                        <p>AI is analyzing market conditions...</p>
+                    </div>
+                </div>
             </div>
-        </div>
-
-        <!-- AI Performance Analysis -->
-        <div class="glass-card rounded-xl p-6">
-            <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                <i class="fas fa-brain mr-2"></i>AI Model Performance
-            </h3>
-            <div id="aiPerformanceChart" class="chart-container"></div>
         </div>
     </div>
 
+    <!-- WebSocket and JavaScript -->
     <script>
-        let currentPeriod = '1d';
-        let analyticsData = {};
-
-        document.addEventListener('DOMContentLoaded', function() {
-            loadAnalyticsData();
-            initializeCharts();
-            checkSystemStatus();
-            loadTradingSignals();
-            
-            // Auto-refresh every 30 seconds
-            setInterval(loadAnalyticsData, 30000);
-            setInterval(checkSystemStatus, 15000);
-            setInterval(loadTradingSignals, 10000);
-        });
-
-        function changePeriod(period) {
-            currentPeriod = period;
-            
-            // Update active button
-            document.querySelectorAll('[data-period]').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            document.querySelector(`[data-period="${period}"]`).classList.add('active');
-            
-            loadAnalyticsData();
-        }
-
-        function startBot() {
-            fetch('/start_bot', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    alert(data.message || 'Bot started');
-                    loadAnalyticsData();
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Failed to start bot');
-                });
-        }
-
-        function stopBot() {
-            fetch('/stop_bot', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    alert(data.message || 'Bot stopped');
-                    loadAnalyticsData();
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Failed to stop bot');
-                });
-        }
-
-        function checkSystemStatus() {
-            // Check API status
-            fetch('/api/status/api')
-                .then(response => response.json())
-                .then(data => {
-                    const apiDot = document.getElementById('apiStatus');
-                    if (data.status === 'online') {
-                        apiDot.className = 'status-dot status-online';
-                    } else {
-                        apiDot.className = 'status-dot status-offline';
+        const socket = io();
+        let roiChart, performanceChart;
+        let currentROIPeriod = '1h';
+        
+        // Initialize charts
+        function initCharts() {
+            // ROI Chart
+            const roiCtx = document.getElementById('roiChart').getContext('2d');
+            roiChart = new Chart(roiCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Cumulative ROI %',
+                        data: [],
+                        borderColor: '#00D9FF',
+                        backgroundColor: 'rgba(0, 217, 255, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#00D9FF',
+                        pointBorderColor: '#00D9FF',
+                        pointHoverBackgroundColor: '#FF00C1',
+                        pointHoverBorderColor: '#FF00C1',
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#00D9FF',
+                            bodyColor: '#FFFFFF',
+                            borderColor: '#00D9FF',
+                            borderWidth: 1,
+                            cornerRadius: 4,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return `ROI: ${context.parsed.y.toFixed(2)}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                borderColor: 'rgba(0, 217, 255, 0.3)'
+                            },
+                            ticks: {
+                                color: '#888',
+                                font: {
+                                    family: 'JetBrains Mono'
+                                }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                borderColor: 'rgba(0, 217, 255, 0.3)'
+                            },
+                            ticks: {
+                                color: '#888',
+                                font: {
+                                    family: 'JetBrains Mono'
+                                },
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
                     }
-                })
-                .catch(() => {
-                    document.getElementById('apiStatus').className = 'status-dot status-offline';
-                });
-
-            // Check Database status
-            fetch('/api/status/db')
-                .then(response => response.json())
-                .then(data => {
-                    const dbDot = document.getElementById('dbStatus');
-                    if (data.status === 'online') {
-                        dbDot.className = 'status-dot status-online';
-                    } else {
-                        dbDot.className = 'status-dot status-offline';
-                    }
-                })
-                .catch(() => {
-                    document.getElementById('dbStatus').className = 'status-dot status-offline';
-                });
-
-            // Check AI Model status
-            fetch('/api/status/ai')
-                .then(response => response.json())
-                .then(data => {
-                    const aiDot = document.getElementById('aiStatus');
-                    if (data.status === 'online') {
-                        aiDot.className = 'status-dot status-online';
-                    } else {
-                        aiDot.className = 'status-dot status-offline';
-                    }
-                })
-                .catch(() => {
-                    document.getElementById('aiStatus').className = 'status-dot status-offline';
-                });
-        }
-
-        function loadTradingSignals() {
-            fetch('/api/trading_signals')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        displayTradingSignals(data.signals, data.auto_execute);
-                    } else {
-                        console.error('Failed to load trading signals');
-                    }
-                })
-                .catch(error => {
-                    console.error('Trading signals error:', error);
-                });
-        }
-
-        function displayTradingSignals(signals, autoExecute) {
-            const container = document.getElementById('tradingSignals');
-            if (!signals || signals.length === 0) {
-                container.innerHTML = '<p class="text-gray-400">No trading signals available</p>';
-                return;
-            }
-
-            container.innerHTML = signals.map(signal => `
-                <div class="bg-gray-800 rounded-lg p-4 border-l-4 ${signal.signal === 'BUY' ? 'border-green-500' : 'border-red-500'}">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <h4 class="font-bold text-white">${signal.symbol}</h4>
-                            <p class="text-sm text-gray-400">${signal.signal} at $${signal.price}</p>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-lg font-bold ${signal.signal === 'BUY' ? 'text-green-400' : 'text-red-400'}">${signal.confidence}%</div>
-                            <div class="text-xs text-gray-500">${new Date(signal.timestamp).toLocaleTimeString()}</div>
-                        </div>
-                    </div>
-                    ${autoExecute ? `
-                        <div class="mt-2 text-sm text-yellow-400">
-                            <i class="fas fa-bolt"></i> Auto-execute enabled
-                        </div>
-                    ` : `
-                        <button onclick="executeSignal('${signal.symbol}', '${signal.signal}', ${signal.confidence})" 
-                                class="mt-2 cyber-button px-4 py-2 rounded text-sm">
-                            Execute Trade
-                        </button>
-                    `}
-                </div>
-            `).join('');
-        }
-
-        function executeSignal(symbol, signal, confidence) {
-            fetch('/api/execute_ai_trade', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ symbol: symbol, side: signal, confidence: confidence, amount: 100 })
-            })
-            .then(response => response.json())
-            .then(data => {
-                alert(data.message);
-                if (data.success) {
-                    loadTradingSignals();
-                    loadAnalyticsData();
                 }
-            })
-            .catch(error => {
-                console.error('Execute trade error:', error);
-                alert('Failed to execute trade');
+            });
+            
+            // Performance Chart
+            const perfCtx = document.getElementById('performanceChart').getContext('2d');
+            performanceChart = new Chart(perfCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Wins', 'Losses', 'Pending'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: [
+                            'rgba(0, 255, 136, 0.5)',
+                            'rgba(255, 0, 193, 0.5)',
+                            'rgba(255, 215, 0, 0.5)'
+                        ],
+                        borderColor: [
+                            '#00FF88',
+                            '#FF00C1',
+                            '#FFD700'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#00D9FF',
+                            bodyColor: '#FFFFFF',
+                            borderColor: '#00D9FF',
+                            borderWidth: 1,
+                            cornerRadius: 4
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                borderColor: 'rgba(0, 217, 255, 0.3)'
+                            },
+                            ticks: {
+                                color: '#888',
+                                font: {
+                                    family: 'Orbitron',
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                borderColor: 'rgba(0, 217, 255, 0.3)'
+                            },
+                            ticks: {
+                                color: '#888',
+                                font: {
+                                    family: 'JetBrains Mono'
+                                }
+                            }
+                        }
+                    }
+                }
             });
         }
-
-        function loadAnalyticsData() {
+        
+        // Update dashboard data with real ByBit data
+        function updateDashboard() {
+            // Get real balance data
             fetch('/api/analytics_data')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        analyticsData = processRealData(data);
-                        updateMetrics();
-                        updateCharts();
-                        updateBalance(data);
-                    } else {
-                        console.error('Failed to load analytics data:', data.error);
-                        analyticsData = generateFallbackData();
-                        updateMetrics();
-                        updateCharts();
+                        // Update balance with real data
+                        document.getElementById('totalBalance').textContent = `$${data.total_balance.toFixed(2)}`;
+                        
+                        // Update positions with real data
+                        document.getElementById('activePositions').textContent = data.active_positions_count;
+                        
+                        // Update P&L with real data
+                        const pnlElement = document.getElementById('dailyPnL');
+                        const pnlPercentElement = document.getElementById('dailyPnLPercent');
+                        const pnl = data.unrealized_pnl;
+                        const pnlPercent = data.total_balance > 0 ? (pnl / data.total_balance * 100) : 0;
+                        
+                        if (pnl >= 0) {
+                            pnlElement.innerHTML = `<span class="profit-text">+$${Math.abs(pnl).toFixed(2)}</span>`;
+                            pnlPercentElement.innerHTML = `<span class="profit-text">+${Math.abs(pnlPercent).toFixed(2)}%</span>`;
+                        } else {
+                            pnlElement.innerHTML = `<span class="loss-text">-$${Math.abs(pnl).toFixed(2)}</span>`;
+                            pnlPercentElement.innerHTML = `<span class="loss-text">-${Math.abs(pnlPercent).toFixed(2)}%</span>`;
+                        }
+                        
+                        // Calculate real win rate from trading history
+                        const winRate = data.win_rate || 0;
+                        const totalTrades = data.total_trades || 0;
+                        document.getElementById('winRate').textContent = `${winRate.toFixed(1)}%`;
+                        document.getElementById('totalTrades').textContent = `${totalTrades} TRADES`;
+                        
+                        // Update positions table with real data
+                        updatePositionsTable(data.positions || []);
+                        
+                        // Update performance chart with real data
+                        updatePerformanceChart(data);
                     }
                 })
                 .catch(error => {
-                    console.error('Analytics data error:', error);
-                    analyticsData = generateFallbackData();
-                    updateMetrics();
-                    updateCharts();
+                    console.error('Dashboard update error:', error);
+                    // Show error state
+                    document.getElementById('totalBalance').textContent = 'Error';
+                    document.getElementById('activePositions').textContent = '0';
                 });
+                
+            // Update trading parameters from settings
+            updateTradingParameters();
+            
+            // Get real trading signals
+            fetch('/api/trading_signals')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateTradingSignals(data.signals || []);
+                    }
+                })
+                .catch(error => console.error('Signals update error:', error));
         }
-
-        function updateBalance(data) {
-            if (data.total_balance) {
-                document.getElementById('balance').textContent = `$${data.total_balance.toFixed(2)}`;
-            }
-            if (data.unrealized_pnl !== undefined) {
-                const pnlElement = document.getElementById('unrealizedPnl');
-                pnlElement.textContent = `$${data.unrealized_pnl.toFixed(2)}`;
-                pnlElement.className = data.unrealized_pnl >= 0 ? 'text-2xl font-bold profit' : 'text-2xl font-bold loss';
-            }
-            if (data.total_volume) {
-                document.getElementById('volume24h').textContent = `$${data.total_volume.toFixed(2)}`;
-            }
-        }
-
-        function processRealData(apiData) {
-            const now = new Date();
-            const days = currentPeriod === '1d' ? 1 : currentPeriod === '1w' ? 7 :
-                         currentPeriod === '1m' ? 30 : currentPeriod === '3m' ? 90 :
-                         currentPeriod === '1y' ? 365 : 365;
-
-            // Calculate metrics from real data
-            const totalReturn = apiData.total_balance > 0 ?
-                (apiData.unrealized_pnl / apiData.total_balance) * 100 : 0;
-
-            const data = {
-                totalReturn: totalReturn,
-                sharpeRatio: apiData.sharpe_ratio || 0,
-                maxDrawdown: Math.abs(apiData.max_drawdown || 0),
-                winRate: apiData.win_rate || 0,
-                avgTrade: apiData.total_trades > 0 ? apiData.total_volume / apiData.total_trades : 0,
-                profitFactor: apiData.profit_factor || 1,
-                totalTrades: apiData.total_trades || 0,
-                winningTrades: Math.floor((apiData.total_trades || 0) * (apiData.win_rate || 0) / 100),
-                losingTrades: Math.floor((apiData.total_trades || 0) * (100 - (apiData.win_rate || 0)) / 100),
-                largestWin: Math.max(apiData.unrealized_pnl, 0),
-                largestLoss: Math.min(apiData.unrealized_pnl, 0),
-                averageWin: apiData.total_trades > 0 ? Math.abs(apiData.unrealized_pnl) / apiData.total_trades : 0,
-                averageLoss: apiData.total_trades > 0 ? Math.abs(apiData.total_fees) / apiData.total_trades : 0,
-                consecutiveWins: apiData.consecutive_wins || 0,
-                consecutiveLosses: apiData.consecutive_losses || 0,
-                volatility: Math.abs(totalReturn) * 2,
-                var95: Math.abs(apiData.unrealized_pnl) * 0.15,
-                beta: 1.0,
-                alpha: totalReturn / 12,
-                calmarRatio: Math.abs(apiData.max_drawdown) > 0 ?
-                    totalReturn / Math.abs(apiData.max_drawdown) : 0,
-                sortinoRatio: (apiData.sharpe_ratio || 0) * 1.2,
-                recoveryFactor: Math.abs(apiData.max_drawdown) > 0 ?
-                    Math.abs(totalReturn) / Math.abs(apiData.max_drawdown) : 1,
-                payoffRatio: Math.abs(apiData.total_fees) > 0 ?
-                    Math.abs(apiData.unrealized_pnl) / Math.abs(apiData.total_fees) : 1,
-                portfolioValues: [],
-                drawdowns: [],
-                monthlyReturns: [],
-                tradeDurations: [],
-                aiAccuracy: []
-            };
-
-            // Generate time series data
-            generateTimeSeriesData(data, days, apiData);
-
-            return data;
-        }
-
-        function generateTimeSeriesData(data, days, apiData) {
-            const now = new Date();
-
-            // Portfolio values and drawdowns
-            for (let i = 0; i < days; i++) {
-                const date = new Date(now - (days - i) * 24 * 60 * 60 * 1000);
-                const dayProgress = i / days;
-                const portfolioValue = apiData.total_balance -
-                    (apiData.unrealized_pnl * (1 - dayProgress));
-
-                data.portfolioValues.push({
-                    date: date,
-                    value: portfolioValue
-                });
-
-                data.drawdowns.push({
-                    date: date,
-                    drawdown: Math.min(0,
-                        (portfolioValue - apiData.total_balance) / apiData.total_balance * 100)
-                });
-            }
-
-            // Monthly returns - use historical data if available
-            if (apiData.monthly_returns && apiData.monthly_returns.length > 0) {
-                data.monthlyReturns = apiData.monthly_returns;
-            } else {
-                // Generate realistic distribution based on total return
-                const baseReturn = data.totalReturn / 12;
-                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                for (let i = 0; i < 12; i++) {
-                    data.monthlyReturns.push({
-                        month: months[i],
-                        return: baseReturn + (baseReturn * 0.3 * Math.sin(i * 0.5))
-                    });
-                }
-            }
-
-            // Trade durations - use real data if available
-            if (apiData.trade_durations && apiData.trade_durations.length > 0) {
-                data.tradeDurations = apiData.trade_durations;
-            } else {
-                // Generate realistic distribution based on total trades
-                const durations = ['< 1h', '1-4h', '4-12h', '12-24h', '1-3d', '> 3d'];
-                durations.forEach((duration, index) => {
-                    data.tradeDurations.push({
-                        duration: duration,
-                        count: Math.floor((data.totalTrades || 0) *
-                            [0.3, 0.25, 0.2, 0.15, 0.08, 0.02][index])
-                    });
-                });
-            }
-
-            // AI accuracy - use real historical data if available
-            if (apiData.ai_accuracy_history && apiData.ai_accuracy_history.length > 0) {
-                data.aiAccuracy = apiData.ai_accuracy_history;
-            } else {
-                // Generate realistic accuracy trend based on win rate
-                const targetAccuracy = data.winRate || 50;
-                for (let i = 0; i < 30; i++) {
-                    const dayOffset = i / 30;
-                    const trendFactor = Math.sin(dayOffset * Math.PI) * 5; // Gradual improvement
-                    data.aiAccuracy.push({
-                        date: new Date(now - (30 - i) * 24 * 60 * 60 * 1000),
-                        accuracy: Math.max(40, Math.min(95, targetAccuracy + trendFactor))
-                    });
-                }
-            }
-        }
-
-        function generateFallbackData() {
-            return {
-                totalReturn: 0, sharpeRatio: 0, maxDrawdown: 0, winRate: 0,
-                avgTrade: 0, profitFactor: 1, totalTrades: 0, winningTrades: 0,
-                losingTrades: 0, largestWin: 0, largestLoss: 0, averageWin: 0,
-                averageLoss: 0, consecutiveWins: 0, consecutiveLosses: 0,
-                volatility: 0, var95: 0, beta: 1, alpha: 0, calmarRatio: 0,
-                sortinoRatio: 0, recoveryFactor: 1, payoffRatio: 1,
-                portfolioValues: [], drawdowns: [], monthlyReturns: [],
-                tradeDurations: [], aiAccuracy: []
-            };
-        }
-
-        function updateMetrics() {
-            document.getElementById('totalReturn').textContent =
-                `${analyticsData.totalReturn >= 0 ? '+' : ''}${analyticsData.totalReturn.toFixed(2)}%`;
-            document.getElementById('sharpeRatio').textContent =
-                analyticsData.sharpeRatio.toFixed(2);
-            document.getElementById('maxDrawdown').textContent =
-                `${analyticsData.maxDrawdown.toFixed(2)}%`;
-            document.getElementById('winRate').textContent =
-                `${analyticsData.winRate.toFixed(1)}%`;
-            document.getElementById('avgTrade').textContent =
-                `$${analyticsData.avgTrade.toFixed(2)}`;
-            document.getElementById('profitFactor').textContent =
-                analyticsData.profitFactor.toFixed(2);
-
-            // Update detailed stats
-            document.getElementById('statTotalTrades').textContent = analyticsData.totalTrades;
-            document.getElementById('statWinningTrades').textContent = analyticsData.winningTrades;
-            document.getElementById('statLosingTrades').textContent = analyticsData.losingTrades;
-            document.getElementById('statLargestWin').textContent =
-                `$${analyticsData.largestWin.toFixed(2)}`;
-            document.getElementById('statLargestLoss').textContent =
-                `$${analyticsData.largestLoss.toFixed(2)}`;
-            document.getElementById('statAverageWin').textContent =
-                `$${analyticsData.averageWin.toFixed(2)}`;
-            document.getElementById('statAverageLoss').textContent =
-                `$${analyticsData.averageLoss.toFixed(2)}`;
-            document.getElementById('statConsecutiveWins').textContent =
-                analyticsData.consecutiveWins;
-            document.getElementById('statConsecutiveLosses').textContent =
-                analyticsData.consecutiveLosses;
-
-            // Update risk metrics
-            document.getElementById('statVolatility').textContent =
-                `${analyticsData.volatility.toFixed(2)}%`;
-            document.getElementById('statVaR').textContent =
-                `$${analyticsData.var95.toFixed(2)}`;
-            document.getElementById('statBeta').textContent =
-                analyticsData.beta.toFixed(2);
-            document.getElementById('statAlpha').textContent =
-                `${analyticsData.alpha.toFixed(2)}%`;
-            document.getElementById('statCalmarRatio').textContent =
-                analyticsData.calmarRatio.toFixed(2);
-            document.getElementById('statSortinoRatio').textContent =
-                analyticsData.sortinoRatio.toFixed(2);
-            document.getElementById('statRecoveryFactor').textContent =
-                analyticsData.recoveryFactor.toFixed(2);
-            document.getElementById('statPayoffRatio').textContent =
-                analyticsData.payoffRatio.toFixed(2);
-
-            // Update color coding
-            const returnElement = document.getElementById('totalReturn');
-            returnElement.className = analyticsData.totalReturn >= 0 ?
-                'metric-number profit' : 'metric-number loss';
-        }
-
-        function initializeCharts() {
-            // Initialize empty charts
-            updateCharts();
-        }
-
-        function updateCharts() {
-            updatePerformanceChart();
-            updateTradeDistributionChart();
-            updateMonthlyReturnsChart();
-            updateDurationChart();
-            updateAIPerformanceChart();
-        }
-
-        function updatePerformanceChart() {
-            if (!analyticsData.portfolioValues || analyticsData.portfolioValues.length === 0) {
+        
+        // Update positions table
+        function updatePositionsTable(positions) {
+            const tbody = document.getElementById('positionsTable');
+            
+            if (!positions || positions.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center py-8 text-gray-500">
+                            No active positions
+                        </td>
+                    </tr>
+                `;
                 return;
             }
-
-            const portfolioTrace = {
-                x: analyticsData.portfolioValues.map(d => d.date),
-                y: analyticsData.portfolioValues.map(d => d.value),
-                type: 'scatter',
-                mode: 'lines',
-                name: 'Portfolio Value',
-                line: { color: '#FFD700', width: 3 }
-            };
-
-            const drawdownTrace = {
-                x: analyticsData.drawdowns.map(d => d.date),
-                y: analyticsData.drawdowns.map(d => d.drawdown),
-                type: 'scatter',
-                mode: 'lines',
-                name: 'Drawdown',
-                line: { color: '#FF00C1', width: 2 },
-                fill: 'tozeroy',
-                fillcolor: 'rgba(255, 0, 193, 0.1)',
-                yaxis: 'y2'
-            };
-
-            const layout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff', family: 'Inter' },
-                xaxis: {
-                    title: 'Date',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                yaxis: {
-                    title: 'Portfolio Value ($)',
-                    side: 'left',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                yaxis2: {
-                    title: 'Drawdown (%)',
-                    side: 'right',
-                    overlaying: 'y',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                hovermode: 'x unified',
-                height: 350,
-                margin: { t: 20, b: 40, l: 60, r: 60 }
-            };
-
-            Plotly.newPlot('performanceChart', [portfolioTrace, drawdownTrace], layout,
-                {responsive: true, displayModeBar: false});
+            
+            tbody.innerHTML = positions.map(pos => {
+                const pnl = parseFloat(pos.unrealisedPnl || 0);
+                const pnlPercent = parseFloat(pos.percentage || 0);
+                const pnlClass = pnl >= 0 ? 'profit-text' : 'loss-text';
+                
+                return `
+                    <tr class="border-b border-dark-border hover:bg-dark-hover transition-colors">
+                        <td class="py-3 font-medium">${pos.symbol}</td>
+                        <td class="py-3">
+                            <span class="px-2 py-1 rounded text-xs font-bold ${pos.side === 'Buy' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}">
+                                ${pos.side}
+                            </span>
+                        </td>
+                        <td class="py-3">${pos.size}</td>
+                        <td class="py-3">$${parseFloat(pos.avgPrice).toFixed(4)}</td>
+                        <td class="py-3">$${parseFloat(pos.markPrice).toFixed(4)}</td>
+                        <td class="py-3 ${pnlClass}">
+                            ${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}
+                        </td>
+                        <td class="py-3 ${pnlClass}">
+                            ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%
+                        </td>
+                        <td class="py-3">
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="closePosition('${pos.symbol}')">
+                                Close
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         }
-
-        function updateTradeDistributionChart() {
-            const data = [{
-                values: [analyticsData.winningTrades, analyticsData.losingTrades],
-                labels: ['Winning Trades', 'Losing Trades'],
-                type: 'pie',
-                marker: { colors: ['#00FF88', '#FF00C1'] },
-                textfont: { color: '#ffffff', family: 'Inter' }
-            }];
-
-            const layout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff', family: 'Inter' },
-                height: 350,
-                margin: { t: 20, b: 20, l: 20, r: 20 },
-                showlegend: true,
-                legend: { font: { color: '#ffffff' } }
-            };
-
-            Plotly.newPlot('tradeDistChart', data, layout,
-                {responsive: true, displayModeBar: false});
+        
+        // Update trading status
+        function updateTradingStatus() {
+            fetch('/api/trading_status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.status) {
+                        const statusDot = document.getElementById('statusDot');
+                        const statusText = document.getElementById('statusText');
+                        
+                        if (data.status.worker_running) {
+                            statusDot.className = 'status-indicator online';
+                            statusText.textContent = 'ONLINE';
+                            statusText.className = 'text-sm font-medium text-neon-green';
+                            
+                            // Start the worker if not already running
+                            if (!data.status.enabled) {
+                                fetch('/api/start_worker', { method: 'POST' })
+                                    .then(response => response.json())
+                                    .then(result => {
+                                        if (result.success) {
+                                            addConsoleMessage('SUCCESS', 'AI Worker activated');
+                                        }
+                                    });
+                            }
+                        } else {
+                            statusDot.className = 'status-indicator offline';
+                            statusText.textContent = 'OFFLINE';
+                            statusText.className = 'text-sm font-medium text-neon-pink';
+                        }
+                        
+                        document.getElementById('maxPositions').textContent = data.status.max_trades || 5;
+                    }
+                })
+                .catch(error => console.error('Trading status error:', error));
         }
-
-        function updateMonthlyReturnsChart() {
-            const data = [{
-                x: analyticsData.monthlyReturns.map(d => d.month),
-                y: analyticsData.monthlyReturns.map(d => d.return),
-                type: 'bar',
-                marker: {
-                    color: analyticsData.monthlyReturns.map(d =>
-                        d.return >= 0 ? '#00FF88' : '#FF00C1')
+        
+        // Socket event handlers
+        socket.on('console_log', function(data) {
+            addConsoleMessage(data.level, data.message);
+        });
+        
+        socket.on('training_progress', function(data) {
+            updateTrainingProgress(data.progress);
+        });
+        
+        socket.on('training_log', function(data) {
+            addConsoleMessage(data.level, data.message);
+        });
+        
+        socket.on('position_update', function(data) {
+            updateDashboard();
+        });
+        
+        // Console message handler
+        function addConsoleMessage(level, message) {
+            const consoleOutput = document.getElementById('consoleOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            let colorClass = 'text-gray-400';
+            let prefix = '>';
+            
+            switch(level) {
+                case 'SUCCESS':
+                    colorClass = 'text-neon-green';
+                    prefix = '✓';
+                    break;
+                case 'ERROR':
+                    colorClass = 'text-neon-pink';
+                    prefix = '✗';
+                    break;
+                case 'WARNING':
+                    colorClass = 'text-neon-yellow';
+                    prefix = '!';
+                    break;
+                case 'INFO':
+                    colorClass = 'text-neon-cyan';
+                    prefix = 'i';
+                    break;
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = colorClass;
+            messageDiv.innerHTML = `<span class="text-gray-600">[${timestamp}]</span> <span class="font-bold">${prefix}</span> ${message}`;
+            
+            consoleOutput.appendChild(messageDiv);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            
+            // Keep only last 100 messages
+            while (consoleOutput.children.length > 100) {
+                consoleOutput.removeChild(consoleOutput.firstChild);
+            }
+        }
+        
+        // Training progress handler
+        function updateTrainingProgress(progress) {
+            const panel = document.getElementById('trainingProgressPanel');
+            panel.style.display = 'block';
+            
+            document.getElementById('trainingPercent').textContent = `${progress.overall_progress.toFixed(1)}%`;
+            document.getElementById('trainingProgressBar').style.width = `${progress.overall_progress}%`;
+            document.getElementById('currentSymbol').textContent = progress.current_symbol || '-';
+            document.getElementById('currentBatch').textContent = `${progress.current_batch}/${progress.total_batches}`;
+            
+            if (progress.overall_progress >= 100) {
+                setTimeout(() => {
+                    panel.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        // Simplified Control functions
+        function startBot() {
+            addConsoleMessage('INFO', 'Starting A.R.I.E trading bot...');
+            
+            // Disable button while starting
+            const startBtn = document.getElementById('startBtn');
+            startBtn.disabled = true;
+            startBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-3"></i><span class="font-bold text-lg">STARTING...</span>';
+            
+            // First start training
+            fetch('/api/start_training', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addConsoleMessage('SUCCESS', 'AI training started - analyzing market data');
+                        
+                        // Then enable live trading
+                        return fetch('/api/enable_trading', { method: 'POST' });
+                    } else {
+                        throw new Error(data.message || 'Failed to start training');
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addConsoleMessage('SUCCESS', '🚀 BOT STARTED - Live trading enabled with real money');
+                        addConsoleMessage('WARNING', '⚠️ REAL MONEY MODE ACTIVE - Monitor positions carefully');
+                    } else {
+                        addConsoleMessage('ERROR', data.message || 'Failed to enable trading');
+                    }
+                })
+                .catch(error => {
+                    addConsoleMessage('ERROR', `Bot startup failed: ${error.message}`);
+                })
+                .finally(() => {
+                    // Re-enable button
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = '<i class="fas fa-play mr-3 text-lg group-hover:animate-pulse"></i><span class="font-bold text-lg">START BOT</span>';
+                    updateTradingStatus();
+                });
+        }
+        
+        function stopBot() {
+            addConsoleMessage('WARNING', 'Stopping A.R.I.E trading bot...');
+            
+            // Disable button while stopping
+            const stopBtn = document.getElementById('stopBtn');
+            stopBtn.disabled = true;
+            stopBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-3"></i><span class="font-bold text-lg">STOPPING...</span>';
+            
+            fetch('/api/stop_all', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addConsoleMessage('SUCCESS', '🛑 BOT STOPPED - All trading activities halted');
+                        addConsoleMessage('INFO', 'Existing positions remain open - close manually if needed');
+                    } else {
+                        addConsoleMessage('ERROR', data.message || 'Failed to stop bot');
+                    }
+                })
+                .catch(error => {
+                    addConsoleMessage('ERROR', `Bot shutdown failed: ${error.message}`);
+                })
+                .finally(() => {
+                    // Re-enable button
+                    stopBtn.disabled = false;
+                    stopBtn.innerHTML = '<i class="fas fa-stop mr-3 text-lg group-hover:animate-pulse"></i><span class="font-bold text-lg">STOP BOT</span>';
+                    updateTradingStatus();
+                });
+        }
+        
+        // ROI period change
+        function changeROIPeriod(period, button) {
+            currentROIPeriod = period;
+            
+            // Update button states
+            document.querySelectorAll('.cyber-button').forEach(btn => {
+                if (btn.textContent.toLowerCase() === period.toLowerCase() || 
+                    (period === 'all' && btn.textContent === 'ALL')) {
+                    btn.classList.add('active');
+                } else if (btn.parentElement.classList.contains('flex') && 
+                          btn.parentElement.classList.contains('space-x-2')) {
+                    btn.classList.remove('active');
                 }
-            }];
-
-            const layout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff', family: 'Inter' },
-                xaxis: {
-                    title: 'Month',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                yaxis: {
-                    title: 'Return (%)',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                height: 350,
-                margin: { t: 20, b: 40, l: 60, r: 20 }
-            };
-
-            Plotly.newPlot('monthlyReturnsChart', data, layout,
-                {responsive: true, displayModeBar: false});
+            });
+            
+            // Update chart data
+            updateROIChart(period);
         }
-
-        function updateDurationChart() {
-            const data = [{
-                x: analyticsData.tradeDurations.map(d => d.duration),
-                y: analyticsData.tradeDurations.map(d => d.count),
-                type: 'bar',
-                marker: { color: '#00D9FF' }
-            }];
-
-            const layout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff', family: 'Inter' },
-                xaxis: {
-                    title: 'Duration',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                yaxis: {
-                    title: 'Number of Trades',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                height: 350,
-                margin: { t: 20, b: 40, l: 60, r: 20 }
-            };
-
-            Plotly.newPlot('durationChart', data, layout,
-                {responsive: true, displayModeBar: false});
+        
+        function updateROIChart(period) {
+            // Fetch actual trading history for ROI calculation
+            fetch('/api/trading_history')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.trades) {
+                        const labels = [];
+                        const roiData = [];
+                        let cumulativeROI = 0;
+                        
+                        // Process actual trade data for ROI
+                        data.trades.forEach((trade, index) => {
+                            if (trade.realizedPnl) {
+                                cumulativeROI += parseFloat(trade.realizedPnl);
+                            }
+                            labels.push(new Date(trade.time).toLocaleDateString());
+                            roiData.push(cumulativeROI);
+                        });
+                        
+                        // If no data, show flat line
+                        if (roiData.length === 0) {
+                            labels.push('Today');
+                            roiData.push(0);
+                        }
+                        
+                        roiChart.data.labels = labels;
+                        roiChart.data.datasets[0].data = roiData;
+                        roiChart.update();
+                    } else {
+                        // Show no data state
+                        roiChart.data.labels = ['No Data'];
+                        roiChart.data.datasets[0].data = [0];
+                        roiChart.update();
+                    }
+                })
+                .catch(error => {
+                    console.error('ROI chart error:', error);
+                    // Show error state
+                    roiChart.data.labels = ['Error'];
+                    roiChart.data.datasets[0].data = [0];
+                    roiChart.update();
+                });
         }
-
-        function updateAIPerformanceChart() {
-            const data = [{
-                x: analyticsData.aiAccuracy.map(d => d.date),
-                y: analyticsData.aiAccuracy.map(d => d.accuracy),
-                type: 'scatter',
-                mode: 'lines+markers',
-                name: 'AI Accuracy',
-                line: { color: '#FFD700', width: 3 },
-                marker: { size: 6, color: '#FFD700' }
-            }];
-
-            const layout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff', family: 'Inter' },
-                xaxis: {
-                    title: 'Date',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                yaxis: {
-                    title: 'Accuracy (%)',
-                    range: [60, 100],
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                height: 350,
-                margin: { t: 20, b: 40, l: 60, r: 20 }
-            };
-
-            Plotly.newPlot('aiPerformanceChart', data, layout,
-                {responsive: true, displayModeBar: false});
+        
+        // Update performance chart with real data
+        function updatePerformanceChart(data) {
+            const wins = data.winning_trades || 0;
+            const losses = (data.total_trades || 0) - wins;
+            const pending = data.active_positions_count || 0;
+            
+            performanceChart.data.datasets[0].data = [wins, losses, pending];
+            performanceChart.update();
+        }
+        
+        // Update trading parameters from settings
+        function updateTradingParameters() {
+            fetch('/api/settings')
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.bot) {
+                        // Update AI confidence threshold
+                        const confidence = data.bot.ai_confidence_threshold || 75;
+                        document.getElementById('aiConfidence').textContent = `${confidence}%`;
+                        
+                        // Update max concurrent trades
+                        const maxTrades = data.bot.max_concurrent_trades || 5;
+                        document.getElementById('maxPositions').textContent = maxTrades;
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to load trading parameters:', error);
+                });
+        }
+        
+        // Update trading signals grid
+        function updateTradingSignals(signals) {
+            const grid = document.getElementById('signalsGrid');
+            
+            if (!signals || signals.length === 0) {
+                grid.innerHTML = `
+                    <div class="text-center py-12 text-gray-500 col-span-3">
+                        <i class="fas fa-brain text-6xl mb-4 opacity-20"></i>
+                        <p>No active trading signals</p>
+                        <p class="text-sm">AI is analyzing market conditions...</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            grid.innerHTML = signals.slice(0, 6).map(signal => `
+                <div class="glass-card rounded-xl p-6 hover:scale-105 transition-all duration-300">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-lg font-bold text-white">${signal.symbol}</h4>
+                        <span class="text-sm px-3 py-1 rounded-full ${signal.side === 'Buy' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}">
+                            ${signal.side}
+                        </span>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Confidence:</span>
+                            <span class="text-neon-yellow font-bold">${signal.confidence}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Take Profit:</span>
+                            <span class="text-neon-green">${signal.take_profit}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Stop Loss:</span>
+                            <span class="text-neon-pink">${signal.stop_loss}%</span>
+                        </div>
+                        <button class="w-full cyber-button py-2 px-4 rounded-lg text-sm mt-4" 
+                                onclick="executeSignal('${signal.symbol}', '${signal.side}', ${signal.take_profit}, ${signal.stop_loss})">
+                            <i class="fas fa-rocket mr-2"></i>EXECUTE
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Execute signal
+        function executeSignal(symbol, side, takeProfit, stopLoss) {
+            if (confirm(`Execute ${side} signal for ${symbol}?`)) {
+                fetch('/api/execute_ai_trade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        side: side,
+                        amount: 100,
+                        takeProfit: takeProfit,
+                        stopLoss: stopLoss
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addConsoleMessage('SUCCESS', `Trade executed: ${symbol} ${side}`);
+                        updateDashboard();
+                    } else {
+                        addConsoleMessage('ERROR', `Trade failed: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    addConsoleMessage('ERROR', `Error: ${error.message}`);
+                });
+            }
+        }
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            updateDashboard();
+            updateTradingStatus();
+            updateROIChart('1h');
+            
+            // Set up refresh intervals
+            setInterval(updateDashboard, 10000);  // Every 10 seconds
+            setInterval(updateTradingStatus, 15000);  // Every 15 seconds
+            
+            // Add initial console message
+            addConsoleMessage('SUCCESS', 'A.R.I.E Control Center initialized');
+            addConsoleMessage('INFO', 'Loading real-time data...');
+            
+            // Initial data load
+            setTimeout(() => {
+                addConsoleMessage('SUCCESS', 'Real-time data connection established');
+            }, 2000);
+        });
+        
+        // Position management
+        function closePosition(symbol) {
+            if (confirm(`Close position for ${symbol}?`)) {
+                fetch('/api/close_position', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol: symbol })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addConsoleMessage('SUCCESS', `Position closed: ${symbol}`);
+                        updateDashboard();
+                    } else {
+                        addConsoleMessage('ERROR', `Failed to close position: ${data.message}`);
+                    }
+                });
+            }
+        }
+        
+        function closeAllPositions() {
+            if (confirm('Close ALL positions?')) {
+                fetch('/api/close_all_positions', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            addConsoleMessage('SUCCESS', 'All positions closed');
+                            updateDashboard();
+                        } else {
+                            addConsoleMessage('ERROR', 'Failed to close positions');
+                        }
+                    });
+            }
         }
     </script>
 </body>
