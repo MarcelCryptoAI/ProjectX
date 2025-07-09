@@ -1418,7 +1418,8 @@ def get_positions():
     try:
         positions = bybit_session.get_positions(
             category="linear",
-            settleCoin="USDT"
+            settleCoin="USDT",
+            limit=200
         )
         
         # Filter only positions with size > 0
@@ -1460,7 +1461,8 @@ def get_positions():
                         'takeProfit': take_profit,
                         'targetInfo': target_info,
                         'trailingStopInfo': trailing_stop_info,
-                        'pnlPercentage': (unrealized_pnl / (size * avg_price) * 100) if size > 0 and avg_price > 0 else 0
+                        # Calculate ROI percentage properly
+                        'pnlPercentage': ((mark_price - avg_price) / avg_price * 100) if side == 'Buy' and avg_price > 0 else ((avg_price - mark_price) / avg_price * 100) if side == 'Sell' and avg_price > 0 else 0
                     })
             
             return jsonify({
@@ -1530,7 +1532,8 @@ def get_stats():
         # Get current positions for additional stats
         positions = bybit_session.get_positions(
             category="linear",
-            settleCoin="USDT"
+            settleCoin="USDT",
+            limit=200
         )
         active_positions = []
         
@@ -1729,7 +1732,8 @@ def close_all_positions():
         # Get all open positions
         positions = bybit_session.get_positions(
             category="linear",
-            settleCoin="USDT"
+            settleCoin="USDT",
+            limit=200
         )
         
         if not positions or 'result' not in positions:
@@ -2292,7 +2296,8 @@ def get_analytics_data():
         balance = bybit_session.get_wallet_balance(accountType="UNIFIED")
         positions = bybit_session.get_positions(
             category="linear",
-            settleCoin="USDT"
+            settleCoin="USDT",
+            limit=200
         )
         history = bybit_session.get_executions(category="linear", limit=100)
         
@@ -2417,7 +2422,8 @@ def get_analytics_data():
                 'avgPrice': float(pos.get('avgPrice', 0)),
                 'markPrice': float(pos.get('markPrice', 0)),
                 'unrealisedPnl': float(pos.get('unrealisedPnl', 0)),
-                'percentage': float(pos.get('unrealisedPnlPcnt', 0)) * 100,
+                # Calculate ROI manually since ByBit doesn't provide unrealisedPnlPcnt
+                'percentage': 0,  # Will calculate below
                 'positionValue': float(pos.get('positionValue', 0)),
                 'leverage': float(pos.get('leverage', 1)),
                 'tp_levels': [],
@@ -2425,6 +2431,16 @@ def get_analytics_data():
                 'sl_moved_to_breakeven': False,
                 'distance_to_tp1': 0
             }
+            
+            # Calculate ROI percentage manually
+            avg_price = position_data['avgPrice']
+            mark_price = position_data['markPrice']
+            if avg_price > 0 and mark_price > 0:
+                if pos.get('side') == 'Buy':
+                    roi = ((mark_price - avg_price) / avg_price) * 100
+                else:  # Sell position
+                    roi = ((avg_price - mark_price) / avg_price) * 100
+                position_data['percentage'] = roi
             
             # Add TP level information from AI worker if available
             if ai_worker and hasattr(ai_worker, 'active_trades'):
@@ -2777,7 +2793,7 @@ def get_trading_signals():
                                 else:
                                     # Check if same direction position exists
                                     try:
-                                        positions = bybit_session.get_positions(category="linear", symbol=result['symbol'])
+                                        positions = bybit_session.get_positions(category="linear", symbol=result['symbol'], limit=200)
                                         if positions and 'result' in positions:
                                             for position in positions['result']['list']:
                                                 if position['symbol'] == result['symbol'] and float(position['size']) > 0:
@@ -3335,7 +3351,8 @@ def update_trade_stats():
         # Get current positions
         positions = bybit_session.get_positions(
             category="linear",
-            settleCoin="USDT"
+            settleCoin="USDT",
+            limit=200
         )
         trade_stats['current_positions'] = positions['result']['list']
         
