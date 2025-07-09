@@ -701,17 +701,16 @@
         
         // Load current balance
         function loadCurrentBalance() {
-            fetch('/api/balance')
+            fetch('/api/balance_header')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
                         const balance = data.balance || 0;
-                        const available = data.available_balance || 0;
-                        const used = data.used_balance || 0;
+                        const pnl = data.pnl_24h || 0;
                         
                         document.getElementById('currentBalance').textContent = `$${balance.toFixed(2)}`;
-                        document.getElementById('availableBalance').textContent = `$${available.toFixed(2)}`;
-                        document.getElementById('usedBalance').textContent = `$${used.toFixed(2)}`;
+                        document.getElementById('availableBalance').textContent = `$${balance.toFixed(2)}`;
+                        document.getElementById('usedBalance').textContent = `$${Math.abs(pnl).toFixed(2)}`;
                     } else {
                         console.error('Balance API error:', data.error);
                         document.getElementById('currentBalance').textContent = '$0.00';
