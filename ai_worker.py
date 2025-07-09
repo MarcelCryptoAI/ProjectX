@@ -676,14 +676,50 @@ class AIWorker:
             side = signal['side']  # Keep as 'Buy' or 'Sell' - don't uppercase
             confidence = signal['confidence']
             
-            # List of most liquid symbols that are definitely supported
+            # Expanded list of supported symbols based on training data
             supported_symbols = [
                 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
                 'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'TRXUSDT', 'LINKUSDT',
                 'DOTUSDT', 'MATICUSDT', 'LTCUSDT', 'BCHUSDT', 'NEARUSDT',
                 'ATOMUSDT', 'UNIUSDT', 'FILUSDT', 'ETCUSDT', 'XLMUSDT',
                 'VETUSDT', 'ICPUSDT', 'APTUSDT', 'HBARUSDT', 'ALGOUSDT',
-                'QNTUSDT', 'LDOUSDT', 'OPUSDT', 'ARBUSDT', 'INJUSDT'
+                'QNTUSDT', 'LDOUSDT', 'OPUSDT', 'ARBUSDT', 'INJUSDT',
+                # Additional symbols from AI training
+                'CTKUSDT', 'DGBUSDT', 'DODOUSDT', 'DUSKUSDT', 'DYDXUSDT',
+                'EDUUSDT', 'EGLDUSDT', 'ENSUSDT', 'EOSUSDT', 'GALAUSDT',
+                'GMTUSDT', 'GRTUSDT', 'HNTUSDT', 'HOTUSDT', 'IOSTUSDT',
+                'IOTAUSDT', 'JASMYUSDT', 'KAVAUSDT', 'KLAYUSDT', 'KNCUSDT',
+                'KSMUSDT', 'LPTUSDT', 'LRCUSDT', 'MANAUSDT', 'MASKUSDT',
+                'MINAUSDT', 'MKRUSDT', 'MTLUSDT', 'OCEANUSDT', 'ONEUSDT',
+                'ONGUSDT', 'ONTUSDT', 'PEOPLEUSDT', 'QTUMUSDT', 'RENUSDT',
+                'RNDRUSDT', 'RSRUSDT', 'SANDUSDT', 'SFPUSDT', 'SKLUSDT',
+                'SLPUSDT', 'SNTUSDT', 'SNXUSDT', 'SPELLUSDT', 'SSVUSDT',
+                'STGUSDT', 'STORJUSDT', 'STRKUSDT', 'STXUSDT', 'SUIUSDT',
+                'SUSHIUSDT', 'SXPUSDT', 'THETAUSDT', 'TLMUSDT', 'TRBUSDT',
+                'TRUUSDT', 'UMAUSDT', 'WLDUSDT', 'WOOUSDT', 'XEMUSDT',
+                'XMRUSDT', 'XTZUSDT', 'YFIUSDT', 'YGGUSDT', 'ZECUSDT',
+                'ZENUSDT', 'ZILUSDT', 'ZRXUSDT', 'AAVEUSDT', 'ACEUSDT',
+                'AGIXUSDT', 'AIUSDT', 'ALPHAUSDT', 'AMBUSDT', 'ANKRUSDT',
+                'APEUSDT', 'ARUSDT', 'ASTRUSDT', 'AUDIOUSDT', 'AVAUSDT',
+                'AXSUSDT', 'BADGERUSDT', 'BALUSDT', 'BANDUSDT', 'BATUSDT',
+                'BELUSDT', 'BICOUSDT', 'BNTUSDT', 'BONEUSDT', 'CHZUSDT',
+                'COMPUSDT', 'CRVUSDT', 'CVXUSDT', 'DARUSDT', 'DASHUSDT',
+                'DENUSDT', 'DREPUSDT', 'DUSKUSDT', 'DYDXUSDT', 'FLMUSDT',
+                'FORTHUSDT', 'FTTUSDT', 'FUNUSDT', 'FXSUSDT', 'GLMUSDT',
+                'GODSUSDT', 'HFTUSDT', 'IDUSDT', 'IMXUSDT', 'JOEUSDT',
+                'JSTOLUSDT', 'LEVERUSDT', 'LINAUSDT', 'LOOMUSDT', 'LQTYUSDT',
+                'MAGICUSDT', 'MAVUSDT', 'MDTUSDT', 'MEMECUSDT', 'MOVRUSDT',
+                'NMRUSDT', 'NKNUSDT', 'NULSUSDT', 'OXTUSDT', 'PENDLEUSDT',
+                'PERPUSDT', 'PHBUSDT', 'POLYXUSDT', 'POWRUSDT', 'PRIMEUSDT',
+                'PUNDIXUSDT', 'RADUSDT', 'RAREUSDT', 'REEFUSDT', 'REQUSDT',
+                'RIFUSDT', 'RLCUSDT', 'ROSEUSDT', 'RUNEUSDT', 'RVNUSDT',
+                'SCUSDT', 'SCRTUSDT', 'SEIUSDT', 'SFPUSDT', 'SHIBUSDT',
+                'SKLUSDT', 'SLPUSDT', 'SNTUSDT', 'SNXUSDT', 'STEEMUSDT',
+                'STMXUSDT', 'STORJUSDT', 'STRKUSDT', 'STXUSDT', 'SUIUSDT',
+                'SUNUSDT', 'SUSHIUSDT', 'SXPUSDT', 'TLMUSDT', 'TRBUSDT',
+                'TRUUSDT', 'UNFIUSDT', 'USDCUSDT', 'WAXPUSDT', 'WLDUSDT',
+                'XECUSDT', 'XEMUSDT', 'XMRUSDT', 'XTZUSDT', 'YFIUSDT',
+                'YGGUSDT', 'ZECUSDT', 'ZENUSDT', 'ZILUSDT', 'ZRXUSDT'
             ]
             
             # Check if symbol is in our supported list
