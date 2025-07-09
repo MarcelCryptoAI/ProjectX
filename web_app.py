@@ -657,10 +657,9 @@ def get_order_history():
                 entry_value = qty * avg_entry_price
                 pnl_percentage = (closed_pnl / entry_value * 100) if entry_value > 0 else 0
                 
-                # For short positions, adjust percentage calculation
-                if side == 'Sell':
-                    # Short position: profit when price goes down
-                    pnl_percentage = -pnl_percentage if closed_pnl != 0 else 0
+                # Note: ByBit API already returns correct P&L for both long and short positions
+                # Short positions: profit when price goes down (positive closed_pnl)
+                # Short positions: loss when price goes up (negative closed_pnl)
                 
                 formatted_order = {
                     'orderId': pnl_entry.get('orderId', ''),
@@ -2264,8 +2263,15 @@ def get_pnl_chart():
             exec_time = pd.to_datetime(int(trade['execTime']), unit='ms')
             exec_fee = float(trade.get('execFee', 0))
             
-            # Calculate trade PnL (simplified - actual PnL calculation would be more complex)
-            trade_pnl = -abs(exec_fee)  # Start with fee as loss
+            # Get actual realized P&L from trade data
+            # Note: Individual executions might not have closedPnl, so we use fees as approximation
+            realized_pnl = float(trade.get('closedPnl', 0))
+            
+            # If no realized P&L available, use fee as negative impact (approximation)
+            if realized_pnl == 0:
+                trade_pnl = -abs(exec_fee)  # Fee as loss approximation
+            else:
+                trade_pnl = realized_pnl - abs(exec_fee)  # Actual P&L minus fees
             
             cumulative_pnl += trade_pnl
             trades.append({
