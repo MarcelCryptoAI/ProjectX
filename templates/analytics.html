@@ -23,10 +23,6 @@
                         'dark-panel': '#0F0F1A',
                         'dark-border': '#1A1A2E',
                         'dark-hover': '#16213E'
-                    },
-                    fontFamily: {
-                        'sans': ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
-                        'mono': ['SF Mono', 'Consolas', 'monospace']
                     }
                 }
             }
@@ -40,712 +36,391 @@
             overflow-x: hidden;
         }
         
-        /* Removed animated background lines */
-        
         .glass-card {
             background: rgba(15, 15, 26, 0.6);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(0, 217, 255, 0.2);
             box-shadow: 
                 0 8px 32px rgba(0, 0, 0, 0.4),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1),
-                0 0 40px rgba(0, 217, 255, 0.1);
-            position: relative;
-            overflow: hidden;
+                0 2px 8px rgba(0, 217, 255, 0.1);
         }
         
-        .metric-card {
-            background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(255, 215, 0, 0.1));
+        .stat-card {
+            background: linear-gradient(135deg, rgba(15, 15, 26, 0.8), rgba(26, 26, 46, 0.5));
             border: 1px solid rgba(0, 217, 255, 0.3);
-            box-shadow: 0 4px 20px rgba(0, 217, 255, 0.1);
             transition: all 0.3s ease;
         }
         
-        .metric-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(0, 217, 255, 0.2);
+        .stat-card:hover {
+            border-color: rgba(0, 217, 255, 0.5);
+            box-shadow: 0 8px 32px rgba(0, 217, 255, 0.1);
         }
         
-        .metric-number {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #FFD700;
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-        }
-        
-        .metric-label {
-            font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.7);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 500;
-        }
-        
-        .profit { color: #008844; text-shadow: 0 0 10px #008844; }
-        .loss { color: #CC0000; text-shadow: 0 0 10px #CC0000; }
-        
-        .cyber-button {
-            position: relative;
-            background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(255, 215, 0, 0.1));
-            border: 1px solid rgba(0, 217, 255, 0.5);
-            color: #00D9FF;
-            font-family: 'Inter', sans-serif;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            transition: all 0.3s;
-            overflow: hidden;
-        }
-        
-        .cyber-button:hover {
-            background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(255, 215, 0, 0.2));
-            border-color: #00D9FF;
-            box-shadow: 0 0 20px rgba(0, 217, 255, 0.5), inset 0 0 20px rgba(0, 217, 255, 0.1);
-            transform: translateY(-1px);
-        }
-        
-        .cyber-button.active {
-            background: linear-gradient(135deg, rgba(0, 217, 255, 0.3), rgba(255, 215, 0, 0.3));
-            border-color: #FFD700;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-            color: #FFD700;
-        }
-        
-        .performance-badge {
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .performance-excellent {
-            background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 217, 255, 0.1));
-            border: 1px solid #00FF88;
+        .metric-up {
             color: #00FF88;
         }
         
-        .performance-good {
-            background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(255, 215, 0, 0.1));
-            border: 1px solid #00D9FF;
+        .metric-down {
+            color: #FF4444;
+        }
+        
+        .metric-neutral {
             color: #00D9FF;
         }
         
-        .performance-average {
-            background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 107, 0, 0.1));
-            border: 1px solid #FFD700;
-            color: #FFD700;
-        }
-        
-        .performance-poor {
-            background: linear-gradient(135deg, rgba(255, 0, 193, 0.2), rgba(255, 107, 0, 0.1));
-            border: 1px solid #FF00C1;
-            color: #FF00C1;
-        }
-        
         .chart-container {
-            height: 400px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
-            padding: 10px;
+            background: rgba(15, 15, 26, 0.8);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            border-radius: 12px;
+            padding: 20px;
         }
         
-        .stat-table {
-            background: rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-            overflow: hidden;
+        .loading {
+            color: #00D9FF;
+            animation: pulse 2s infinite;
         }
         
-        .stat-table tr {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .stat-table td {
-            padding: 12px 16px;
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 0.875rem;
-        }
-        
-        .stat-table td:first-child {
-            color: rgba(255, 255, 255, 0.6);
-        }
-        
-        .stat-table td:last-child {
-            font-weight: 600;
-            color: #FFD700;
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
     </style>
 </head>
-<body class="bg-dark-bg text-white font-sans min-h-screen relative">
-    <!-- Include shared header -->
+<body class="font-sans text-white">
     {% include 'includes/header.html' %}
     
-    <!-- Main Content -->
-    <div class="w-full max-w-none px-4 py-8 relative z-10">
-        <!-- Page Header -->
+    <div class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Header -->
         <div class="mb-8">
-            <div class="flex justify-between items-center">
-                <div>
-                    <h1 class="text-4xl font-bold text-neon-cyan mb-2">
-                        <i class="fas fa-chart-bar mr-3"></i>ADVANCED ANALYTICS
-                    </h1>
-                    <p class="text-gray-400">Comprehensive performance analysis and trading insights</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button class="cyber-button py-2 px-4 rounded-lg text-sm active" onclick="changePeriod('1d')" data-period="1d">1D</button>
-                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="changePeriod('1w')" data-period="1w">1W</button>
-                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="changePeriod('1m')" data-period="1m">1M</button>
-                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="changePeriod('3m')" data-period="3m">3M</button>
-                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="changePeriod('1y')" data-period="1y">1Y</button>
-                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" onclick="changePeriod('all')" data-period="all">ALL</button>
-                </div>
-            </div>
+            <h1 class="text-4xl font-bold text-neon-cyan mb-2">
+                <i class="fas fa-chart-line mr-3"></i>Analytics Dashboard
+            </h1>
+            <p class="text-gray-400">Comprehensive trading performance analysis and statistics</p>
         </div>
         
-        <!-- Key Metrics Grid -->
-        <div class="grid grid-cols-6 gap-6 mb-8">
-            <div class="metric-card glass-card rounded-xl p-6 text-center">
-                <div class="metric-number" id="totalReturn">+0.00%</div>
-                <div class="metric-label">Total Return</div>
-            </div>
-            <div class="metric-card glass-card rounded-xl p-6 text-center">
-                <div class="metric-number" id="sharpeRatio">0.00</div>
-                <div class="metric-label">Sharpe Ratio</div>
-            </div>
-            <div class="metric-card glass-card rounded-xl p-6 text-center">
-                <div class="metric-number" id="maxDrawdown">0.00%</div>
-                <div class="metric-label">Max Drawdown</div>
-            </div>
-            <div class="metric-card glass-card rounded-xl p-6 text-center">
-                <div class="metric-number" id="winRate">0.00%</div>
-                <div class="metric-label">Win Rate</div>
-            </div>
-            <div class="metric-card glass-card rounded-xl p-6 text-center">
-                <div class="metric-number" id="avgTrade">$0.00</div>
-                <div class="metric-label">Avg Trade</div>
-            </div>
-            <div class="metric-card glass-card rounded-xl p-6 text-center">
-                <div class="metric-number" id="profitFactor">0.00</div>
-                <div class="metric-label">Profit Factor</div>
-            </div>
+        <!-- Loading State -->
+        <div id="loading" class="text-center py-12">
+            <i class="fas fa-spinner fa-spin text-4xl text-neon-cyan mb-4"></i>
+            <p class="text-gray-400">Loading analytics data...</p>
         </div>
         
-        <!-- Performance Overview -->
-        <div class="glass-card rounded-xl p-6 mb-8">
-            <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                <i class="fas fa-trophy mr-2"></i>Performance Overview
-            </h3>
-            <div class="grid grid-cols-4 gap-6">
-                <div class="text-center">
-                    <h6 class="text-sm text-gray-400 mb-2">Strategy Performance</h6>
-                    <span class="performance-badge performance-good" id="strategyRating">Good</span>
+        <!-- Main Content -->
+        <div id="analytics-content" style="display: none;">
+            <!-- Portfolio Overview -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="stat-card rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-gray-400 text-sm font-medium">Total Balance</h3>
+                            <p id="totalBalance" class="text-2xl font-bold text-white">$0.00</p>
+                        </div>
+                        <i class="fas fa-wallet text-neon-cyan text-2xl"></i>
+                    </div>
                 </div>
-                <div class="text-center">
-                    <h6 class="text-sm text-gray-400 mb-2">Risk Management</h6>
-                    <span class="performance-badge performance-excellent" id="riskRating">Excellent</span>
+                
+                <div class="stat-card rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-gray-400 text-sm font-medium">Unrealized P&L</h3>
+                            <p id="unrealizedPnl" class="text-2xl font-bold">$0.00</p>
+                        </div>
+                        <i class="fas fa-chart-line text-neon-yellow text-2xl"></i>
+                    </div>
                 </div>
-                <div class="text-center">
-                    <h6 class="text-sm text-gray-400 mb-2">Consistency</h6>
-                    <span class="performance-badge performance-average" id="consistencyRating">Average</span>
+                
+                <div class="stat-card rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-gray-400 text-sm font-medium">Win Rate</h3>
+                            <p id="winRate" class="text-2xl font-bold text-neon-green">0%</p>
+                        </div>
+                        <i class="fas fa-target text-neon-green text-2xl"></i>
+                    </div>
                 </div>
-                <div class="text-center">
-                    <h6 class="text-sm text-gray-400 mb-2">Overall Score</h6>
-                    <span class="performance-badge performance-good" id="overallRating">7.5/10</span>
+                
+                <div class="stat-card rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-gray-400 text-sm font-medium">Active Positions</h3>
+                            <p id="activePositions" class="text-2xl font-bold text-neon-orange">0</p>
+                        </div>
+                        <i class="fas fa-coins text-neon-orange text-2xl"></i>
+                    </div>
                 </div>
             </div>
-        </div>
-        
-        <!-- Charts Grid -->
-        <div class="grid grid-cols-3 gap-6 mb-8">
-            <div class="col-span-2">
-                <div class="glass-card rounded-xl p-6">
+            
+            <!-- Advanced Metrics -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <div class="stat-card rounded-xl p-6">
+                    <h3 class="text-gray-400 text-sm font-medium mb-2">Total Trades</h3>
+                    <p id="totalTrades" class="text-xl font-bold text-white">0</p>
+                    <div class="flex items-center mt-2">
+                        <span id="winningTrades" class="text-sm text-neon-green mr-2">0 wins</span>
+                        <span id="losingTrades" class="text-sm text-neon-red">0 losses</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card rounded-xl p-6">
+                    <h3 class="text-gray-400 text-sm font-medium mb-2">Trading Volume</h3>
+                    <p id="totalVolume" class="text-xl font-bold text-white">$0.00</p>
+                    <p id="totalFees" class="text-sm text-gray-400 mt-1">$0.00 in fees</p>
+                </div>
+                
+                <div class="stat-card rounded-xl p-6">
+                    <h3 class="text-gray-400 text-sm font-medium mb-2">Profit Factor</h3>
+                    <p id="profitFactor" class="text-xl font-bold text-neon-cyan">0.00</p>
+                    <p class="text-sm text-gray-400 mt-1">Total Profit / Total Loss</p>
+                </div>
+                
+                <div class="stat-card rounded-xl p-6">
+                    <h3 class="text-gray-400 text-sm font-medium mb-2">Largest Win</h3>
+                    <p id="largestWin" class="text-xl font-bold text-neon-green">$0.00</p>
+                </div>
+                
+                <div class="stat-card rounded-xl p-6">
+                    <h3 class="text-gray-400 text-sm font-medium mb-2">Largest Loss</h3>
+                    <p id="largestLoss" class="text-xl font-bold text-neon-red">$0.00</p>
+                </div>
+                
+                <div class="stat-card rounded-xl p-6">
+                    <h3 class="text-gray-400 text-sm font-medium mb-2">Sharpe Ratio</h3>
+                    <p id="sharpeRatio" class="text-xl font-bold text-neon-yellow">0.00</p>
+                    <p class="text-sm text-gray-400 mt-1">Risk-adjusted return</p>
+                </div>
+            </div>
+            
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- P&L Chart -->
+                <div class="chart-container">
                     <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                        <i class="fas fa-chart-line mr-2"></i>Portfolio Performance & Drawdown
+                        <i class="fas fa-chart-area mr-2"></i>P&L Performance
                     </h3>
-                    <div id="performanceChart" class="chart-container"></div>
+                    <div id="pnlChart" style="height: 300px;"></div>
                 </div>
-            </div>
-            <div class="col-span-1">
-                <div class="glass-card rounded-xl p-6">
+                
+                <!-- Win Rate Chart -->
+                <div class="chart-container">
                     <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                        <i class="fas fa-pie-chart mr-2"></i>Trade Distribution
+                        <i class="fas fa-pie-chart mr-2"></i>Win/Loss Distribution
                     </h3>
-                    <div id="tradeDistChart" class="chart-container"></div>
+                    <div id="winLossChart" style="height: 300px;"></div>
                 </div>
             </div>
-        </div>
-        
-        <!-- Second Charts Row -->
-        <div class="grid grid-cols-2 gap-6 mb-8">
-            <div class="glass-card rounded-xl p-6">
+            
+            <!-- Position Details -->
+            <div class="glass-card rounded-xl p-6 mb-8">
                 <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                    <i class="fas fa-calendar-alt mr-2"></i>Monthly Returns
+                    <i class="fas fa-coins mr-2"></i>Active Positions
                 </h3>
-                <div id="monthlyReturnsChart" class="chart-container"></div>
-            </div>
-            <div class="glass-card rounded-xl p-6">
-                <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                    <i class="fas fa-clock mr-2"></i>Trade Duration Analysis
-                </h3>
-                <div id="durationChart" class="chart-container"></div>
-            </div>
-        </div>
-        
-        <!-- Statistics Tables -->
-        <div class="grid grid-cols-2 gap-6 mb-8">
-            <div class="glass-card rounded-xl p-6">
-                <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                    <i class="fas fa-list-alt mr-2"></i>Detailed Statistics
-                </h3>
-                <div class="stat-table">
-                    <table class="w-full">
-                        <tbody>
-                            <tr><td>Total Trades</td><td id="statTotalTrades">0</td></tr>
-                            <tr><td>Winning Trades</td><td id="statWinningTrades">0</td></tr>
-                            <tr><td>Losing Trades</td><td id="statLosingTrades">0</td></tr>
-                            <tr><td>Largest Win</td><td id="statLargestWin">$0.00</td></tr>
-                            <tr><td>Largest Loss</td><td id="statLargestLoss">$0.00</td></tr>
-                            <tr><td>Average Win</td><td id="statAverageWin">$0.00</td></tr>
-                            <tr><td>Average Loss</td><td id="statAverageLoss">$0.00</td></tr>
-                            <tr><td>Consecutive Wins</td><td id="statConsecutiveWins">0</td></tr>
-                            <tr><td>Consecutive Losses</td><td id="statConsecutiveLosses">0</td></tr>
-                        </tbody>
-                    </table>
+                <div id="positionsTable">
+                    <p class="text-gray-400 text-center py-8">No active positions</p>
                 </div>
             </div>
-            <div class="glass-card rounded-xl p-6">
+            
+            <!-- Trading Volume Chart -->
+            <div class="chart-container mb-8">
                 <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                    <i class="fas fa-shield-alt mr-2"></i>Risk Metrics
+                    <i class="fas fa-bar-chart mr-2"></i>Trading Volume Over Time
                 </h3>
-                <div class="stat-table">
-                    <table class="w-full">
-                        <tbody>
-                            <tr><td>Volatility (Annualized)</td><td id="statVolatility">0.00%</td></tr>
-                            <tr><td>Value at Risk (95%)</td><td id="statVaR">$0.00</td></tr>
-                            <tr><td>Beta</td><td id="statBeta">0.00</td></tr>
-                            <tr><td>Alpha</td><td id="statAlpha">0.00%</td></tr>
-                            <tr><td>Calmar Ratio</td><td id="statCalmarRatio">0.00</td></tr>
-                            <tr><td>Sortino Ratio</td><td id="statSortinoRatio">0.00</td></tr>
-                            <tr><td>Recovery Factor</td><td id="statRecoveryFactor">0.00</td></tr>
-                            <tr><td>Payoff Ratio</td><td id="statPayoffRatio">0.00</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+                <div id="volumeChart" style="height: 300px;"></div>
             </div>
-        </div>
-        
-        <!-- AI Performance Analysis -->
-        <div class="glass-card rounded-xl p-6">
-            <h3 class="text-xl font-bold text-neon-cyan mb-4">
-                <i class="fas fa-brain mr-2"></i>AI Model Performance
-            </h3>
-            <div id="aiPerformanceChart" class="chart-container"></div>
         </div>
     </div>
     
     <script>
-        let currentPeriod = '1d';
         let analyticsData = {};
         
+        // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             loadAnalyticsData();
-            initializeCharts();
-            
-            // Auto-refresh every 30 seconds
-            setInterval(loadAnalyticsData, 30000);
+            setInterval(loadAnalyticsData, 30000); // Refresh every 30 seconds
         });
-        
-        function changePeriod(period) {
-            currentPeriod = period;
-            
-            // Update active button
-            document.querySelectorAll('[data-period]').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            document.querySelector(`[data-period="${period}"]`).classList.add('active');
-            
-            loadAnalyticsData();
-        }
         
         function loadAnalyticsData() {
             fetch('/api/analytics_data')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        analyticsData = processRealData(data);
-                        updateMetrics();
-                        updateCharts();
+                        analyticsData = data;
+                        updateDashboard();
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('analytics-content').style.display = 'block';
                     } else {
-                        console.error('Failed to load analytics data:', data.error);
-                        analyticsData = generateFallbackData();
-                        updateMetrics();
-                        updateCharts();
+                        showError('Failed to load analytics data');
                     }
                 })
                 .catch(error => {
-                    console.error('Analytics data error:', error);
-                    analyticsData = generateFallbackData();
-                    updateMetrics();
-                    updateCharts();
+                    console.error('Error loading analytics:', error);
+                    showError('Connection error');
                 });
         }
         
-        function processRealData(apiData) {
-            const now = new Date();
-            const days = currentPeriod === '1d' ? 1 : currentPeriod === '1w' ? 7 : 
-                        currentPeriod === '1m' ? 30 : currentPeriod === '3m' ? 90 : 
-                        currentPeriod === '1y' ? 365 : 365;
+        function updateDashboard() {
+            // Update main metrics
+            document.getElementById('totalBalance').textContent = `$${analyticsData.total_balance.toFixed(2)}`;
             
-            // Calculate metrics from real data
-            const totalReturn = apiData.total_balance > 0 ? 
-                (apiData.unrealized_pnl / apiData.total_balance) * 100 : 0;
+            const unrealizedPnl = document.getElementById('unrealizedPnl');
+            unrealizedPnl.textContent = `${analyticsData.unrealized_pnl >= 0 ? '+' : ''}$${analyticsData.unrealized_pnl.toFixed(2)}`;
+            unrealizedPnl.className = `text-2xl font-bold ${analyticsData.unrealized_pnl >= 0 ? 'metric-up' : 'metric-down'}`;
             
-            const data = {
-                totalReturn: totalReturn,
-                sharpeRatio: apiData.sharpe_ratio || 0,
-                maxDrawdown: Math.abs(apiData.max_drawdown || 0),
-                winRate: apiData.win_rate || 0,
-                avgTrade: apiData.total_trades > 0 ? apiData.total_volume / apiData.total_trades : 0,
-                profitFactor: apiData.profit_factor || 1,
-                totalTrades: apiData.total_trades || 0,
-                winningTrades: Math.floor((apiData.total_trades || 0) * (apiData.win_rate || 0) / 100),
-                losingTrades: Math.floor((apiData.total_trades || 0) * (100 - (apiData.win_rate || 0)) / 100),
-                largestWin: Math.max(apiData.unrealized_pnl, 0),
-                largestLoss: Math.min(apiData.unrealized_pnl, 0),
-                averageWin: apiData.total_trades > 0 ? Math.abs(apiData.unrealized_pnl) / apiData.total_trades : 0,
-                averageLoss: apiData.total_trades > 0 ? Math.abs(apiData.total_fees) / apiData.total_trades : 0,
-                consecutiveWins: Math.floor(Math.random() * 5) + 1,
-                consecutiveLosses: Math.floor(Math.random() * 3) + 1,
-                volatility: Math.abs(totalReturn) * 2,
-                var95: Math.abs(apiData.unrealized_pnl) * 0.15,
-                beta: 1.0,
-                alpha: totalReturn / 12,
-                calmarRatio: Math.abs(apiData.max_drawdown) > 0 ? 
-                    totalReturn / Math.abs(apiData.max_drawdown) : 0,
-                sortinoRatio: (apiData.sharpe_ratio || 0) * 1.2,
-                recoveryFactor: Math.abs(apiData.max_drawdown) > 0 ? 
-                    Math.abs(totalReturn) / Math.abs(apiData.max_drawdown) : 1,
-                payoffRatio: Math.abs(apiData.total_fees) > 0 ? 
-                    Math.abs(apiData.unrealized_pnl) / Math.abs(apiData.total_fees) : 1,
-                portfolioValues: [],
-                drawdowns: [],
-                monthlyReturns: [],
-                tradeDurations: [],
-                aiAccuracy: []
-            };
+            document.getElementById('winRate').textContent = `${analyticsData.win_rate.toFixed(1)}%`;
+            document.getElementById('activePositions').textContent = analyticsData.active_positions_count;
             
-            // Generate time series data
-            generateTimeSeriesData(data, days, apiData);
+            // Update advanced metrics
+            document.getElementById('totalTrades').textContent = analyticsData.total_trades;
+            document.getElementById('winningTrades').textContent = `${analyticsData.winning_trades} wins`;
+            document.getElementById('losingTrades').textContent = `${analyticsData.losing_trades} losses`;
+            document.getElementById('totalVolume').textContent = `$${analyticsData.total_volume.toFixed(2)}`;
+            document.getElementById('totalFees').textContent = `$${analyticsData.total_fees.toFixed(2)} in fees`;
+            document.getElementById('profitFactor').textContent = analyticsData.profit_factor.toFixed(2);
+            document.getElementById('largestWin').textContent = `$${analyticsData.largest_win.toFixed(2)}`;
+            document.getElementById('largestLoss').textContent = `$${analyticsData.largest_loss.toFixed(2)}`;
+            document.getElementById('sharpeRatio').textContent = analyticsData.sharpe_ratio.toFixed(2);
             
-            return data;
+            // Update charts
+            updatePnlChart();
+            updateWinLossChart();
+            updateVolumeChart();
+            updatePositionsTable();
         }
         
-        function generateTimeSeriesData(data, days, apiData) {
-            const now = new Date();
-            
-            // Portfolio values and drawdowns
-            for (let i = 0; i < days; i++) {
-                const date = new Date(now - (days - i) * 24 * 60 * 60 * 1000);
-                const dayProgress = i / days;
-                const portfolioValue = apiData.total_balance - 
-                    (apiData.unrealized_pnl * (1 - dayProgress));
-                
-                data.portfolioValues.push({
-                    date: date,
-                    value: portfolioValue
-                });
-                
-                data.drawdowns.push({
-                    date: date,
-                    drawdown: Math.min(0, 
-                        (portfolioValue - apiData.total_balance) / apiData.total_balance * 100)
-                });
-            }
-            
-            // Monthly returns
-            for (let i = 0; i < 12; i++) {
-                data.monthlyReturns.push({
-                    month: new Date(2024, i, 1).toLocaleDateString('en-US', { month: 'short' }),
-                    return: (data.totalReturn / 12) + (Math.random() * 4 - 2)
-                });
-            }
-            
-            // Trade durations
-            const durations = ['< 1h', '1-4h', '4-12h', '12-24h', '1-3d', '> 3d'];
-            durations.forEach((duration, index) => {
-                data.tradeDurations.push({
-                    duration: duration,
-                    count: Math.floor((data.totalTrades || 0) * 
-                        [0.3, 0.25, 0.2, 0.15, 0.08, 0.02][index])
-                });
-            });
-            
-            // AI accuracy
-            for (let i = 0; i < 30; i++) {
-                data.aiAccuracy.push({
-                    date: new Date(now - (30 - i) * 24 * 60 * 60 * 1000),
-                    accuracy: Math.max(50, Math.min(95, 
-                        (data.winRate || 50) + (Math.random() * 20 - 10)))
-                });
-            }
-        }
-        
-        function generateFallbackData() {
-            return {
-                totalReturn: 0, sharpeRatio: 0, maxDrawdown: 0, winRate: 0,
-                avgTrade: 0, profitFactor: 1, totalTrades: 0, winningTrades: 0,
-                losingTrades: 0, largestWin: 0, largestLoss: 0, averageWin: 0,
-                averageLoss: 0, consecutiveWins: 0, consecutiveLosses: 0,
-                volatility: 0, var95: 0, beta: 1, alpha: 0, calmarRatio: 0,
-                sortinoRatio: 0, recoveryFactor: 1, payoffRatio: 1,
-                portfolioValues: [], drawdowns: [], monthlyReturns: [],
-                tradeDurations: [], aiAccuracy: []
-            };
-        }
-        
-        function updateMetrics() {
-            document.getElementById('totalReturn').textContent = 
-                `${analyticsData.totalReturn >= 0 ? '+' : ''}${analyticsData.totalReturn.toFixed(2)}%`;
-            document.getElementById('sharpeRatio').textContent = 
-                analyticsData.sharpeRatio.toFixed(2);
-            document.getElementById('maxDrawdown').textContent = 
-                `${analyticsData.maxDrawdown.toFixed(2)}%`;
-            document.getElementById('winRate').textContent = 
-                `${analyticsData.winRate.toFixed(1)}%`;
-            document.getElementById('avgTrade').textContent = 
-                `$${analyticsData.avgTrade.toFixed(2)}`;
-            document.getElementById('profitFactor').textContent = 
-                analyticsData.profitFactor.toFixed(2);
-            
-            // Update detailed stats
-            document.getElementById('statTotalTrades').textContent = analyticsData.totalTrades;
-            document.getElementById('statWinningTrades').textContent = analyticsData.winningTrades;
-            document.getElementById('statLosingTrades').textContent = analyticsData.losingTrades;
-            document.getElementById('statLargestWin').textContent = 
-                `$${analyticsData.largestWin.toFixed(2)}`;
-            document.getElementById('statLargestLoss').textContent = 
-                `$${analyticsData.largestLoss.toFixed(2)}`;
-            document.getElementById('statAverageWin').textContent = 
-                `$${analyticsData.averageWin.toFixed(2)}`;
-            document.getElementById('statAverageLoss').textContent = 
-                `$${analyticsData.averageLoss.toFixed(2)}`;
-            document.getElementById('statConsecutiveWins').textContent = 
-                analyticsData.consecutiveWins;
-            document.getElementById('statConsecutiveLosses').textContent = 
-                analyticsData.consecutiveLosses;
-            
-            // Update risk metrics
-            document.getElementById('statVolatility').textContent = 
-                `${analyticsData.volatility.toFixed(2)}%`;
-            document.getElementById('statVaR').textContent = 
-                `$${analyticsData.var95.toFixed(2)}`;
-            document.getElementById('statBeta').textContent = 
-                analyticsData.beta.toFixed(2);
-            document.getElementById('statAlpha').textContent = 
-                `${analyticsData.alpha.toFixed(2)}%`;
-            document.getElementById('statCalmarRatio').textContent = 
-                analyticsData.calmarRatio.toFixed(2);
-            document.getElementById('statSortinoRatio').textContent = 
-                analyticsData.sortinoRatio.toFixed(2);
-            document.getElementById('statRecoveryFactor').textContent = 
-                analyticsData.recoveryFactor.toFixed(2);
-            document.getElementById('statPayoffRatio').textContent = 
-                analyticsData.payoffRatio.toFixed(2);
-            
-            // Update color coding
-            const returnElement = document.getElementById('totalReturn');
-            returnElement.className = analyticsData.totalReturn >= 0 ? 
-                'metric-number profit' : 'metric-number loss';
-        }
-        
-        function updateCharts() {
-            updatePerformanceChart();
-            updateTradeDistributionChart();
-            updateMonthlyReturnsChart();
-            updateDurationChart();
-            updateAIPerformanceChart();
-        }
-        
-        function updatePerformanceChart() {
-            if (!analyticsData.portfolioValues || analyticsData.portfolioValues.length === 0) {
-                return;
-            }
-            
-            const portfolioTrace = {
-                x: analyticsData.portfolioValues.map(d => d.date),
-                y: analyticsData.portfolioValues.map(d => d.value),
-                type: 'scatter',
-                mode: 'lines',
-                name: 'Portfolio Value',
-                line: { color: '#FFD700', width: 3 }
-            };
-            
-            const drawdownTrace = {
-                x: analyticsData.drawdowns.map(d => d.date),
-                y: analyticsData.drawdowns.map(d => d.drawdown),
-                type: 'scatter',
-                mode: 'lines',
-                name: 'Drawdown',
-                line: { color: '#FF00C1', width: 2 },
-                fill: 'tozeroy',
-                fillcolor: 'rgba(255, 0, 193, 0.1)',
-                yaxis: 'y2'
-            };
-            
-            const layout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff', family: 'Inter' },
-                xaxis: { 
-                    title: 'Date',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                yaxis: { 
-                    title: 'Portfolio Value ($)',
-                    side: 'left',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                yaxis2: { 
-                    title: 'Drawdown (%)',
-                    side: 'right',
-                    overlaying: 'y',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                hovermode: 'x unified',
-                height: 350,
-                margin: { t: 20, b: 40, l: 60, r: 60 }
-            };
-            
-            Plotly.newPlot('performanceChart', [portfolioTrace, drawdownTrace], layout, 
-                {responsive: true, displayModeBar: false});
-        }
-        
-        function updateTradeDistributionChart() {
+        function updatePnlChart() {
             const data = [{
-                values: [analyticsData.winningTrades, analyticsData.losingTrades],
-                labels: ['Winning Trades', 'Losing Trades'],
-                type: 'pie',
-                marker: { colors: ['#008844', '#CC0000'] },
-                textfont: { color: '#ffffff', family: 'Inter' }
-            }];
-            
-            const layout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff', family: 'Inter' },
-                height: 350,
-                margin: { t: 20, b: 20, l: 20, r: 20 },
-                showlegend: true,
-                legend: { font: { color: '#ffffff' } }
-            };
-            
-            Plotly.newPlot('tradeDistChart', data, layout, 
-                {responsive: true, displayModeBar: false});
-        }
-        
-        function updateMonthlyReturnsChart() {
-            const data = [{
-                x: analyticsData.monthlyReturns.map(d => d.month),
-                y: analyticsData.monthlyReturns.map(d => d.return),
+                x: ['Realized P&L', 'Unrealized P&L', 'Total P&L'],
+                y: [
+                    analyticsData.total_profit - analyticsData.total_loss,
+                    analyticsData.unrealized_pnl,
+                    (analyticsData.total_profit - analyticsData.total_loss) + analyticsData.unrealized_pnl
+                ],
                 type: 'bar',
                 marker: {
-                    color: analyticsData.monthlyReturns.map(d => 
-                        d.return >= 0 ? '#008844' : '#CC0000')
+                    color: [
+                        analyticsData.total_profit - analyticsData.total_loss >= 0 ? '#00FF88' : '#FF4444',
+                        analyticsData.unrealized_pnl >= 0 ? '#00FF88' : '#FF4444',
+                        ((analyticsData.total_profit - analyticsData.total_loss) + analyticsData.unrealized_pnl) >= 0 ? '#00FF88' : '#FF4444'
+                    ]
                 }
             }];
             
             const layout = {
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff', family: 'Inter' },
-                xaxis: { 
-                    title: 'Month',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                yaxis: { 
-                    title: 'Return (%)',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                height: 350,
-                margin: { t: 20, b: 40, l: 60, r: 20 }
+                font: { color: 'white' },
+                margin: { l: 50, r: 50, t: 20, b: 50 },
+                xaxis: { gridcolor: 'rgba(255,255,255,0.1)' },
+                yaxis: { gridcolor: 'rgba(255,255,255,0.1)' }
             };
             
-            Plotly.newPlot('monthlyReturnsChart', data, layout, 
-                {responsive: true, displayModeBar: false});
+            Plotly.newPlot('pnlChart', data, layout, {responsive: true});
         }
         
-        function updateDurationChart() {
+        function updateWinLossChart() {
             const data = [{
-                x: analyticsData.tradeDurations.map(d => d.duration),
-                y: analyticsData.tradeDurations.map(d => d.count),
-                type: 'bar',
+                values: [analyticsData.winning_trades, analyticsData.losing_trades],
+                labels: ['Winning Trades', 'Losing Trades'],
+                type: 'pie',
+                marker: {
+                    colors: ['#00FF88', '#FF4444']
+                },
+                textinfo: 'label+percent',
+                textposition: 'outside'
+            }];
+            
+            const layout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: 'white' },
+                margin: { l: 20, r: 20, t: 20, b: 20 },
+                showlegend: false
+            };
+            
+            Plotly.newPlot('winLossChart', data, layout, {responsive: true});
+        }
+        
+        function updateVolumeChart() {
+            const tradesByDate = analyticsData.trades_by_date || {};
+            const dates = Object.keys(tradesByDate).sort();
+            const volumes = dates.map(date => tradesByDate[date].volume);
+            
+            const data = [{
+                x: dates,
+                y: volumes,
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: { color: '#00D9FF' },
                 marker: { color: '#00D9FF' }
             }];
             
             const layout = {
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff', family: 'Inter' },
-                xaxis: { 
-                    title: 'Duration',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                yaxis: { 
-                    title: 'Number of Trades',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                height: 350,
-                margin: { t: 20, b: 40, l: 60, r: 20 }
+                font: { color: 'white' },
+                margin: { l: 60, r: 50, t: 20, b: 50 },
+                xaxis: { gridcolor: 'rgba(255,255,255,0.1)' },
+                yaxis: { gridcolor: 'rgba(255,255,255,0.1)', title: 'Volume ($)' }
             };
             
-            Plotly.newPlot('durationChart', data, layout, 
-                {responsive: true, displayModeBar: false});
+            Plotly.newPlot('volumeChart', data, layout, {responsive: true});
         }
         
-        function updateAIPerformanceChart() {
-            const data = [{
-                x: analyticsData.aiAccuracy.map(d => d.date),
-                y: analyticsData.aiAccuracy.map(d => d.accuracy),
-                type: 'scatter',
-                mode: 'lines+markers',
-                name: 'AI Accuracy',
-                line: { color: '#FFD700', width: 3 },
-                marker: { size: 6, color: '#FFD700' }
-            }];
+        function updatePositionsTable() {
+            const container = document.getElementById('positionsTable');
             
-            const layout = {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff', family: 'Inter' },
-                xaxis: { 
-                    title: 'Date',
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                yaxis: { 
-                    title: 'Accuracy (%)',
-                    range: [60, 100],
-                    gridcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff'
-                },
-                height: 350,
-                margin: { t: 20, b: 40, l: 60, r: 20 }
-            };
+            if (!analyticsData.positions || analyticsData.positions.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-center py-8">No active positions</p>';
+                return;
+            }
             
-            Plotly.newPlot('aiPerformanceChart', data, layout, 
-                {responsive: true, displayModeBar: false});
+            let html = `
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-dark-border">
+                                <th class="text-left py-3 px-4 text-gray-400 font-medium">Symbol</th>
+                                <th class="text-left py-3 px-4 text-gray-400 font-medium">Side</th>
+                                <th class="text-left py-3 px-4 text-gray-400 font-medium">Size</th>
+                                <th class="text-left py-3 px-4 text-gray-400 font-medium">Entry Price</th>
+                                <th class="text-left py-3 px-4 text-gray-400 font-medium">Mark Price</th>
+                                <th class="text-left py-3 px-4 text-gray-400 font-medium">P&L</th>
+                                <th class="text-left py-3 px-4 text-gray-400 font-medium">P&L %</th>
+                                <th class="text-left py-3 px-4 text-gray-400 font-medium">Leverage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            analyticsData.positions.forEach(position => {
+                const pnlClass = position.unrealisedPnl >= 0 ? 'text-neon-green' : 'text-neon-red';
+                const sideClass = position.side === 'Buy' ? 'text-neon-green' : 'text-neon-red';
+                
+                html += `
+                    <tr class="border-b border-dark-border hover:bg-dark-hover">
+                        <td class="py-3 px-4 font-bold">${position.symbol}</td>
+                        <td class="py-3 px-4 ${sideClass}">${position.side}</td>
+                        <td class="py-3 px-4">${position.size}</td>
+                        <td class="py-3 px-4">$${position.avgPrice.toFixed(4)}</td>
+                        <td class="py-3 px-4">$${position.markPrice.toFixed(4)}</td>
+                        <td class="py-3 px-4 font-bold ${pnlClass}">
+                            ${position.unrealisedPnl >= 0 ? '+' : ''}$${position.unrealisedPnl.toFixed(2)}
+                        </td>
+                        <td class="py-3 px-4 font-bold ${pnlClass}">
+                            ${position.percentage >= 0 ? '+' : ''}${position.percentage.toFixed(2)}%
+                        </td>
+                        <td class="py-3 px-4">${position.leverage}x</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
         }
         
-        function initializeCharts() {
-            updateCharts();
+        function showError(message) {
+            document.getElementById('loading').innerHTML = `
+                <i class="fas fa-exclamation-triangle text-4xl text-neon-red mb-4"></i>
+                <p class="text-gray-400">${message}</p>
+            `;
         }
     </script>
 </body>
