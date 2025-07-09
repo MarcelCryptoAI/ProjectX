@@ -901,8 +901,10 @@ class AIWorker:
             # Ensure minimum trade amount (user's setting or $5 minimum)
             trade_amount_usd = max(min_trade_amount, calculated_trade_amount)
             
-            # Calculate total quantity for this trade amount (WITHOUT leverage in quantity calc)
-            total_qty = trade_amount_usd / current_price
+            # Calculate total quantity for this trade amount (WITH leverage to get position value)
+            # Trade amount × leverage = position value, so qty = (trade_amount × leverage) / price
+            position_value = trade_amount_usd * leverage
+            total_qty = position_value / current_price
             
             # Round to proper step size
             total_qty = max(min_order_qty, round(total_qty / qty_step) * qty_step)
@@ -918,9 +920,9 @@ class AIWorker:
                 self.console_logger.log('ERROR', f'❌ Order value ${total_order_value:.2f} is below ByBit minimum $5.00 for {symbol}')
                 return False
             
-            self.console_logger.log('INFO', f'💰 Trade Amount (Your Risk): ${trade_amount_usd:.2f} ({risk_per_trade:.1f}% of ${total_balance:.2f})')
+            self.console_logger.log('INFO', f'💰 Trade Amount Setting: ${trade_amount_usd:.2f} ({risk_per_trade:.1f}% of ${total_balance:.2f})')
+            self.console_logger.log('INFO', f'💰 Position Value (Trade Amount × {leverage}x Leverage): ${position_value:.2f}')
             self.console_logger.log('INFO', f'💰 Order Value (After Rounding): ${total_order_value:.2f} (Qty: {total_qty})')
-            self.console_logger.log('INFO', f'💰 Position Value (With {leverage}x Leverage): ${total_order_value * leverage:.2f}')
             self.console_logger.log('INFO', f'🔧 Settings: Min Lev: {min_leverage}x, Max Lev: {max_leverage}x, Strategy: {leverage_strategy}')
             self.console_logger.log('INFO', f'📊 Max Concurrent Trades: {self.max_concurrent_trades} (from user settings)')
             
