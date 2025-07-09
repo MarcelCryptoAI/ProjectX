@@ -2645,6 +2645,7 @@ def load_settings():
             'testnetMode': False,
             'apiTimeout': 30,
             'confidenceThreshold': 75,
+            'accuracyThreshold': 80,
             'modelUpdateFreq': '4h',
             'technicalIndicators': 15,
             'strategyMode': 'balanced',

@@ -18,8 +18,8 @@
                     colors: {
                         'neon-cyan': '#00D9FF',
                         'neon-yellow': '#FFD700',
-                        'neon-pink': '#CC0000',
-                        'neon-green': '#008844',
+                        'neon-pink': '#FF00C1',
+                        'neon-green': '#00FF88',
                         'neon-orange': '#FF6B00',
                         'matrix-green': '#00FF41',
                         'dark-bg': '#0A0A0F',
@@ -70,7 +70,31 @@
             overflow-x: hidden;
         }
         
-        /* Removed animated background lines */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 217, 255, 0.03) 2px,
+                    rgba(0, 217, 255, 0.03) 4px
+                ),
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(161, 0, 255, 0.03) 2px,
+                    rgba(161, 0, 255, 0.03) 4px
+                );
+            pointer-events: none;
+            z-index: 1;
+        }
         
         
         .glass-panel {
@@ -211,13 +235,13 @@
         }
         
         .status-indicator.online {
-            background: #008844;
-            box-shadow: 0 0 10px #008844, 0 0 20px #008844;
+            background: #00FF88;
+            box-shadow: 0 0 10px #00FF88, 0 0 20px #00FF88;
         }
         
         .status-indicator.offline {
-            background: #CC0000;
-            box-shadow: 0 0 10px #CC0000, 0 0 20px #CC0000;
+            background: #FF00C1;
+            box-shadow: 0 0 10px #FF00C1, 0 0 20px #FF00C1;
         }
         
         .status-indicator.processing {
@@ -226,8 +250,8 @@
             animation: pulse-neon 1s infinite;
         }
         
-        .profit-text { color: #008844; text-shadow: 0 0 10px #008844; }
-        .loss-text { color: #CC0000; text-shadow: 0 0 10px #CC0000; }
+        .profit-text { color: #00FF88; text-shadow: 0 0 10px #00FF88; }
+        .loss-text { color: #FF00C1; text-shadow: 0 0 10px #FF00C1; }
         
         .chart-container {
             position: relative;
@@ -261,7 +285,7 @@
         }
         
         ::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(to bottom, #00D9FF, #CC0000);
+            background: linear-gradient(to bottom, #00D9FF, #FF00C1);
         }
     </style>
 </head>
@@ -306,12 +330,12 @@
                     
                     <!-- Control Buttons -->
                     <div class="space-y-4">
-                        <button class="w-full cyber-button py-4 px-6 rounded-lg flex items-center justify-center group bg-dark-bg/50" onclick="startBot()" id="startBtn" style="border-color: #008844; color: #008844;">
+                        <button class="w-full cyber-button py-4 px-6 rounded-lg flex items-center justify-center group" onclick="startBot()" id="startBtn" style="background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 217, 255, 0.1)); border-color: #00FF88; color: #00FF88;">
                             <i class="fas fa-play mr-3 text-lg group-hover:animate-pulse"></i>
                             <span class="font-bold text-lg">START BOT</span>
                         </button>
                         
-                        <button class="w-full cyber-button py-4 px-6 rounded-lg flex items-center justify-center group bg-dark-bg/50" onclick="stopBot()" id="stopBtn" style="border-color: #CC0000; color: #CC0000;">
+                        <button class="w-full cyber-button py-4 px-6 rounded-lg flex items-center justify-center group" onclick="stopBot()" id="stopBtn" style="background: linear-gradient(135deg, rgba(255, 0, 193, 0.2), rgba(255, 107, 0, 0.1)); border-color: #FF00C1; color: #FF00C1;">
                             <i class="fas fa-stop mr-3 text-lg group-hover:animate-pulse"></i>
                             <span class="font-bold text-lg">STOP BOT</span>
                         </button>
@@ -330,40 +354,16 @@
                         <h4 class="text-sm font-bold text-neon-yellow mb-3">TRADING PARAMETERS</h4>
                         <div class="space-y-2 text-xs">
                             <div class="flex justify-between">
-                                <span class="text-gray-400">Strategy Mode:</span>
-                                <span class="text-neon-yellow" id="strategyMode">BALANCED</span>
+                                <span class="text-gray-400">Risk Level:</span>
+                                <span class="text-neon-green">MODERATE</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Max Positions:</span>
-                                <span class="text-neon-yellow" id="maxPositions">20</span>
+                                <span class="text-neon-yellow" id="maxPositions">5</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">AI Confidence:</span>
-                                <span class="text-neon-yellow" id="aiConfidence">85%</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Min Accuracy:</span>
-                                <span class="text-neon-yellow" id="minAccuracy">80%</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Amount per Trade:</span>
-                                <span class="text-neon-yellow" id="amountPerTrade">$100</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Leverage:</span>
-                                <span class="text-neon-yellow" id="leverage">10x</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Dynamic TP:</span>
-                                <span class="text-neon-yellow" id="dynamicTP">OFF</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Trailing SL:</span>
-                                <span class="text-neon-yellow" id="trailingSL">OFF</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Trailing %:</span>
-                                <span class="text-neon-yellow" id="trailingPercent">2%</span>
+                                <span class="text-neon-yellow" id="aiConfidence">75%</span>
                             </div>
                         </div>
                     </div>
@@ -572,8 +572,8 @@
                         fill: true,
                         pointBackgroundColor: '#00D9FF',
                         pointBorderColor: '#00D9FF',
-                        pointHoverBackgroundColor: '#CC0000',
-                        pointHoverBorderColor: '#CC0000',
+                        pointHoverBackgroundColor: '#FF00C1',
+                        pointHoverBorderColor: '#FF00C1',
                         pointRadius: 4,
                         pointHoverRadius: 6
                     }]
@@ -641,13 +641,13 @@
                     datasets: [{
                         data: [0, 0, 0],
                         backgroundColor: [
-                            'rgba(0, 136, 68, 0.5)',
-                            'rgba(204, 0, 0, 0.5)',
+                            'rgba(0, 255, 136, 0.5)',
+                            'rgba(255, 0, 193, 0.5)',
                             'rgba(255, 215, 0, 0.5)'
                         ],
                         borderColor: [
-                            '#008844',
-                            '#CC0000',
+                            '#00FF88',
+                            '#FF00C1',
                             '#FFD700'
                         ],
                         borderWidth: 2
@@ -1064,56 +1064,21 @@
         
         // Update trading parameters from settings
         function updateTradingParameters() {
-            // Load all settings from settings API
-            fetch('/api/load_settings')
+            fetch('/api/settings')
                 .then(response => response.json())
                 .then(data => {
-                    if (data && data.success) {
-                        // Update amount per trade (using minTradeAmount as base)
-                        const amountPerTrade = data.settings.minTradeAmount || 19;
-                        document.getElementById('amountPerTrade').textContent = `$${amountPerTrade}`;
+                    if (data && data.bot) {
+                        // Update AI confidence threshold
+                        const confidence = data.bot.ai_confidence_threshold || 75;
+                        document.getElementById('aiConfidence').textContent = `${confidence}%`;
                         
-                        // Update leverage
-                        const leverage = data.settings.maxLeverage || 10;
-                        document.getElementById('leverage').textContent = `${leverage}x`;
-                        
-                        // Update dynamic take profit
-                        const dynamicTP = data.settings.dynamicTakeProfit || false;
-                        document.getElementById('dynamicTP').textContent = dynamicTP ? 'ON' : 'OFF';
-                        document.getElementById('dynamicTP').className = 'text-neon-yellow';
-                        
-                        // Update trailing stop loss
-                        const trailingSL = data.settings.trailingStopLoss || false;
-                        document.getElementById('trailingSL').textContent = trailingSL ? 'ON' : 'OFF';
-                        document.getElementById('trailingSL').className = 'text-neon-yellow';
-                        
-                        // Update trailing percentage
-                        const trailingPercent = data.settings.trailingStopValue || 1.0;
-                        document.getElementById('trailingPercent').textContent = `${trailingPercent}%`;
-                        
-                        // Update max concurrent trades from settings
-                        const maxConcurrentTrades = data.settings.maxConcurrentTrades || 20;
-                        document.getElementById('maxPositions').textContent = maxConcurrentTrades;
-                        
-                        // Update strategy mode from settings
-                        const strategyMode = data.settings.strategyMode || 'balanced';
-                        document.getElementById('strategyMode').textContent = strategyMode.toUpperCase();
-                        
-                        // Update AI confidence from settings
-                        const confidenceThreshold = data.settings.confidenceThreshold || 75;
-                        document.getElementById('aiConfidence').textContent = `${confidenceThreshold}%`;
-                        
-                        // Update accuracy threshold from settings
-                        const accuracyThreshold = data.settings.accuracyThreshold || 80;
-                        document.getElementById('minAccuracy').textContent = `${accuracyThreshold}%`;
-                        
-                        // Update auto execute from settings
-                        const autoExecute = data.settings.autoExecute || false;
-                        document.getElementById('autoExecute').checked = autoExecute;
+                        // Update max concurrent trades
+                        const maxTrades = data.bot.max_concurrent_trades || 5;
+                        document.getElementById('maxPositions').textContent = maxTrades;
                     }
                 })
                 .catch(error => {
-                    console.error('Failed to load extended settings:', error);
+                    console.error('Failed to load trading parameters:', error);
                 });
         }
         
