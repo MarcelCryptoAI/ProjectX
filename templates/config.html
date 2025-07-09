@@ -575,6 +575,11 @@
                             <div class="form-text">Minimum AI confidence to execute trades</div>
                         </div>
                         <div>
+                            <label for="accuracyThreshold" class="form-label">Accuracy Threshold (%)</label>
+                            <input type="number" class="form-input w-full" id="accuracyThreshold" step="1" min="50" max="95" value="80">
+                            <div class="form-text">Minimum AI accuracy to show signals</div>
+                        </div>
+                        <div>
                             <label for="modelUpdateFreq" class="form-label">Model Update Frequency</label>
                             <select class="form-input w-full" id="modelUpdateFreq">
                                 <option value="1h">Every Hour</option>
@@ -785,6 +790,7 @@
                 
                 // AI settings
                 confidenceThreshold: parseInt(document.getElementById('confidenceThreshold').value),
+                accuracyThreshold: parseInt(document.getElementById('accuracyThreshold').value),
                 modelUpdateFreq: document.getElementById('modelUpdateFreq').value,
                 technicalIndicators: parseInt(document.getElementById('technicalIndicators').value),
                 strategyMode: document.getElementById('strategyMode').value,
