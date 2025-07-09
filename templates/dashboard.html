@@ -330,8 +330,8 @@
                         <h4 class="text-sm font-bold text-neon-yellow mb-3">TRADING PARAMETERS</h4>
                         <div class="space-y-2 text-xs">
                             <div class="flex justify-between">
-                                <span class="text-gray-400">Risk Level:</span>
-                                <span class="text-neon-yellow" id="riskLevel">MODERATE</span>
+                                <span class="text-gray-400">Strategy Mode:</span>
+                                <span class="text-neon-yellow" id="strategyMode">BALANCED</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Max Positions:</span>
@@ -1091,12 +1091,9 @@
                         const maxConcurrentTrades = data.settings.maxConcurrentTrades || 20;
                         document.getElementById('maxPositions').textContent = maxConcurrentTrades;
                         
-                        // Update risk level from settings
-                        const riskPerTrade = data.settings.riskPerTrade || 2.0;
-                        let riskLevel = 'MODERATE';
-                        if (riskPerTrade <= 1.0) riskLevel = 'LOW';
-                        else if (riskPerTrade >= 5.0) riskLevel = 'HIGH';
-                        document.getElementById('riskLevel').textContent = riskLevel;
+                        // Update strategy mode from settings
+                        const strategyMode = data.settings.strategyMode || 'balanced';
+                        document.getElementById('strategyMode').textContent = strategyMode.toUpperCase();
                         
                         // Update AI confidence from settings
                         const confidenceThreshold = data.settings.confidenceThreshold || 75;
