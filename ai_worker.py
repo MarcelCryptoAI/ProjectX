@@ -813,14 +813,16 @@ class AIWorker:
                 stop_loss_price = current_price * (1 + stop_loss_pct / 100)
                 take_profit_price = current_price * (1 - take_profit_pct / 100)
             
-            # Place market order with pybit
+            # Place market order with pybit including TP/SL
             order_params = {
                 'category': 'linear',
                 'symbol': symbol,
                 'side': side,  # Use exact case: 'Buy' or 'Sell'
                 'orderType': 'Market',
                 'qty': str(qty),
-                'timeInForce': 'IOC'  # Immediate or Cancel
+                'timeInForce': 'IOC',  # Immediate or Cancel
+                'takeProfit': str(take_profit_price),
+                'stopLoss': str(stop_loss_price)
             }
             
             self.console_logger.log('INFO', f'📤 Placing {side} order: {qty} {symbol} @ market (~${current_price:.4f})')
@@ -835,92 +837,19 @@ class AIWorker:
                 self.console_logger.log('SUCCESS', f'✅ Order placed: {order_id}')
                 self.console_logger.log('INFO', f'📊 Details: {qty} {symbol}, SL: ${stop_loss_price:.4f}, TP: ${take_profit_price:.4f}')
                 
-                # Set stop loss and take profit immediately after successful order
-                try:
-                    # Place stop loss order (conditional market order)
-                    sl_result = self.bybit_session.place_order(
-                        category='linear',
-                        symbol=symbol,
-                        side='Sell' if side == 'Buy' else 'Buy',
-                        orderType='Market',
-                        qty=str(qty),
-                        triggerPrice=str(stop_loss_price),
-                        timeInForce='IOC'
-                    )
-                    
-                    if sl_result and 'result' in sl_result:
-                        sl_order_id = sl_result['result']['orderId']
-                        self.console_logger.log('SUCCESS', f'✅ Stop Loss set: {sl_order_id} @ ${stop_loss_price:.4f}')
-                    else:
-                        self.console_logger.log('WARNING', f'⚠️ Stop Loss failed: {sl_result.get("retMsg", "Unknown error")}')
-                    
-                    # Handle partial take profit levels if enabled
-                    if signal.get('partial_take_profit', False) and 'take_profit_levels' in signal:
-                        self.console_logger.log('INFO', f'📊 Setting up partial take profit with {len(signal["take_profit_levels"])} levels')
-                        
-                        for level in signal['take_profit_levels']:
-                            # Calculate quantity for this level
-                            level_qty = (qty * level['sell_percentage']) / 100
-                            level_price = current_price * (1 + level['percentage'] / 100) if side == 'Buy' else current_price * (1 - level['percentage'] / 100)
-                            
-                            # Place take profit order for this level
-                            tp_result = self.bybit_session.place_order(
-                                category='linear',
-                                symbol=symbol,
-                                side='Sell' if side == 'Buy' else 'Buy',
-                                orderType='Limit',
-                                qty=str(level_qty),
-                                price=str(level_price),
-                                timeInForce='GTC'
-                            )
-                            
-                            if tp_result and 'result' in tp_result:
-                                tp_order_id = tp_result['result']['orderId']
-                                self.console_logger.log('SUCCESS', f'✅ TP Level {level["level"]} set: {tp_order_id} @ ${level_price:.4f} ({level["sell_percentage"]}%)')
-                            else:
-                                self.console_logger.log('WARNING', f'⚠️ TP Level {level["level"]} failed: {tp_result.get("retMsg", "Unknown error")}')
-                    
-                    else:
-                        # Single take profit order
-                        tp_result = self.bybit_session.place_order(
-                            category='linear',
-                            symbol=symbol,
-                            side='Sell' if side == 'Buy' else 'Buy',
-                            orderType='Limit',
-                            qty=str(qty),
-                            price=str(take_profit_price),
-                            timeInForce='GTC'
-                        )
-                        
-                        if tp_result and 'result' in tp_result:
-                            tp_order_id = tp_result['result']['orderId']
-                            self.console_logger.log('SUCCESS', f'✅ Take Profit set: {tp_order_id} @ ${take_profit_price:.4f}')
-                        else:
-                            self.console_logger.log('WARNING', f'⚠️ Take Profit failed: {tp_result.get("retMsg", "Unknown error")}')
-                    
-                    # Log moving stop loss info if enabled
-                    if signal.get('move_stop_loss_on_partial_tp', False):
-                        self.console_logger.log('INFO', f'📈 Moving stop loss to breakeven enabled for partial profits')
-                        
-                        # Store trade info for monitoring
-                        trade_info = {
-                            'symbol': symbol,
-                            'side': side,
-                            'entry_price': current_price,
-                            'sl_order_id': sl_order_id if 'sl_order_id' in locals() else None,
-                            'move_sl_to_breakeven': True,
-                            'partial_tp_enabled': True,
-                            'timestamp': datetime.now().isoformat()
-                        }
-                        
-                        # Start monitoring thread for this trade
-                        if hasattr(self, 'active_trades'):
-                            self.active_trades[order_id] = trade_info
-                        else:
-                            self.active_trades = {order_id: trade_info}
-                    
-                except Exception as tp_sl_error:
-                    self.console_logger.log('ERROR', f'❌ Failed to set SL/TP: {str(tp_sl_error)}')
+                # TP/SL are now integrated in main order - no separate orders needed
+                self.console_logger.log('SUCCESS', f'✅ TP/SL integrated in main order')
+                
+                # Store trade in active trades for monitoring
+                self.active_trades[order_id] = {
+                    'symbol': symbol,
+                    'side': side,
+                    'quantity': qty,
+                    'entry_price': current_price,
+                    'stop_loss': stop_loss_price,
+                    'take_profit': take_profit_price,
+                    'timestamp': datetime.now().isoformat()
+                }
                 
                 return True
             else:
