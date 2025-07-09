@@ -179,19 +179,42 @@
                             <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('pnl')">
                                 P&L <i class="fas fa-sort ml-1"></i>
                             </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('pnl_percentage')">
+                                P&L % <i class="fas fa-sort ml-1"></i>
+                            </th>
                             <th class="px-6 py-4 text-left font-medium text-neon-cyan">Order ID</th>
                         </tr>
                     </thead>
                     <tbody id="ordersTableBody">
                         <!-- Loading state -->
                         <tr>
-                            <td colspan="9" class="text-center py-16">
+                            <td colspan="10" class="text-center py-16">
                                 <i class="fas fa-spinner fa-spin text-4xl text-neon-cyan mb-4"></i>
                                 <div class="text-gray-400">Loading order history...</div>
                             </td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+        
+        <!-- Pagination -->
+        <div class="glass-card rounded-xl p-6 mt-8" id="paginationContainer" style="display: none;">
+            <div class="flex items-center justify-between">
+                <div class="text-sm text-gray-400" id="paginationInfo">
+                    Showing 1-50 of 0 orders
+                </div>
+                <div class="flex items-center gap-2" id="paginationControls">
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" id="prevPage" onclick="changePage(-1)" disabled>
+                        <i class="fas fa-chevron-left mr-2"></i>Previous
+                    </button>
+                    <div class="flex items-center gap-1" id="pageNumbers">
+                        <!-- Page numbers will be inserted here -->
+                    </div>
+                    <button class="cyber-button py-2 px-4 rounded-lg text-sm" id="nextPage" onclick="changePage(1)" disabled>
+                        Next<i class="fas fa-chevron-right ml-2"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -201,13 +224,17 @@
         let currentFilter = 'all';
         let sortColumn = 'timestamp';
         let sortDirection = 'desc';
+        let currentPage = 1;
+        let totalPages = 1;
+        let totalOrders = 0;
         
-        function loadOrderHistory() {
+        function loadOrderHistory(page = 1) {
             const timeFilter = document.getElementById('timeFilter').value;
+            currentPage = page;
             
-            console.log('Loading order history with period:', timeFilter);
+            console.log('Loading order history with period:', timeFilter, 'page:', page);
             
-            fetch(`/api/order_history?period=${timeFilter}`)
+            fetch(`/api/order_history?period=${timeFilter}&page=${page}`)
                 .then(response => {
                     console.log('Response status:', response.status);
                     return response.json();
@@ -217,6 +244,7 @@
                     if (data.success) {
                         allOrders = data.orders || [];
                         updateStats(data.stats);
+                        updatePagination(data.pagination);
                         displayOrders();
                         
                         if (data.error) {
@@ -289,7 +317,7 @@
             if (filteredOrders.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="9" class="text-center py-12">
+                        <td colspan="10" class="text-center py-12">
                             <i class="fas fa-inbox text-4xl text-gray-600 mb-4"></i>
                             <div class="text-gray-400">No orders found</div>
                         </td>
@@ -345,6 +373,11 @@
                             </div>
                         </td>
                         <td class="px-6 py-4">
+                            <div class="${pnlClass} font-bold">
+                                ${(order.pnl_percentage || 0) >= 0 ? '+' : ''}${(order.pnl_percentage || 0).toFixed(2)}%
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
                             <div class="text-xs text-gray-400 font-mono">${order.orderId}</div>
                         </td>
                     </tr>
@@ -381,19 +414,99 @@
         function refreshOrders() {
             document.getElementById('ordersTableBody').innerHTML = `
                 <tr>
-                    <td colspan="9" class="text-center py-16">
+                    <td colspan="10" class="text-center py-16">
                         <i class="fas fa-spinner fa-spin text-4xl text-neon-cyan mb-4"></i>
                         <div class="text-gray-400">Refreshing order history...</div>
                     </td>
                 </tr>
             `;
-            loadOrderHistory();
+            loadOrderHistory(currentPage);
+        }
+        
+        function updatePagination(pagination) {
+            if (!pagination) return;
+            
+            totalPages = pagination.total_pages;
+            totalOrders = pagination.total_orders;
+            currentPage = pagination.current_page;
+            
+            const container = document.getElementById('paginationContainer');
+            const info = document.getElementById('paginationInfo');
+            const prevBtn = document.getElementById('prevPage');
+            const nextBtn = document.getElementById('nextPage');
+            const pageNumbers = document.getElementById('pageNumbers');
+            
+            if (totalPages <= 1) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            container.style.display = 'block';
+            
+            // Update info text
+            const start = (currentPage - 1) * pagination.per_page + 1;
+            const end = Math.min(currentPage * pagination.per_page, totalOrders);
+            info.textContent = `Showing ${start}-${end} of ${totalOrders} orders`;
+            
+            // Update buttons
+            prevBtn.disabled = !pagination.has_prev;
+            nextBtn.disabled = !pagination.has_next;
+            
+            // Update page numbers
+            pageNumbers.innerHTML = '';
+            const maxVisiblePages = 5;
+            const startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.className = `cyber-button py-2 px-3 rounded text-sm ${i === currentPage ? 'active' : ''}`;
+                pageBtn.textContent = i;
+                pageBtn.onclick = () => changePage(i - currentPage);
+                pageNumbers.appendChild(pageBtn);
+            }
+        }
+        
+        function changePage(direction) {
+            let newPage;
+            if (typeof direction === 'number' && direction > 0 && direction <= totalPages) {
+                newPage = currentPage + direction;
+            } else {
+                newPage = currentPage + direction;
+            }
+            
+            if (newPage >= 1 && newPage <= totalPages) {
+                loadOrderHistory(newPage);
+            }
+        }
+        
+        function sortTable(column) {
+            // Toggle sort direction if clicking the same column
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'desc'; // Default to descending
+            }
+            
+            // Re-display orders with new sorting
+            displayOrders();
+            
+            // Update sort indicators
+            document.querySelectorAll('.fas.fa-sort').forEach(icon => {
+                icon.className = 'fas fa-sort';
+            });
+            
+            const clickedHeader = document.querySelector(`th[onclick="sortTable('${column}')"] .fas`);
+            if (clickedHeader) {
+                clickedHeader.className = sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+            }
         }
         
         function showError(message) {
             document.getElementById('ordersTableBody').innerHTML = `
                 <tr>
-                    <td colspan="9" class="text-center py-16">
+                    <td colspan="10" class="text-center py-16">
                         <i class="fas fa-exclamation-triangle text-4xl text-neon-red mb-4"></i>
                         <div class="text-gray-400">${message}</div>
                     </td>

@@ -12,7 +12,7 @@ bot:
   ai_confidence_threshold: 80
   auto_tpsl: true
   cooldown_period: 1
-  default_leverage: 20
+  default_leverage: 5
   enabled_pairs:
   - AAVEUSDT
   - ADAUSDT

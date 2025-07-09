@@ -551,12 +551,14 @@ def order_history():
 
 @app.route('/api/order_history')
 def get_order_history():
-    """Get order history for this app's trades"""
+    """Get order history for this app's trades with pagination"""
     try:
         ensure_components_initialized()
         
-        # Get period from query params
+        # Get query params
         period = request.args.get('period', '7d')
+        page = int(request.args.get('page', 1))
+        per_page = 50
         
         # Calculate time range
         now = datetime.now()
@@ -569,31 +571,69 @@ def get_order_history():
         else:  # all
             start_time = now - timedelta(days=365)  # 1 year max
         
-        # Get orders from ByBit (using executions for trade history)
-        orders = None
+        # Get closed P&L history for better P&L calculation
+        closed_pnl_data = []
         try:
-            # Try to get order history first
-            orders = bybit_session.get_open_orders(category="linear")
-            app.logger.info(f"Open orders response: {orders}")
-        except Exception as order_error:
-            app.logger.warning(f"Open orders failed: {order_error}")
-        
-        # Get trade executions for actual trade history
-        executions = None
+            # Get closed P&L data
+            cursor = None
+            while True:
+                params = {
+                    'category': 'linear',
+                    'startTime': int(start_time.timestamp() * 1000),
+                    'limit': 200
+                }
+                if cursor:
+                    params['cursor'] = cursor
+                    
+                pnl_result = bybit_session.get_closed_pnl(**params)
+                app.logger.info(f"Closed P&L batch response: {pnl_result}")
+                
+                if not pnl_result or 'result' not in pnl_result or not pnl_result['result']['list']:
+                    break
+                    
+                closed_pnl_data.extend(pnl_result['result']['list'])
+                
+                # Check if there are more pages
+                if 'nextPageCursor' in pnl_result['result'] and pnl_result['result']['nextPageCursor']:
+                    cursor = pnl_result['result']['nextPageCursor']
+                else:
+                    break
+                    
+        except Exception as pnl_error:
+            app.logger.warning(f"Closed P&L failed: {pnl_error}")
+            
+        # Get all executions for additional data
+        all_executions = []
         try:
-            executions = bybit_session.get_executions(
-                category="linear",
-                startTime=int(start_time.timestamp() * 1000),
-                limit=200
-            )
-            app.logger.info(f"Executions response: {executions}")
+            # Get executions in batches to avoid limits
+            cursor = None
+            while True:
+                params = {
+                    'category': 'linear',
+                    'startTime': int(start_time.timestamp() * 1000),
+                    'limit': 200
+                }
+                if cursor:
+                    params['cursor'] = cursor
+                    
+                executions = bybit_session.get_executions(**params)
+                app.logger.info(f"Executions batch response: {executions}")
+                
+                if not executions or 'result' not in executions or not executions['result']['list']:
+                    break
+                    
+                all_executions.extend(executions['result']['list'])
+                
+                # Check if there are more pages
+                if 'nextPageCursor' in executions['result'] and executions['result']['nextPageCursor']:
+                    cursor = executions['result']['nextPageCursor']
+                else:
+                    break
+                    
         except Exception as exec_error:
             app.logger.warning(f"Executions failed: {exec_error}")
         
-        # Use executions as primary source
-        if executions and 'result' in executions:
-            orders = executions
-        
+        # Process all data
         formatted_orders = []
         stats = {
             'total_orders': 0,
@@ -603,36 +643,111 @@ def get_order_history():
             'total_pnl': 0
         }
         
-        if orders and 'result' in orders and 'list' in orders['result']:
-            for order in orders['result']['list']:
-                # Handle both order and execution data formats
+        # Process closed P&L data (more accurate P&L)
+        if closed_pnl_data:
+            for pnl_entry in closed_pnl_data:
+                symbol = pnl_entry.get('symbol', '')
+                side = pnl_entry.get('side', '')
+                qty = float(pnl_entry.get('qty', 0))
+                avg_entry_price = float(pnl_entry.get('avgEntryPrice', 0))
+                avg_exit_price = float(pnl_entry.get('avgExitPrice', 0))
+                closed_pnl = float(pnl_entry.get('closedPnl', 0))
+                
+                # Calculate P&L percentage
+                entry_value = qty * avg_entry_price
+                pnl_percentage = (closed_pnl / entry_value * 100) if entry_value > 0 else 0
+                
+                # For short positions, adjust percentage calculation
+                if side == 'Sell':
+                    # Short position: profit when price goes down
+                    pnl_percentage = -pnl_percentage if closed_pnl != 0 else 0
+                
                 formatted_order = {
-                    'orderId': order.get('orderId', '') or order.get('execId', ''),
-                    'symbol': order.get('symbol', ''),
-                    'side': order.get('side', ''),
-                    'type': order.get('orderType', '') or order.get('execType', 'Market'),
-                    'quantity': float(order.get('qty', 0)) or float(order.get('execQty', 0)),
-                    'price': float(order.get('avgPrice', 0)) or float(order.get('execPrice', 0)) or float(order.get('price', 0)),
-                    'status': order.get('orderStatus', '') or 'Filled',
-                    'timestamp': order.get('createdTime', '') or order.get('execTime', ''),
-                    'pnl': float(order.get('cumRealisedPnl', 0)) or float(order.get('realizedPnl', 0))
+                    'orderId': pnl_entry.get('orderId', ''),
+                    'symbol': symbol,
+                    'side': side,
+                    'type': 'Market',
+                    'quantity': qty,
+                    'price': avg_exit_price,
+                    'status': 'Filled',
+                    'timestamp': pnl_entry.get('updatedTime', ''),
+                    'pnl': closed_pnl,
+                    'pnl_percentage': pnl_percentage,
+                    'fee': float(pnl_entry.get('cumExecFee', 0))
                 }
                 
                 formatted_orders.append(formatted_order)
                 
                 # Update stats
                 stats['total_orders'] += 1
-                if formatted_order['status'] == 'Filled':
-                    stats['completed_orders'] += 1
-                    stats['total_volume'] += formatted_order['quantity'] * formatted_order['price']
-                    stats['total_pnl'] += formatted_order['pnl']
-                elif formatted_order['status'] == 'Cancelled':
-                    stats['cancelled_orders'] += 1
+                stats['completed_orders'] += 1
+                stats['total_volume'] += entry_value
+                stats['total_pnl'] += closed_pnl
+        
+        # If no closed P&L data, fall back to executions
+        elif all_executions:
+            for execution in all_executions:
+                # Calculate P&L and percentage
+                quantity = float(execution.get('execQty', 0))
+                price = float(execution.get('execPrice', 0))
+                side = execution.get('side', '')
+                
+                # Calculate trade value
+                trade_value = quantity * price
+                
+                # Get fees
+                exec_fee = float(execution.get('execFee', 0))
+                
+                # Use realized P&L from API (often 0 for individual executions)
+                realized_pnl = float(execution.get('closedPnl', 0)) or float(execution.get('realizedPnl', 0))
+                
+                # Calculate percentage (approximation based on trade value)
+                pnl_percentage = (realized_pnl / trade_value * 100) if trade_value > 0 else 0
+                
+                formatted_order = {
+                    'orderId': execution.get('execId', ''),
+                    'symbol': execution.get('symbol', ''),
+                    'side': side,
+                    'type': execution.get('execType', 'Market'),
+                    'quantity': quantity,
+                    'price': price,
+                    'status': 'Filled',
+                    'timestamp': execution.get('execTime', ''),
+                    'pnl': realized_pnl,
+                    'pnl_percentage': pnl_percentage,
+                    'fee': exec_fee
+                }
+                
+                formatted_orders.append(formatted_order)
+                
+                # Update stats
+                stats['total_orders'] += 1
+                stats['completed_orders'] += 1
+                stats['total_volume'] += trade_value
+                stats['total_pnl'] += realized_pnl
+        
+        # Sort by timestamp (newest first)
+        formatted_orders.sort(key=lambda x: int(x['timestamp']) if x['timestamp'] else 0, reverse=True)
+        
+        # Apply pagination
+        total_orders = len(formatted_orders)
+        total_pages = (total_orders + per_page - 1) // per_page
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_orders = formatted_orders[start_idx:end_idx]
         
         return jsonify({
             'success': True,
-            'orders': formatted_orders,
-            'stats': stats
+            'orders': paginated_orders,
+            'stats': stats,
+            'pagination': {
+                'current_page': page,
+                'per_page': per_page,
+                'total_pages': total_pages,
+                'total_orders': total_orders,
+                'has_next': page < total_pages,
+                'has_prev': page > 1
+            }
         })
         
     except Exception as e:
@@ -640,7 +755,7 @@ def get_order_history():
         import traceback
         app.logger.error(f"Traceback: {traceback.format_exc()}")
         
-        # Return sample data for testing
+        # Return sample data for testing with pagination
         sample_orders = [
             {
                 'orderId': 'sample_001',
@@ -650,8 +765,10 @@ def get_order_history():
                 'quantity': 0.001,
                 'price': 45000.0,
                 'status': 'Filled',
-                'timestamp': int(datetime.now().timestamp() * 1000),
-                'pnl': 15.50
+                'timestamp': str(int(datetime.now().timestamp() * 1000)),
+                'pnl': 15.50,
+                'pnl_percentage': 0.34,
+                'fee': 0.45
             },
             {
                 'orderId': 'sample_002',
@@ -661,8 +778,10 @@ def get_order_history():
                 'quantity': 0.1,
                 'price': 2800.0,
                 'status': 'Filled',
-                'timestamp': int((datetime.now() - timedelta(hours=2)).timestamp() * 1000),
-                'pnl': -8.30
+                'timestamp': str(int((datetime.now() - timedelta(hours=2)).timestamp() * 1000)),
+                'pnl': -8.30,
+                'pnl_percentage': -2.96,
+                'fee': 0.28
             }
         ]
         
@@ -675,6 +794,14 @@ def get_order_history():
                 'cancelled_orders': 0,
                 'total_volume': 45000 * 0.001 + 2800 * 0.1,
                 'total_pnl': 15.50 - 8.30
+            },
+            'pagination': {
+                'current_page': 1,
+                'per_page': 50,
+                'total_pages': 1,
+                'total_orders': 2,
+                'has_next': False,
+                'has_prev': False
             },
             'error': f'Using sample data due to API error: {str(e)}'
         })
@@ -1160,6 +1287,105 @@ def get_all_symbols():
         app.logger.error(f"Symbols API error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+def calculate_target_info(symbol, side, avg_price, mark_price, stop_loss, take_profit):
+    """Calculate target information for position"""
+    try:
+        # Calculate standard TP levels (multiple targets)
+        tp_levels = []
+        
+        if side == 'Buy':
+            # Long position - targets above entry price
+            if take_profit > 0:
+                # Create multiple TP levels
+                base_distance = (take_profit - avg_price) / avg_price
+                for i in range(1, 5):  # TP1, TP2, TP3, TP4
+                    tp_price = avg_price * (1 + (base_distance * i / 4))
+                    distance_pct = ((tp_price - mark_price) / mark_price * 100)
+                    tp_levels.append({
+                        'level': f'TP{i}',
+                        'price': tp_price,
+                        'distance_pct': distance_pct,
+                        'hit': mark_price >= tp_price
+                    })
+            
+            # Find next target
+            next_target = None
+            for tp in tp_levels:
+                if not tp['hit']:
+                    next_target = tp
+                    break
+                    
+            # Stop loss info
+            sl_distance = ((stop_loss - mark_price) / mark_price * 100) if stop_loss > 0 else None
+            
+        else:  # Sell (Short position)
+            # Short position - targets below entry price
+            if take_profit > 0:
+                # Create multiple TP levels
+                base_distance = (avg_price - take_profit) / avg_price
+                for i in range(1, 5):  # TP1, TP2, TP3, TP4
+                    tp_price = avg_price * (1 - (base_distance * i / 4))
+                    distance_pct = ((mark_price - tp_price) / mark_price * 100)
+                    tp_levels.append({
+                        'level': f'TP{i}',
+                        'price': tp_price,
+                        'distance_pct': distance_pct,
+                        'hit': mark_price <= tp_price
+                    })
+            
+            # Find next target
+            next_target = None
+            for tp in tp_levels:
+                if not tp['hit']:
+                    next_target = tp
+                    break
+                    
+            # Stop loss info
+            sl_distance = ((mark_price - stop_loss) / mark_price * 100) if stop_loss > 0 else None
+        
+        return {
+            'tp_levels': tp_levels,
+            'next_target': next_target,
+            'sl_distance_pct': sl_distance,
+            'total_targets': len(tp_levels),
+            'targets_hit': sum(1 for tp in tp_levels if tp['hit'])
+        }
+        
+    except Exception as e:
+        return {
+            'tp_levels': [],
+            'next_target': None,
+            'sl_distance_pct': None,
+            'total_targets': 0,
+            'targets_hit': 0,
+            'error': str(e)
+        }
+
+def get_realized_pnl_for_position(symbol, side):
+    """Get realized P&L for a specific position"""
+    try:
+        # Get recent closed P&L for this symbol
+        from datetime import datetime, timedelta
+        start_time = datetime.now() - timedelta(days=7)  # Last 7 days
+        
+        closed_pnl = bybit_session.get_closed_pnl(
+            category="linear",
+            symbol=symbol,
+            startTime=int(start_time.timestamp() * 1000),
+            limit=50
+        )
+        
+        total_realized = 0
+        if closed_pnl and 'result' in closed_pnl and 'list' in closed_pnl['result']:
+            for pnl_entry in closed_pnl['result']['list']:
+                if pnl_entry.get('symbol') == symbol and pnl_entry.get('side') == side:
+                    total_realized += float(pnl_entry.get('closedPnl', 0))
+        
+        return total_realized
+        
+    except Exception as e:
+        return 0
+
 @app.route('/api/positions')
 def get_positions():
     ensure_components_initialized()
@@ -1174,15 +1400,37 @@ def get_positions():
             active_positions = []
             for pos in positions['result']['list']:
                 if float(pos.get('size', 0)) > 0:
+                    symbol = pos['symbol']
+                    side = pos['side']
+                    size = float(pos['size'])
+                    avg_price = float(pos.get('avgPrice', 0))
+                    mark_price = float(pos.get('markPrice', 0))
+                    unrealized_pnl = float(pos.get('unrealisedPnl', 0))
+                    
+                    # Get stop loss and take profit info
+                    stop_loss = float(pos.get('stopLoss', 0))
+                    take_profit = float(pos.get('takeProfit', 0))
+                    
+                    # Calculate target distances and next target
+                    target_info = calculate_target_info(symbol, side, avg_price, mark_price, stop_loss, take_profit)
+                    
+                    # Get realized P&L for this position
+                    realized_pnl = get_realized_pnl_for_position(symbol, side)
+                    
                     active_positions.append({
-                        'symbol': pos['symbol'],
-                        'side': pos['side'],
-                        'size': float(pos['size']),
-                        'avgPrice': float(pos.get('avgPrice', 0)),
-                        'markPrice': float(pos.get('markPrice', 0)),
-                        'unrealisedPnl': float(pos.get('unrealisedPnl', 0)),
+                        'symbol': symbol,
+                        'side': side,
+                        'size': size,
+                        'avgPrice': avg_price,
+                        'markPrice': mark_price,
+                        'unrealisedPnl': unrealized_pnl,
+                        'realizedPnl': realized_pnl,
                         'leverage': float(pos.get('leverage', 1)),
-                        'positionValue': float(pos.get('positionValue', 0))
+                        'positionValue': float(pos.get('positionValue', 0)),
+                        'stopLoss': stop_loss,
+                        'takeProfit': take_profit,
+                        'targetInfo': target_info,
+                        'pnlPercentage': (unrealized_pnl / (size * avg_price) * 100) if size > 0 and avg_price > 0 else 0
                     })
             
             return jsonify({
@@ -1338,7 +1586,7 @@ def stop_trading():
     is_trading = False
     
     # Stop AI worker
-    ai_worker = get_ai_worker()
+    ai_worker = get_ai_worker(socketio=socketio, bybit_session=bybit_session)
     ai_worker.stop()
     
     return jsonify({'success': True, 'message': 'Trading and AI worker stopped'})
@@ -1407,7 +1655,7 @@ def place_order():
         trade_logger.log_trade(enhanced_order_data, result)
         
         # Emit to console
-        ai_worker = get_ai_worker()
+        ai_worker = get_ai_worker(socketio=socketio, bybit_session=bybit_session)
         if ai_worker:
             socketio.emit('console_log', {
                 'timestamp': datetime.now().strftime('%H:%M:%S'),
@@ -2181,7 +2429,7 @@ def get_trading_signals():
             app.logger.warning(f"Could not load settings from database: {settings_error}")
             # Fallback to environment variables
             ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
-            auto_execute = os.getenv('AUTO_EXECUTE', 'false').lower() == 'true'
+            auto_execute = os.getenv('AUTO_EXECUTE', 'true').lower() == 'true'
             db_settings = {}  # Empty dict for fallback
         
         # Try to get AI worker
@@ -2420,8 +2668,8 @@ def get_trading_signals():
                 'last_updated': datetime.now().isoformat()
             })
         
-        # Sort by confidence (highest first)
-        signals.sort(key=lambda x: x['confidence'], reverse=True)
+        # Sort by confidence (highest first), then accuracy (highest first)
+        signals.sort(key=lambda x: (x['confidence'], x['analysis']['accuracy']), reverse=True)
         
         return jsonify({
             'success': True,
@@ -2457,7 +2705,7 @@ def get_config():
                 auto_execute = saved_settings.get('autoExecute', False)
         else:
             ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
-            auto_execute = os.getenv('AUTO_EXECUTE', 'false').lower() == 'true'
+            auto_execute = os.getenv('AUTO_EXECUTE', 'true').lower() == 'true'
             
         max_positions = int(os.getenv('MAX_CONCURRENT_TRADES', 5))
         risk_per_trade = float(os.getenv('RISK_PER_TRADE', 2.0))
@@ -3031,7 +3279,7 @@ def load_settings():
             'notifyErrors': True,
             'notifyProfits': True,
             'dailySummary': True,
-            'autoExecute': False  # Added autoExecute field
+            'autoExecute': True  # Auto execute enabled by default
         }
         
         # Try to load from database

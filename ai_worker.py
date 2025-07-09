@@ -166,6 +166,9 @@ class AIWorker:
                 # Generate trading signals
                 self._generate_signals()
                 
+                # Execute trades from ranked signal list
+                self._execute_top_signals()
+                
                 # Monitor trades and move stop loss if needed
                 self.monitor_trades_and_move_sl()
                 
@@ -485,7 +488,7 @@ class AIWorker:
             self.socketio.emit('training_progress', self.training_progress)
     
     def _generate_signals(self):
-        """Generate trading signals"""
+        """Generate trading signals and save to database - NO DIRECT EXECUTION"""
         if self.training_in_progress:
             return
             
@@ -502,17 +505,30 @@ class AIWorker:
                 self.console_logger.log('INFO', 
                     f'🎯 Signal #{self.signal_count}: {side} {symbol} (Confidence: {confidence:.1f}%)')
                 
-                # Execute trade directly with pybit if under limit
-                if self.bybit_session:
-                    active_trades_count = self.get_active_positions_count()
-                    if active_trades_count < self.max_concurrent_trades:
-                        trade_result = self.execute_signal_direct(prediction)
-                        if trade_result:
-                            self.console_logger.log('SUCCESS', f'✅ Trade executed for {symbol} ({active_trades_count + 1}/{self.max_concurrent_trades})')
-                        else:
-                            self.console_logger.log('WARNING', f'⚠️ Trade execution failed for {symbol}')
-                    else:
-                        self.console_logger.log('INFO', f'🚫 Max trades reached ({active_trades_count}/{self.max_concurrent_trades}) - signal queued')
+                # SAVE TO DATABASE ONLY - NO DIRECT EXECUTION
+                # Let the ranked system handle execution
+                try:
+                    from database import TradingDatabase
+                    db = TradingDatabase()
+                    
+                    # Save signal to database with waiting status
+                    signal_id = f'signal_{self.signal_count}_{symbol}'
+                    db.save_trading_signal(
+                        signal_id=signal_id,
+                        symbol=symbol,
+                        side=side,
+                        confidence=confidence,
+                        accuracy=prediction.get('accuracy', 70),
+                        amount=prediction.get('amount', 100),
+                        stop_loss=prediction.get('stop_loss', 2.0),
+                        take_profit=prediction.get('take_profit', 3.0),
+                        status='waiting'
+                    )
+                    
+                    self.console_logger.log('SUCCESS', f'✅ Signal saved to database: {signal_id}')
+                    
+                except Exception as db_error:
+                    self.console_logger.log('ERROR', f'❌ Failed to save signal to database: {str(db_error)}')
                 
                 # Emit signal to frontend
                 if self.socketio:
@@ -528,6 +544,63 @@ class AIWorker:
                 
         except Exception as e:
             self.console_logger.log('ERROR', f'Signal generation error: {str(e)}')
+    
+    def _execute_top_signals(self):
+        """Execute only the top-ranked signals from database"""
+        try:
+            # Check if we have capacity for new trades
+            active_trades_count = self.get_active_positions_count()
+            if active_trades_count >= self.max_concurrent_trades:
+                return
+                
+            # Get waiting signals from database
+            from database import TradingDatabase
+            db = TradingDatabase()
+            
+            # Get all waiting signals
+            waiting_signals = [s for s in db.get_trading_signals() if s.get('status') == 'waiting']
+            
+            if not waiting_signals:
+                return
+                
+            # Sort by confidence (highest first), then accuracy (highest first)
+            waiting_signals.sort(key=lambda x: (x.get('confidence', 0), x.get('accuracy', 0)), reverse=True)
+            
+            # Execute top signal if we have capacity
+            for signal in waiting_signals:
+                if active_trades_count >= self.max_concurrent_trades:
+                    break
+                    
+                # Check if signal meets minimum confidence threshold
+                from utils.settings_loader import SettingsLoader
+                settings = SettingsLoader()
+                ai_threshold = settings.ai_confidence_threshold
+                
+                if signal.get('confidence', 0) < ai_threshold:
+                    self.console_logger.log('INFO', f'⏭️ Signal {signal["symbol"]} below threshold ({signal.get("confidence", 0):.1f}% < {ai_threshold}%)')
+                    continue
+                
+                # Execute this top signal
+                self.console_logger.log('INFO', f'🎯 Executing TOP signal: {signal["symbol"]} (Confidence: {signal.get("confidence", 0):.1f}%)')
+                
+                # Update signal status to in_progress
+                db.update_signal_status(signal['signal_id'], 'in_progress')
+                
+                # Execute the trade
+                trade_result = self.execute_signal_direct(signal)
+                
+                if trade_result:
+                    # Update signal status to executed
+                    db.update_signal_status(signal['signal_id'], 'executed')
+                    active_trades_count += 1
+                    self.console_logger.log('SUCCESS', f'✅ TOP signal executed for {signal["symbol"]} ({active_trades_count}/{self.max_concurrent_trades})')
+                else:
+                    # Update signal status to failed
+                    db.update_signal_status(signal['signal_id'], 'failed')
+                    self.console_logger.log('ERROR', f'❌ TOP signal execution failed for {signal["symbol"]}')
+                    
+        except Exception as e:
+            self.console_logger.log('ERROR', f'Top signal execution error: {str(e)}')
     
     def _update_statistics(self):
         """Update trading statistics"""
