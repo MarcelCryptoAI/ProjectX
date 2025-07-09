@@ -816,30 +816,102 @@ class AIWorker:
             
             current_price = float(ticker['result']['list'][0]['lastPrice'])
             
-            # Use the amount from signal, or fallback to default
-            # User can set minimum trade amount in settings
-            trade_amount_usd = float(signal.get('amount', 100))
+            # Get user settings for leverage and trade amount
+            try:
+                from database import TradingDatabase
+                db = TradingDatabase()
+                db_settings = db.load_settings()
+                
+                # User leverage settings
+                min_leverage = int(db_settings.get('minLeverage', 1))
+                max_leverage = int(db_settings.get('maxLeverage', 10))
+                leverage_strategy = db_settings.get('leverageStrategy', 'confidence_based')
+                
+                # User trade amount settings
+                risk_per_trade = float(db_settings.get('riskPerTrade', 2.0))  # Percentage of balance
+                min_trade_amount = float(db_settings.get('minTradeAmount', 5.0))  # Minimum $5
+                
+                # User concurrent trades setting
+                max_concurrent_trades = int(db_settings.get('maxConcurrentTrades', 5))
+                
+                # Update AI worker's max concurrent trades from user settings
+                self.max_concurrent_trades = max_concurrent_trades
+                
+            except Exception as settings_error:
+                self.console_logger.log('WARNING', f'⚠️ Could not load settings: {settings_error}, using defaults')
+                min_leverage = 1
+                max_leverage = 10
+                leverage_strategy = 'confidence_based'
+                risk_per_trade = 2.0
+                min_trade_amount = 5.0
+                max_concurrent_trades = 5
+                self.max_concurrent_trades = max_concurrent_trades
             
-            # Calculate raw quantity
-            raw_qty = trade_amount_usd / current_price
+            # Calculate leverage based on user settings and AI confidence
+            if leverage_strategy == 'confidence_based':
+                # Higher confidence = higher leverage within user's range
+                leverage_factor = max(0, min(1, (confidence - 50) / 50))  # Scale 0-1
+                leverage = min_leverage + int((max_leverage - min_leverage) * leverage_factor)
+            elif leverage_strategy == 'fixed':
+                leverage = min_leverage
+            else:  # volatility_based or adaptive
+                leverage = min_leverage + int((max_leverage - min_leverage) * 0.5)  # Mid-range
             
-            # Round to proper step size and ensure minimum
-            qty = max(min_order_qty, round(raw_qty / qty_step) * qty_step)
+            # Ensure leverage is within user's bounds
+            leverage = max(min_leverage, min(max_leverage, leverage))
+            
+            # Get current account balance
+            try:
+                balance_data = self.bybit_session.get_wallet_balance(accountType="UNIFIED")
+                total_balance = float(balance_data['result']['list'][0]['totalWalletBalance'])
+            except:
+                total_balance = 1000  # Fallback if balance fetch fails
+            
+            # Calculate trade amount as percentage of balance (user's risk setting)
+            calculated_trade_amount = total_balance * (risk_per_trade / 100)
+            
+            # Ensure minimum trade amount (user's setting or $5 minimum)
+            trade_amount_usd = max(min_trade_amount, calculated_trade_amount)
+            
+            # Calculate total quantity for this trade amount (WITHOUT leverage in quantity calc)
+            total_qty = trade_amount_usd / current_price
+            
+            # Round to proper step size
+            total_qty = max(min_order_qty, round(total_qty / qty_step) * qty_step)
             
             # Double-check minimum quantity
-            if qty < min_order_qty:
-                self.console_logger.log('ERROR', f'❌ Calculated quantity {qty} is below minimum {min_order_qty} for {symbol}')
+            if total_qty < min_order_qty:
+                self.console_logger.log('ERROR', f'❌ Calculated quantity {total_qty} is below minimum {min_order_qty} for {symbol}')
                 return False
             
-            # Verify minimum order value (ByBit requires $5 minimum)
-            order_value = qty * current_price
-            if order_value < 5.0:
-                self.console_logger.log('ERROR', f'❌ Order value ${order_value:.2f} is below ByBit minimum $5.00 for {symbol}')
+            # Verify minimum order value
+            total_order_value = total_qty * current_price
+            if total_order_value < 5.0:
+                self.console_logger.log('ERROR', f'❌ Order value ${total_order_value:.2f} is below ByBit minimum $5.00 for {symbol}')
                 return False
             
-            # Calculate stop loss and take profit from signal
-            stop_loss_pct = float(signal.get('stop_loss', 2.0))  # Default 2%
-            take_profit_pct = float(signal.get('take_profit', 3.0))  # Default 3%
+            self.console_logger.log('INFO', f'💰 Trade: ${trade_amount_usd:.2f} ({risk_per_trade:.1f}% of ${total_balance:.2f}), Leverage: {leverage}x')
+            self.console_logger.log('INFO', f'🔧 Settings: Min Lev: {min_leverage}x, Max Lev: {max_leverage}x, Strategy: {leverage_strategy}')
+            self.console_logger.log('INFO', f'📊 Max Concurrent Trades: {self.max_concurrent_trades} (from user settings)')
+            
+            # Set leverage first
+            try:
+                leverage_result = self.bybit_session.set_leverage(
+                    category="linear",
+                    symbol=symbol,
+                    buyLeverage=str(leverage),
+                    sellLeverage=str(leverage)
+                )
+                if leverage_result and 'result' in leverage_result:
+                    self.console_logger.log('SUCCESS', f'✅ Leverage set to {leverage}x for {symbol}')
+                else:
+                    self.console_logger.log('WARNING', f'⚠️ Could not set leverage for {symbol}')
+            except Exception as lev_error:
+                self.console_logger.log('WARNING', f'⚠️ Leverage setting error: {str(lev_error)}')
+            
+            # Calculate stop loss and take profit from signal (AI determined)
+            stop_loss_pct = float(signal.get('stop_loss', 2.0))  # AI determines SL
+            take_profit_pct = float(signal.get('take_profit', 3.0))  # AI determines TP
             
             if side == 'Buy':
                 stop_loss_price = current_price * (1 - stop_loss_pct / 100)
@@ -848,35 +920,20 @@ class AIWorker:
                 stop_loss_price = current_price * (1 + stop_loss_pct / 100)
                 take_profit_price = current_price * (1 - take_profit_pct / 100)
             
-            # Place main market order with stop loss only
+            # Place main market order with stop loss only (no TP in main order)
             order_params = {
                 'category': 'linear',
                 'symbol': symbol,
                 'side': side,  # Use exact case: 'Buy' or 'Sell'
                 'orderType': 'Market',
-                'qty': str(qty),
+                'qty': str(total_qty),
                 'timeInForce': 'IOC',  # Immediate or Cancel
                 'stopLoss': str(stop_loss_price)
             }
             
-            # Calculate 4 TP levels (TP1, TP2, TP3 as limit orders, TP4 as close)
-            tp_levels = []
-            for i in range(1, 5):
-                if side == 'Buy':
-                    tp_price = current_price * (1 + (take_profit_pct * i / 4) / 100)
-                else:  # Sell
-                    tp_price = current_price * (1 - (take_profit_pct * i / 4) / 100)
-                
-                tp_levels.append({
-                    'level': i,
-                    'price': tp_price,
-                    'qty': qty / 4,  # Split quantity across 4 levels
-                    'type': 'Limit' if i <= 3 else 'Market'  # TP4 as market close
-                })
+            self.console_logger.log('INFO', f'📤 Placing {side} order: {total_qty} {symbol} @ market (~${current_price:.4f})')
             
-            self.console_logger.log('INFO', f'📤 Placing {side} order: {qty} {symbol} @ market (~${current_price:.4f})')
-            
-            # Execute the order
+            # Execute the main order first
             order_result = self.bybit_session.place_order(**order_params)
             
             if order_result and 'result' in order_result:
@@ -884,54 +941,84 @@ class AIWorker:
                 
                 # Log successful trade
                 self.console_logger.log('SUCCESS', f'✅ Order placed: {order_id}')
-                self.console_logger.log('INFO', f'📊 Details: {qty} {symbol}, SL: ${stop_loss_price:.4f}, TP: ${take_profit_price:.4f}')
+                self.console_logger.log('INFO', f'📊 Details: {total_qty} {symbol}, SL: ${stop_loss_price:.4f}')
                 
-                # Place multiple TP levels after main order
+                # Calculate 4 TP levels with equal quantity distribution
+                tp_levels = []
                 tp_order_ids = []
-                for tp_level in tp_levels:
+                
+                # Divide total quantity into 4 equal parts
+                tp_qty = total_qty / 4
+                tp_qty = max(min_order_qty, round(tp_qty / qty_step) * qty_step)  # Ensure proper step size
+                
+                for i in range(1, 5):
+                    # Calculate TP price for each level (25%, 50%, 75%, 100% of total TP)
+                    tp_percentage = (take_profit_pct * i) / 4  # Divide TP into 4 levels
+                    
+                    if side == 'Buy':
+                        tp_price = current_price * (1 + tp_percentage / 100)
+                    else:  # Sell
+                        tp_price = current_price * (1 - tp_percentage / 100)
+                    
+                    tp_level = {
+                        'level': i,
+                        'price': tp_price,
+                        'qty': tp_qty,
+                        'status': 'pending',
+                        'hit_time': None,
+                        'order_id': None
+                    }
+                    tp_levels.append(tp_level)
+                    
+                    # Place TP limit order
                     try:
                         tp_order_params = {
                             'category': 'linear',
                             'symbol': symbol,
                             'side': 'Sell' if side == 'Buy' else 'Buy',
-                            'orderType': tp_level['type'],
-                            'qty': str(tp_level['qty']),
-                            'timeInForce': 'GTC'
+                            'orderType': 'Limit',
+                            'qty': str(tp_qty),
+                            'price': str(tp_price),
+                            'timeInForce': 'GTC',
+                            'reduceOnly': True  # Important: this closes the position
                         }
-                        
-                        if tp_level['type'] == 'Limit':
-                            tp_order_params['price'] = str(tp_level['price'])
-                        else:
-                            # TP4 as conditional market order
-                            tp_order_params['triggerPrice'] = str(tp_level['price'])
                         
                         tp_result = self.bybit_session.place_order(**tp_order_params)
                         
                         if tp_result and 'result' in tp_result:
                             tp_order_id = tp_result['result']['orderId']
+                            tp_level['order_id'] = tp_order_id
                             tp_order_ids.append(tp_order_id)
-                            self.console_logger.log('SUCCESS', f'✅ TP{tp_level["level"]} set: {tp_order_id} @ ${tp_level["price"]:.4f}')
+                            self.console_logger.log('SUCCESS', f'✅ TP{i} set: {tp_order_id} @ ${tp_price:.4f} (qty: {tp_qty})')
                         else:
-                            self.console_logger.log('WARNING', f'⚠️ TP{tp_level["level"]} failed: {tp_result.get("retMsg", "Unknown error")}')
+                            error_msg = tp_result.get('retMsg', 'Unknown error') if tp_result else 'No response'
+                            self.console_logger.log('WARNING', f'⚠️ TP{i} failed: {error_msg}')
                             
                     except Exception as tp_error:
-                        self.console_logger.log('ERROR', f'❌ TP{tp_level["level"]} error: {str(tp_error)}')
+                        self.console_logger.log('ERROR', f'❌ TP{i} error: {str(tp_error)}')
                 
-                # Store trade in active trades for monitoring (including trailing SL)
+                # Store trade in active trades for monitoring
                 self.active_trades[order_id] = {
                     'symbol': symbol,
                     'side': side,
-                    'quantity': qty,
+                    'quantity': total_qty,
                     'entry_price': current_price,
                     'stop_loss': stop_loss_price,
+                    'original_stop_loss': stop_loss_price,  # Keep original for reference
                     'take_profit_levels': tp_levels,
                     'tp_order_ids': tp_order_ids,
+                    'tp1_hit': False,
+                    'sl_moved_to_breakeven': False,
                     'trailing_stop_enabled': signal.get('trailing_stop_enabled', True),
                     'trailing_stop_distance': signal.get('trailing_stop_distance', 1.0),
-                    'timestamp': datetime.now().isoformat()
+                    'timestamp': datetime.now().isoformat(),
+                    'trade_amount_usd': trade_amount_usd,
+                    'balance_percentage': balance_percentage
                 }
                 
                 self.console_logger.log('SUCCESS', f'✅ Trade setup complete: {len(tp_order_ids)}/4 TP levels active')
+                self.console_logger.log('INFO', f'📊 TP1: ${tp_levels[0]["price"]:.4f}, TP2: ${tp_levels[1]["price"]:.4f}, TP3: ${tp_levels[2]["price"]:.4f}, TP4: ${tp_levels[3]["price"]:.4f}')
+                self.console_logger.log('INFO', f'🛡️ Stop Loss: ${stop_loss_price:.4f} (will move to breakeven+0.1% when TP1 hits)')
                 
                 return True
             else:
@@ -975,13 +1062,99 @@ class AIWorker:
             return
         
         try:
+            # Get current orders to check TP status
+            orders = self.bybit_session.get_open_orders(category="linear")
+            if not orders or 'result' not in orders:
+                return
+            
             # Get current positions
             positions = self.bybit_session.get_positions(category="linear")
             if not positions or 'result' not in positions:
                 return
             
-            for position in positions['result']['list']:
-                symbol = position['symbol']
+            for order_id, trade_data in list(self.active_trades.items()):
+                symbol = trade_data['symbol']
+                side = trade_data['side']
+                entry_price = trade_data['entry_price']
+                tp_levels = trade_data['take_profit_levels']
+                tp_order_ids = trade_data['tp_order_ids']
+                
+                # Check if TP1 has been hit by looking at open orders
+                tp1_still_open = False
+                for order in orders['result']['list']:
+                    if order['orderId'] in tp_order_ids and order['orderId'] == tp_levels[0].get('order_id'):
+                        tp1_still_open = True
+                        break
+                
+                # If TP1 is no longer in open orders, it was filled
+                if not tp1_still_open and not trade_data.get('tp1_hit', False):
+                    self.console_logger.log('SUCCESS', f'✅ TP1 hit for {symbol}! Moving stop loss to breakeven + 0.1%')
+                    
+                    # Calculate breakeven + 0.1% price
+                    if side == 'Buy':
+                        new_sl_price = entry_price * 1.001  # +0.1%
+                    else:
+                        new_sl_price = entry_price * 0.999  # -0.1%
+                    
+                    # Update stop loss
+                    try:
+                        # Cancel existing stop loss order first
+                        self.bybit_session.cancel_all_orders(category="linear", symbol=symbol, orderFilter="StopOrder")
+                        
+                        # Place new stop loss at breakeven + 0.1%
+                        sl_result = self.bybit_session.place_order(
+                            category="linear",
+                            symbol=symbol,
+                            side="Sell" if side == "Buy" else "Buy",
+                            orderType="Market",
+                            qty=str(trade_data['quantity']),
+                            stopLoss=str(new_sl_price),
+                            reduceOnly=True
+                        )
+                        
+                        if sl_result and 'result' in sl_result:
+                            # Update trade data
+                            trade_data['tp1_hit'] = True
+                            trade_data['sl_moved_to_breakeven'] = True
+                            trade_data['stop_loss'] = new_sl_price
+                            trade_data['tp_levels'][0]['status'] = 'hit'
+                            trade_data['tp_levels'][0]['hit_time'] = datetime.now().isoformat()
+                            
+                            self.console_logger.log('SUCCESS', f'✅ Stop loss moved to breakeven+0.1% for {symbol}: ${new_sl_price:.4f}')
+                        else:
+                            self.console_logger.log('ERROR', f'❌ Failed to move stop loss for {symbol}')
+                            
+                    except Exception as sl_error:
+                        self.console_logger.log('ERROR', f'❌ Error moving stop loss for {symbol}: {str(sl_error)}')
+                
+                # Update TP level statuses
+                for i, tp_level in enumerate(tp_levels):
+                    if tp_level.get('order_id') and tp_level.get('status') == 'pending':
+                        tp_still_open = False
+                        for order in orders['result']['list']:
+                            if order['orderId'] == tp_level['order_id']:
+                                tp_still_open = True
+                                break
+                        
+                        if not tp_still_open:
+                            tp_level['status'] = 'hit'
+                            tp_level['hit_time'] = datetime.now().isoformat()
+                            self.console_logger.log('SUCCESS', f'✅ TP{i+1} hit for {symbol}!')
+                
+                # Clean up completed trades (all TPs hit or position closed)
+                position_exists = False
+                for position in positions['result']['list']:
+                    if position['symbol'] == symbol and float(position.get('size', 0)) > 0:
+                        position_exists = True
+                        break
+                
+                if not position_exists:
+                    # Position is closed, remove from active trades
+                    self.console_logger.log('INFO', f'📊 Position closed for {symbol}, removing from active trades')
+                    del self.active_trades[order_id]
+                    
+        except Exception as e:
+            self.console_logger.log('ERROR', f'❌ Trade monitoring error: {str(e)}')
                 side = position['side']
                 unrealized_pnl = float(position['unrealisedPnl'])
                 

@@ -2285,18 +2285,26 @@ def get_analytics_data():
             
             trades_data['trades_by_date'] = trades_by_date
         
-        # Calculate performance metrics
+        # Calculate performance metrics - ONLY real data
         win_rate = 0
         if trades_data['total_trades'] > 0:
             win_rate = (trades_data['winning_trades'] / trades_data['total_trades']) * 100
-        elif unrealized_pnl > 0:
-            win_rate = min(max(50 + (unrealized_pnl / 100), 0), 100)  # Rough estimate if no trades
+        # No fallback estimates - only real data
         
-        # Format positions for frontend
+        # Format positions for frontend with TP level information
         formatted_positions = []
+        
+        # Get AI worker to access active trades info
+        ai_worker = None
+        try:
+            ai_worker = get_ai_worker(socketio, bybit_session)
+        except:
+            pass
+        
         for pos in active_positions:
-            formatted_positions.append({
-                'symbol': pos.get('symbol'),
+            symbol = pos.get('symbol')
+            position_data = {
+                'symbol': symbol,
                 'side': pos.get('side'),
                 'size': float(pos.get('size', 0)),
                 'avgPrice': float(pos.get('avgPrice', 0)),
@@ -2304,8 +2312,57 @@ def get_analytics_data():
                 'unrealisedPnl': float(pos.get('unrealisedPnl', 0)),
                 'percentage': float(pos.get('unrealisedPnlPcnt', 0)) * 100,
                 'positionValue': float(pos.get('positionValue', 0)),
-                'leverage': float(pos.get('leverage', 1))
-            })
+                'leverage': float(pos.get('leverage', 1)),
+                'tp_levels': [],
+                'tp1_hit': False,
+                'sl_moved_to_breakeven': False,
+                'distance_to_tp1': 0
+            }
+            
+            # Add TP level information from AI worker if available
+            if ai_worker and hasattr(ai_worker, 'active_trades'):
+                for order_id, trade_data in ai_worker.active_trades.items():
+                    if trade_data.get('symbol') == symbol:
+                        tp_levels = trade_data.get('take_profit_levels', [])
+                        current_price = position_data['markPrice']
+                        
+                        # Format TP levels with status
+                        for i, tp_level in enumerate(tp_levels):
+                            tp_info = {
+                                'level': i + 1,
+                                'price': tp_level.get('price', 0),
+                                'status': tp_level.get('status', 'pending'),
+                                'hit_time': tp_level.get('hit_time'),
+                                'distance_percent': 0
+                            }
+                            
+                            # Calculate distance to TP level
+                            if current_price > 0 and tp_level.get('price', 0) > 0:
+                                if pos.get('side') == 'Buy':
+                                    distance = ((tp_level['price'] - current_price) / current_price) * 100
+                                else:
+                                    distance = ((current_price - tp_level['price']) / current_price) * 100
+                                tp_info['distance_percent'] = distance
+                            
+                            position_data['tp_levels'].append(tp_info)
+                        
+                        # Set TP1 and SL status
+                        position_data['tp1_hit'] = trade_data.get('tp1_hit', False)
+                        position_data['sl_moved_to_breakeven'] = trade_data.get('sl_moved_to_breakeven', False)
+                        
+                        # Calculate distance to TP1
+                        if tp_levels and len(tp_levels) > 0:
+                            tp1_price = tp_levels[0].get('price', 0)
+                            if current_price > 0 and tp1_price > 0:
+                                if pos.get('side') == 'Buy':
+                                    distance = ((tp1_price - current_price) / current_price) * 100
+                                else:
+                                    distance = ((current_price - tp1_price) / current_price) * 100
+                                position_data['distance_to_tp1'] = distance
+                        
+                        break
+            
+            formatted_positions.append(position_data)
         
         return jsonify({
             'success': True,
@@ -2324,9 +2381,9 @@ def get_analytics_data():
             'largest_loss': trades_data['largest_loss'],
             'total_profit': trades_data['total_profit'],
             'total_loss': trades_data['total_loss'],
-            'sharpe_ratio': max(0.5, min(2.0, 1.0 + (unrealized_pnl / 1000))),  # Simplified
-            'max_drawdown': max(0, min(20, abs(unrealized_pnl) / 100)) if unrealized_pnl < 0 else 0,
-            'profit_factor': trades_data['total_profit'] / trades_data['total_loss'] if trades_data['total_loss'] > 0 else max(0.8, min(3.0, 1.5 + (unrealized_pnl / 500))),
+            'sharpe_ratio': trades_data['total_profit'] / trades_data['total_loss'] if trades_data['total_loss'] > 0 else 0,
+            'max_drawdown': abs(trades_data['largest_loss']) if trades_data['largest_loss'] < 0 else 0,
+            'profit_factor': trades_data['total_profit'] / trades_data['total_loss'] if trades_data['total_loss'] > 0 else 0,
             'trades_by_date': trades_data['trades_by_date']
         })
         
@@ -2727,18 +2784,31 @@ def get_trading_signals():
 def get_config():
     """Get current configuration"""
     try:
-        # Load from settings file if exists
-        if os.path.exists(settings_file):
-            with open(settings_file, 'r') as f:
-                saved_settings = json.load(f)
-                ai_confidence_threshold = saved_settings.get('confidenceThreshold', 75)
-                auto_execute = saved_settings.get('autoExecute', False)
-        else:
+        # Load from database settings first
+        try:
+            from database import TradingDatabase
+            db = TradingDatabase()
+            db_settings = db.load_settings()
+            
+            ai_confidence_threshold = float(db_settings.get('confidenceThreshold', 75))
+            auto_execute = db_settings.get('autoExecute', False)
+            max_positions = int(db_settings.get('maxConcurrentTrades', 5))
+            risk_per_trade = float(db_settings.get('riskPerTrade', 2.0))
+            min_leverage = int(db_settings.get('minLeverage', 1))
+            max_leverage = int(db_settings.get('maxLeverage', 10))
+            leverage_strategy = db_settings.get('leverageStrategy', 'confidence_based')
+            min_trade_amount = float(db_settings.get('minTradeAmount', 5.0))
+            
+        except Exception as db_error:
+            # Fallback to environment variables if database fails
             ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
             auto_execute = os.getenv('AUTO_EXECUTE', 'true').lower() == 'true'
-            
-        max_positions = int(os.getenv('MAX_CONCURRENT_TRADES', 5))
-        risk_per_trade = float(os.getenv('RISK_PER_TRADE', 2.0))
+            max_positions = int(os.getenv('MAX_CONCURRENT_TRADES', 5))
+            risk_per_trade = float(os.getenv('RISK_PER_TRADE', 2.0))
+            min_leverage = 1
+            max_leverage = 10
+            leverage_strategy = 'confidence_based'
+            min_trade_amount = 5.0
         
         return jsonify({
             'success': True,
@@ -2746,6 +2816,10 @@ def get_config():
             'max_positions': max_positions,
             'risk_per_trade': risk_per_trade,
             'auto_execute': auto_execute,
+            'min_leverage': min_leverage,
+            'max_leverage': max_leverage,
+            'leverage_strategy': leverage_strategy,
+            'min_trade_amount': min_trade_amount,
             'api_key': 'configured' if os.getenv('BYBIT_API_KEY') else 'not_configured',
             'api_secret': 'configured' if os.getenv('BYBIT_API_SECRET') else 'not_configured'
         })

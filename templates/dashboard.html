@@ -1064,40 +1064,52 @@
         
         // Update trading parameters from settings
         function updateTradingParameters() {
-            // Load all settings from settings API
-            fetch('/api/load_settings')
+            // Load all settings from config API
+            fetch('/api/config')
                 .then(response => response.json())
                 .then(data => {
                     if (data && data.success) {
-                        // Update amount per trade (using minTradeAmount as base)
-                        const amountPerTrade = data.settings.minTradeAmount || 19;
-                        document.getElementById('amountPerTrade').textContent = `$${amountPerTrade}`;
+                        // Update max concurrent trades from user settings
+                        const maxPositions = data.max_positions || 5;
+                        document.getElementById('maxPositions').textContent = maxPositions;
                         
-                        // Update leverage
-                        const leverage = data.settings.maxLeverage || 10;
-                        document.getElementById('leverage').textContent = `${leverage}x`;
+                        // Update AI confidence threshold
+                        const aiConfidence = data.ai_confidence_threshold || 75;
+                        document.getElementById('aiConfidence').textContent = `${aiConfidence}%`;
                         
-                        // Update dynamic take profit
-                        const dynamicTP = data.settings.dynamicTakeProfit || false;
-                        document.getElementById('dynamicTP').textContent = dynamicTP ? 'ON' : 'OFF';
-                        document.getElementById('dynamicTP').className = 'text-neon-yellow';
+                        // Update risk per trade (amount calculation)
+                        const riskPerTrade = data.risk_per_trade || 2.0;
+                        document.getElementById('amountPerTrade').textContent = `${riskPerTrade}% of balance`;
                         
-                        // Update trailing stop loss
-                        const trailingSL = data.settings.trailingStopLoss || false;
-                        document.getElementById('trailingSL').textContent = trailingSL ? 'ON' : 'OFF';
-                        document.getElementById('trailingSL').className = 'text-neon-yellow';
+                        // Update leverage range
+                        const minLeverage = data.min_leverage || 1;
+                        const maxLeverage = data.max_leverage || 10;
+                        const leverageStrategy = data.leverage_strategy || 'confidence_based';
+                        document.getElementById('leverage').textContent = `${minLeverage}x-${maxLeverage}x (${leverageStrategy})`;
+                        
+                        // Update strategy mode based on leverage strategy
+                        let strategyMode = 'BALANCED';
+                        if (leverageStrategy === 'confidence_based') {
+                            strategyMode = 'AI ADAPTIVE';
+                        } else if (leverageStrategy === 'fixed') {
+                            strategyMode = 'CONSERVATIVE';
+                        }
+                        document.getElementById('strategyMode').textContent = strategyMode;
+                        
+                        // Update dynamic TP (always ON for 4-level TP)
+                        document.getElementById('dynamicTP').textContent = 'ON (4 levels)';
+                        document.getElementById('dynamicTP').className = 'text-neon-green';
+                        
+                        // Update trailing stop loss (always ON for TP1 breakeven)
+                        document.getElementById('trailingSL').textContent = 'ON (TP1 → BE+0.1%)';
+                        document.getElementById('trailingSL').className = 'text-neon-green';
                         
                         // Update trailing percentage
-                        const trailingPercent = data.settings.trailingStopValue || 1.0;
-                        document.getElementById('trailingPercent').textContent = `${trailingPercent}%`;
+                        document.getElementById('trailingPercent').textContent = '0.1%';
                         
-                        // Update max concurrent trades from settings
-                        const maxConcurrentTrades = data.settings.maxConcurrentTrades || 20;
-                        document.getElementById('maxPositions').textContent = maxConcurrentTrades;
-                        
-                        // Update strategy mode from settings
-                        const strategyMode = data.settings.strategyMode || 'balanced';
-                        document.getElementById('strategyMode').textContent = strategyMode.toUpperCase();
+                        // Update min accuracy (fixed at 60% for signals)
+                        document.getElementById('minAccuracy').textContent = '60%';
+                        console.log('Trading parameters updated successfully');
                         
                         // Update AI confidence from settings
                         const confidenceThreshold = data.settings.confidenceThreshold || 75;
