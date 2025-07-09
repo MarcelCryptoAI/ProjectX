@@ -356,6 +356,9 @@ class AIWorker:
             self.console_logger.log('SUCCESS', f'🎉 Training completed! Overall accuracy: {overall_accuracy:.1f}%')
             self.console_logger.log('INFO', f'📊 Trained on {len(enabled_pairs)} symbols across {len(batches)} batches')
             
+            # Reset failed signals to waiting after retraining
+            self._reset_failed_signals_after_retraining()
+            
             # Final progress update
             self.training_progress['overall_progress'] = 100
             self._emit_training_progress()
@@ -365,6 +368,43 @@ class AIWorker:
             self.console_logger.log('ERROR', f'Training failed: {str(e)}')
             if self.current_training_session:
                 self.database.update_training_session(self.current_training_session, 0, 0, 'failed')
+    
+    def _reset_failed_signals_after_retraining(self):
+        """Reset failed signals to waiting status after retraining to give them another chance"""
+        try:
+            from database import TradingDatabase
+            db = TradingDatabase()
+            
+            # Get all failed signals
+            failed_signals = [s for s in db.get_trading_signals() if s.get('status') == 'failed']
+            
+            reset_count = 0
+            for signal in failed_signals:
+                # Check if signal still meets confidence threshold after retraining
+                confidence = signal.get('confidence', 0)
+                accuracy = signal.get('accuracy', 0)
+                
+                # Get current threshold
+                try:
+                    from utils.settings_loader import SettingsLoader
+                    settings = SettingsLoader()
+                    ai_threshold = settings.ai_confidence_threshold
+                except:
+                    ai_threshold = 75  # Default fallback
+                
+                # If signal still meets requirements, reset to waiting
+                if confidence >= ai_threshold and accuracy > 60:  # Basic quality check
+                    db.update_signal_status(signal['signal_id'], 'waiting')
+                    reset_count += 1
+                    self.console_logger.log('INFO', f'🔄 Reset failed signal {signal["symbol"]} to waiting (Confidence: {confidence:.1f}%)')
+            
+            if reset_count > 0:
+                self.console_logger.log('SUCCESS', f'✅ Reset {reset_count} failed signals to waiting status after retraining')
+            else:
+                self.console_logger.log('INFO', '📊 No failed signals met criteria for reset after retraining')
+                
+        except Exception as e:
+            self.console_logger.log('ERROR', f'Error resetting failed signals: {str(e)}')
     
     def _collect_market_data(self, symbol):
         """Collect market data for a symbol"""
@@ -546,19 +586,20 @@ class AIWorker:
             self.console_logger.log('ERROR', f'Signal generation error: {str(e)}')
     
     def _execute_top_signals(self):
-        """Execute only the top-ranked signals from database"""
+        """Execute signals with robust failure handling - try next signal if current fails"""
         try:
             # Check if we have capacity for new trades
             active_trades_count = self.get_active_positions_count()
             if active_trades_count >= self.max_concurrent_trades:
+                self.console_logger.log('INFO', f'📊 Max concurrent trades reached ({active_trades_count}/{self.max_concurrent_trades})')
                 return
                 
             # Get waiting signals from database
             from database import TradingDatabase
             db = TradingDatabase()
             
-            # Get all waiting signals
-            waiting_signals = [s for s in db.get_trading_signals() if s.get('status') == 'waiting']
+            # Get all waiting signals (including previously failed ones after retraining)
+            waiting_signals = [s for s in db.get_trading_signals() if s.get('status') in ['waiting', 'failed']]
             
             if not waiting_signals:
                 return
@@ -566,22 +607,41 @@ class AIWorker:
             # Sort by confidence (highest first), then accuracy (highest first)
             waiting_signals.sort(key=lambda x: (x.get('confidence', 0), x.get('accuracy', 0)), reverse=True)
             
-            # Execute top signal if we have capacity
-            for signal in waiting_signals:
-                if active_trades_count >= self.max_concurrent_trades:
-                    break
-                    
-                # Check if signal meets minimum confidence threshold
+            # Get confidence threshold
+            try:
                 from utils.settings_loader import SettingsLoader
                 settings = SettingsLoader()
                 ai_threshold = settings.ai_confidence_threshold
+            except:
+                ai_threshold = 75  # Default fallback
+            
+            signals_processed = 0
+            trades_executed = 0
+            
+            self.console_logger.log('INFO', f'🔄 Processing {len(waiting_signals)} signals with {self.max_concurrent_trades - active_trades_count} slots available')
+            
+            # Execute signals until we reach max concurrent trades or run out of signals
+            for signal in waiting_signals:
+                if active_trades_count >= self.max_concurrent_trades:
+                    self.console_logger.log('INFO', f'🚫 Max concurrent trades reached, stopping signal execution')
+                    break
+                    
+                signals_processed += 1
                 
+                # Check if signal meets minimum confidence threshold
                 if signal.get('confidence', 0) < ai_threshold:
-                    self.console_logger.log('INFO', f'⏭️ Signal {signal["symbol"]} below threshold ({signal.get("confidence", 0):.1f}% < {ai_threshold}%)')
+                    self.console_logger.log('INFO', f'⏭️ Signal {signal["symbol"]} below threshold ({signal.get("confidence", 0):.1f}% < {ai_threshold}%) - skipping')
                     continue
                 
-                # Execute this top signal
-                self.console_logger.log('INFO', f'🎯 Executing TOP signal: {signal["symbol"]} (Confidence: {signal.get("confidence", 0):.1f}%)')
+                # Check if signal was previously failed - if so, verify it still meets criteria after retraining
+                if signal.get('status') == 'failed':
+                    # After retraining, if signal still meets confidence/accuracy requirements, retry it
+                    self.console_logger.log('INFO', f'🔄 Retrying previously failed signal: {signal["symbol"]} (Confidence: {signal.get("confidence", 0):.1f}%)')
+                    # Reset status to waiting for retry
+                    db.update_signal_status(signal['signal_id'], 'waiting')
+                
+                # Execute this signal
+                self.console_logger.log('INFO', f'🎯 Executing signal #{signals_processed}: {signal["symbol"]} (Confidence: {signal.get("confidence", 0):.1f}%, Accuracy: {signal.get("accuracy", 0):.1f}%)')
                 
                 # Update signal status to in_progress
                 db.update_signal_status(signal['signal_id'], 'in_progress')
@@ -593,14 +653,23 @@ class AIWorker:
                     # Update signal status to executed
                     db.update_signal_status(signal['signal_id'], 'executed')
                     active_trades_count += 1
-                    self.console_logger.log('SUCCESS', f'✅ TOP signal executed for {signal["symbol"]} ({active_trades_count}/{self.max_concurrent_trades})')
+                    trades_executed += 1
+                    self.console_logger.log('SUCCESS', f'✅ Signal executed for {signal["symbol"]} ({active_trades_count}/{self.max_concurrent_trades} trades active)')
                 else:
-                    # Update signal status to failed
+                    # Update signal status to failed and continue to next signal
                     db.update_signal_status(signal['signal_id'], 'failed')
-                    self.console_logger.log('ERROR', f'❌ TOP signal execution failed for {signal["symbol"]}')
-                    
+                    self.console_logger.log('ERROR', f'❌ Signal execution failed for {signal["symbol"]} - trying next signal')
+                    # Continue to next signal instead of stopping
+                    continue
+            
+            # Log summary
+            if signals_processed > 0:
+                self.console_logger.log('INFO', f'📊 Signal execution summary: {trades_executed}/{signals_processed} signals executed successfully')
+            
         except Exception as e:
-            self.console_logger.log('ERROR', f'Top signal execution error: {str(e)}')
+            self.console_logger.log('ERROR', f'Signal execution error: {str(e)}')
+            import traceback
+            self.console_logger.log('ERROR', f'Traceback: {traceback.format_exc()}')
     
     def _update_statistics(self):
         """Update trading statistics"""
@@ -676,61 +745,8 @@ class AIWorker:
             side = signal['side']  # Keep as 'Buy' or 'Sell' - don't uppercase
             confidence = signal['confidence']
             
-            # Expanded list of supported symbols based on training data
-            supported_symbols = [
-                'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
-                'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'TRXUSDT', 'LINKUSDT',
-                'DOTUSDT', 'MATICUSDT', 'LTCUSDT', 'BCHUSDT', 'NEARUSDT',
-                'ATOMUSDT', 'UNIUSDT', 'FILUSDT', 'ETCUSDT', 'XLMUSDT',
-                'VETUSDT', 'ICPUSDT', 'APTUSDT', 'HBARUSDT', 'ALGOUSDT',
-                'QNTUSDT', 'LDOUSDT', 'OPUSDT', 'ARBUSDT', 'INJUSDT',
-                # Additional symbols from AI training
-                'CTKUSDT', 'DGBUSDT', 'DODOUSDT', 'DUSKUSDT', 'DYDXUSDT',
-                'EDUUSDT', 'EGLDUSDT', 'ENSUSDT', 'EOSUSDT', 'GALAUSDT',
-                'GMTUSDT', 'GRTUSDT', 'HNTUSDT', 'HOTUSDT', 'IOSTUSDT',
-                'IOTAUSDT', 'JASMYUSDT', 'KAVAUSDT', 'KLAYUSDT', 'KNCUSDT',
-                'KSMUSDT', 'LPTUSDT', 'LRCUSDT', 'MANAUSDT', 'MASKUSDT',
-                'MINAUSDT', 'MKRUSDT', 'MTLUSDT', 'OCEANUSDT', 'ONEUSDT',
-                'ONGUSDT', 'ONTUSDT', 'PEOPLEUSDT', 'QTUMUSDT', 'RENUSDT',
-                'RNDRUSDT', 'RSRUSDT', 'SANDUSDT', 'SFPUSDT', 'SKLUSDT',
-                'SLPUSDT', 'SNTUSDT', 'SNXUSDT', 'SPELLUSDT', 'SSVUSDT',
-                'STGUSDT', 'STORJUSDT', 'STRKUSDT', 'STXUSDT', 'SUIUSDT',
-                'SUSHIUSDT', 'SXPUSDT', 'THETAUSDT', 'TLMUSDT', 'TRBUSDT',
-                'TRUUSDT', 'UMAUSDT', 'WLDUSDT', 'WOOUSDT', 'XEMUSDT',
-                'XMRUSDT', 'XTZUSDT', 'YFIUSDT', 'YGGUSDT', 'ZECUSDT',
-                'ZENUSDT', 'ZILUSDT', 'ZRXUSDT', 'AAVEUSDT', 'ACEUSDT',
-                'AGIXUSDT', 'AIUSDT', 'ALPHAUSDT', 'AMBUSDT', 'ANKRUSDT',
-                'APEUSDT', 'ARUSDT', 'ASTRUSDT', 'AUDIOUSDT', 'AVAUSDT',
-                'AXSUSDT', 'BADGERUSDT', 'BALUSDT', 'BANDUSDT', 'BATUSDT',
-                'BELUSDT', 'BICOUSDT', 'BNTUSDT', 'BONEUSDT', 'CHZUSDT',
-                'COMPUSDT', 'CRVUSDT', 'CVXUSDT', 'DARUSDT', 'DASHUSDT',
-                'DENUSDT', 'DREPUSDT', 'DUSKUSDT', 'DYDXUSDT', 'FLMUSDT',
-                'FORTHUSDT', 'FTTUSDT', 'FUNUSDT', 'FXSUSDT', 'GLMUSDT',
-                'GODSUSDT', 'HFTUSDT', 'IDUSDT', 'IMXUSDT', 'JOEUSDT',
-                'JSTOLUSDT', 'LEVERUSDT', 'LINAUSDT', 'LOOMUSDT', 'LQTYUSDT',
-                'MAGICUSDT', 'MAVUSDT', 'MDTUSDT', 'MEMECUSDT', 'MOVRUSDT',
-                'NMRUSDT', 'NKNUSDT', 'NULSUSDT', 'OXTUSDT', 'PENDLEUSDT',
-                'PERPUSDT', 'PHBUSDT', 'POLYXUSDT', 'POWRUSDT', 'PRIMEUSDT',
-                'PUNDIXUSDT', 'RADUSDT', 'RAREUSDT', 'REEFUSDT', 'REQUSDT',
-                'RIFUSDT', 'RLCUSDT', 'ROSEUSDT', 'RUNEUSDT', 'RVNUSDT',
-                'SCUSDT', 'SCRTUSDT', 'SEIUSDT', 'SFPUSDT', 'SHIBUSDT',
-                'SKLUSDT', 'SLPUSDT', 'SNTUSDT', 'SNXUSDT', 'STEEMUSDT',
-                'STMXUSDT', 'STORJUSDT', 'STRKUSDT', 'STXUSDT', 'SUIUSDT',
-                'SUNUSDT', 'SUSHIUSDT', 'SXPUSDT', 'TLMUSDT', 'TRBUSDT',
-                'TRUUSDT', 'UNFIUSDT', 'USDCUSDT', 'WAXPUSDT', 'WLDUSDT',
-                'XECUSDT', 'XEMUSDT', 'XMRUSDT', 'XTZUSDT', 'YFIUSDT',
-                'YGGUSDT', 'ZECUSDT', 'ZENUSDT', 'ZILUSDT', 'ZRXUSDT'
-            ]
-            
-            # Check if symbol is in our supported list
-            if symbol not in supported_symbols:
-                self.console_logger.log('WARNING', f'⚠️ Symbol {symbol} not in supported list, skipping trade')
-                # Update signal status to failed
-                if 'signal_id' in signal:
-                    from database import TradingDatabase
-                    db = TradingDatabase()
-                    db.update_signal_status(signal['signal_id'], 'failed')
-                return False
+            # All symbols are allowed - no restrictions
+            self.console_logger.log('INFO', f'📊 Processing signal for {symbol} (all symbols allowed)')
             
             # Check for existing positions in the same direction
             try:
