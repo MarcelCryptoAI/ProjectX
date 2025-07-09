@@ -2193,6 +2193,120 @@ def ai_status():
             'service': 'AI Worker'
         })
 
+@app.route('/api/balance_header')
+def balance_header():
+    """Get balance data for header display"""
+    try:
+        ensure_components_initialized()
+        
+        # Get balance data
+        balance_data = bybit_session.get_wallet_balance(accountType="UNIFIED")
+        
+        if balance_data['result']['list']:
+            wallet_balance = balance_data['result']['list'][0]
+            total_balance = float(wallet_balance['totalWalletBalance'])
+            unrealized_pnl = float(wallet_balance['totalPerpUPL'])
+            
+            # Calculate 24h PnL percentage
+            pnl_percent = (unrealized_pnl / total_balance * 100) if total_balance > 0 else 0
+            
+            return jsonify({
+                'success': True,
+                'balance': total_balance,
+                'pnl_24h': unrealized_pnl,
+                'pnl_24h_percent': pnl_percent,
+                'status': 'online'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'balance': 0.0,
+                'pnl_24h': 0.0,
+                'pnl_24h_percent': 0.0,
+                'status': 'offline'
+            })
+    except Exception as e:
+        app.logger.error(f"Balance header error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'balance': 0.0,
+            'pnl_24h': 0.0,
+            'pnl_24h_percent': 0.0,
+            'status': 'offline',
+            'error': str(e)
+        })
+
+@app.route('/api/account_name')
+def account_name():
+    """Get account name for header display"""
+    try:
+        # Get account info
+        account_info = bybit_session.get_account_info()
+        
+        if account_info['result']:
+            account_name = account_info['result'].get('marginMode', 'ByBit Account')
+            return jsonify({
+                'success': True,
+                'account_name': account_name
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'account_name': 'ByBit Account'
+            })
+    except Exception as e:
+        app.logger.error(f"Account name error: {str(e)}")
+        return jsonify({
+            'success': True,
+            'account_name': 'ByBit Account'
+        })
+
+@app.route('/api/system_status')
+def system_status():
+    """Get system status for header indicators"""
+    try:
+        status = {
+            'bybit_api': {'status': 'online'},
+            'database': {'status': 'online'},
+            'dyno': {'status': 'online'}
+        }
+        
+        # Test ByBit API
+        try:
+            bybit_session.get_server_time()
+            status['bybit_api']['status'] = 'online'
+        except:
+            status['bybit_api']['status'] = 'offline'
+        
+        # Test Database
+        try:
+            ensure_components_initialized()
+            ai_worker = get_ai_worker(socketio, bybit_session)
+            ai_worker.database.get_latest_training_session()
+            status['database']['status'] = 'online'
+        except:
+            status['database']['status'] = 'offline'
+        
+        # Test AI Worker
+        try:
+            ensure_components_initialized()
+            ai_worker = get_ai_worker(socketio, bybit_session)
+            if ai_worker and hasattr(ai_worker, 'database'):
+                status['dyno']['status'] = 'online'
+            else:
+                status['dyno']['status'] = 'offline'
+        except:
+            status['dyno']['status'] = 'offline'
+        
+        return jsonify(status)
+    except Exception as e:
+        app.logger.error(f"System status error: {str(e)}")
+        return jsonify({
+            'bybit_api': {'status': 'unknown'},
+            'database': {'status': 'unknown'},
+            'dyno': {'status': 'unknown'}
+        })
+
 @app.route('/api/execute_ai_trade', methods=['POST'])
 def execute_ai_trade():
     """Execute a trade based on AI recommendation"""
