@@ -1076,19 +1076,33 @@
         
         // Load symbols info
         function loadSymbolsInfo() {
+            console.log('Loading symbols info...');
             fetch('/api/symbols_info')
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Symbols info response status:', response.status);
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Symbols info data:', data);
                     if (data.success) {
-                        document.getElementById('symbolsCount').textContent = data.count || 'Unknown';
+                        const count = data.count || 0;
+                        const lastUpdated = data.last_updated;
+                        
+                        document.getElementById('symbolsCount').textContent = count > 0 ? count : 'Unknown';
                         document.getElementById('symbolsLastUpdated').textContent = 
-                            data.last_updated ? new Date(data.last_updated).toLocaleString() : 'Never';
+                            lastUpdated ? new Date(lastUpdated).toLocaleString() : 'Never';
+                            
+                        console.log(`Symbols loaded: count=${count}, last_updated=${lastUpdated}`);
+                    } else {
+                        console.error('Symbols API returned error:', data.error);
+                        document.getElementById('symbolsCount').textContent = 'API Error';
+                        document.getElementById('symbolsLastUpdated').textContent = 'API Error';
                     }
                 })
                 .catch(error => {
                     console.error('Error loading symbols info:', error);
-                    document.getElementById('symbolsCount').textContent = 'Error';
-                    document.getElementById('symbolsLastUpdated').textContent = 'Error';
+                    document.getElementById('symbolsCount').textContent = 'Network Error';
+                    document.getElementById('symbolsLastUpdated').textContent = 'Network Error';
                 });
         }
         

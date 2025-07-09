@@ -3901,13 +3901,16 @@ def refresh_symbols():
         current_count = len(current_symbols)
         
         # Get instruments from ByBit
+        app.logger.info("Fetching instruments from ByBit...")
         print("Fetching instruments from ByBit...")
         instruments = bybit_session.get_instruments_info(category="linear")
         
         if not instruments or 'result' not in instruments:
+            error_msg = 'Failed to fetch instruments from ByBit - API response invalid'
+            app.logger.error(error_msg)
             return jsonify({
                 'success': False,
-                'error': 'Failed to fetch instruments from ByBit - API response invalid'
+                'error': error_msg
             })
         
         total_instruments = len(instruments['result']['list'])
@@ -3951,6 +3954,7 @@ def refresh_symbols():
         print(f"Processed {len(symbols_data)} USDT pairs ({active_count} active, {inactive_count} inactive)")
         
         # Save to database
+        app.logger.info(f"Saving {len(symbols_data)} symbols to database...")
         print("Saving symbols to database...")
         db.refresh_supported_symbols(symbols_data)
         
@@ -3958,6 +3962,7 @@ def refresh_symbols():
         new_symbols = db.get_supported_symbols()
         new_count = len(new_symbols)
         
+        app.logger.info(f"Database refresh complete: {current_count} → {new_count} symbols")
         print(f"Database refresh complete: {current_count} → {new_count} symbols")
         
         return jsonify({
@@ -3989,20 +3994,39 @@ def get_symbols_info():
         from database import TradingDatabase
         db = TradingDatabase()
         
+        app.logger.info("Loading symbols from database...")
         symbols = db.get_supported_symbols()
-        last_updated = db.get_symbols_last_updated()
+        app.logger.info(f"Found {len(symbols)} symbols")
         
-        return jsonify({
+        last_updated = db.get_symbols_last_updated()
+        app.logger.info(f"Last updated: {last_updated} (type: {type(last_updated)})")
+        
+        # Handle last_updated properly - could be string or datetime
+        last_updated_str = None
+        if last_updated:
+            if hasattr(last_updated, 'isoformat'):
+                last_updated_str = last_updated.isoformat()
+            else:
+                last_updated_str = str(last_updated)
+        
+        response_data = {
             'success': True,
             'symbols': symbols,
-            'last_updated': last_updated.isoformat() if last_updated else None,
+            'last_updated': last_updated_str,
             'count': len(symbols)
-        })
+        }
+        
+        app.logger.info(f"Returning symbols info: count={len(symbols)}, last_updated={last_updated_str}")
+        return jsonify(response_data)
         
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        app.logger.error(f"Error in get_symbols_info: {error_details}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'details': error_details
         }), 500
 
 @app.route('/api/training_symbols')
@@ -4024,13 +4048,22 @@ def get_training_symbols():
         except:
             fallback_symbols = ['BTCUSDT', 'ETHUSDT']
         
+        # Handle last_updated properly
+        last_updated = db.get_symbols_last_updated()
+        last_updated_str = None
+        if last_updated:
+            if hasattr(last_updated, 'isoformat'):
+                last_updated_str = last_updated.isoformat()
+            else:
+                last_updated_str = str(last_updated)
+        
         return jsonify({
             'success': True,
             'active_symbols': [s['symbol'] for s in active_symbols],
             'active_count': len(active_symbols),
             'fallback_symbols': fallback_symbols,
             'using_database': len(active_symbols) > 0,
-            'last_updated': db.get_symbols_last_updated().isoformat() if db.get_symbols_last_updated() else None
+            'last_updated': last_updated_str
         })
         
     except Exception as e:
@@ -4258,6 +4291,107 @@ def optimize_cache():
                 'status_cache': '30 seconds',
                 'default_cache': '2 minutes'
             }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/trades/active_status')
+def get_active_trades_status():
+    """Get detailed status of all active trades"""
+    try:
+        global ai_worker
+        if not ai_worker:
+            return jsonify({
+                'success': False,
+                'message': 'AI Worker not initialized'
+            })
+        
+        status = ai_worker.get_active_trades_status()
+        return jsonify({
+            'success': True,
+            'data': status
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/trades/force_monitor', methods=['POST'])
+def force_monitor_trades():
+    """Manually trigger trade monitoring for debugging"""
+    try:
+        global ai_worker
+        if not ai_worker:
+            return jsonify({
+                'success': False,
+                'message': 'AI Worker not initialized'
+            })
+        
+        # Trigger monitoring
+        ai_worker.force_monitor_trades()
+        
+        # Get status after monitoring
+        status = ai_worker.get_active_trades_status()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Trade monitoring triggered successfully',
+            'data': status
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/trades/sl_debug')
+def debug_stop_loss():
+    """Debug stop loss movement functionality"""
+    try:
+        global ai_worker
+        if not ai_worker:
+            return jsonify({
+                'success': False,
+                'message': 'AI Worker not initialized'
+            })
+        
+        debug_info = {
+            'has_active_trades': hasattr(ai_worker, 'active_trades') and bool(ai_worker.active_trades),
+            'bybit_session_available': bool(ai_worker.bybit_session),
+            'worker_running': ai_worker.is_running,
+            'monitoring_interval': '30 seconds',
+            'last_check': datetime.now().isoformat()
+        }
+        
+        if hasattr(ai_worker, 'active_trades') and ai_worker.active_trades:
+            debug_info['active_trades_count'] = len(ai_worker.active_trades)
+            debug_info['trades_details'] = []
+            
+            for order_id, trade_data in ai_worker.active_trades.items():
+                trade_debug = {
+                    'order_id': order_id,
+                    'symbol': trade_data['symbol'],
+                    'side': trade_data['side'],
+                    'entry_filled': trade_data.get('entry_filled', False),
+                    'tp1_hit': trade_data.get('tp1_hit', False),
+                    'sl_moved_to_breakeven': trade_data.get('sl_moved_to_breakeven', False),
+                    'tp1_order_id': trade_data['take_profit_levels'][0].get('order_id') if trade_data['take_profit_levels'] else None,
+                    'sl_order_id': trade_data.get('sl_order_id')
+                }
+                debug_info['trades_details'].append(trade_debug)
+        else:
+            debug_info['active_trades_count'] = 0
+        
+        return jsonify({
+            'success': True,
+            'debug_info': debug_info
         })
         
     except Exception as e:

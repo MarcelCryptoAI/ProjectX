@@ -579,8 +579,66 @@ class AIWorker:
             return {}
     
     def _analyze_market_conditions(self):
-        """Analyze overall market conditions for AI prediction"""
+        """Analyze overall market conditions for AI prediction - checks user setting first"""
         try:
+            # First check if user has manually set market condition (not auto)
+            user_market_condition = None
+            try:
+                from database import TradingDatabase
+                db = TradingDatabase()
+                settings = db.load_settings()
+                user_market_condition = settings.get('marketCondition', 'auto')
+            except Exception as settings_error:
+                self.console_logger.log('WARNING', f'Could not load market condition setting: {settings_error}')
+            
+            # If user has set a manual market condition, use it instead of auto-detection
+            if user_market_condition and user_market_condition != 'auto':
+                self.console_logger.log('INFO', f'📊 Using user-defined market condition: {user_market_condition.upper()}')
+                
+                # Still calculate volatility and volume metrics from market data
+                try:
+                    conditions = {
+                        'volatility': {},
+                        'trends': {},
+                        'volumes': {}
+                    }
+                    
+                    major_pairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
+                    
+                    for symbol in major_pairs:
+                        market_data = self._collect_market_data(symbol)
+                        if market_data and len(market_data) > 20:
+                            closes = np.array([float(kline[4]) for kline in market_data])
+                            volumes = np.array([float(kline[5]) for kline in market_data])
+                            
+                            # Calculate volatility (standard deviation of returns)
+                            returns = np.diff(closes) / closes[:-1]
+                            volatility = np.std(returns) * 100  # As percentage
+                            
+                            # Volume trend
+                            vol_trend = ((volumes[-1] - np.mean(volumes[:-5])) / np.mean(volumes[:-5])) * 100
+                            
+                            conditions['volatility'][symbol] = volatility
+                            conditions['volumes'][symbol] = vol_trend
+                    
+                    # Use manual market condition but with real volatility data
+                    return {
+                        'avg_volatility': np.mean(list(conditions['volatility'].values())) if conditions['volatility'] else 2.0,
+                        'market_trend': user_market_condition,  # Use user setting
+                        'volume_strength': np.mean(list(conditions['volumes'].values())) if conditions['volumes'] else 0
+                    }
+                except Exception as data_error:
+                    self.console_logger.log('WARNING', f'Failed to get market data for manual condition: {data_error}')
+                    # Return user condition with fallback metrics
+                    return {
+                        'avg_volatility': 2.0,
+                        'market_trend': user_market_condition,
+                        'volume_strength': 0
+                    }
+            
+            # Auto-detection mode (original logic)
+            self.console_logger.log('INFO', '📊 Auto-detecting market conditions from price data')
+            
             # Get market data for major pairs
             conditions = {
                 'volatility': {},
@@ -611,12 +669,19 @@ class AIWorker:
                     conditions['trends'][symbol] = trend
                     conditions['volumes'][symbol] = vol_trend
             
-            # Overall market conditions
-            conditions['avg_volatility'] = np.mean(list(conditions['volatility'].values()))
-            conditions['market_trend'] = 'bullish' if np.mean(list(conditions['trends'].values())) > 0 else 'bearish'
-            conditions['volume_strength'] = np.mean(list(conditions['volumes'].values()))
+            # Overall market conditions from auto-detection
+            avg_trend = np.mean(list(conditions['trends'].values())) if conditions['trends'] else 0
+            detected_trend = 'bullish' if avg_trend > 1 else 'bearish' if avg_trend < -1 else 'sideways'
             
-            return conditions
+            result = {
+                'avg_volatility': np.mean(list(conditions['volatility'].values())) if conditions['volatility'] else 2.0,
+                'market_trend': detected_trend,
+                'volume_strength': np.mean(list(conditions['volumes'].values())) if conditions['volumes'] else 0
+            }
+            
+            self.console_logger.log('INFO', f'📊 Auto-detected market trend: {detected_trend.upper()} (avg trend: {avg_trend:.2f}%)')
+            
+            return result
             
         except Exception as e:
             self.console_logger.log('WARNING', f'Failed to analyze market conditions: {str(e)}')
@@ -663,6 +728,14 @@ class AIWorker:
             # Get AI prediction with enhanced market analysis
             # Pass current market conditions to AI for better TP calculation
             market_conditions = self._analyze_market_conditions()
+            
+            # Log market conditions being used for AI decision
+            if market_conditions:
+                trend = market_conditions.get('market_trend', 'unknown')
+                volatility = market_conditions.get('avg_volatility', 0)
+                volume_strength = market_conditions.get('volume_strength', 0)
+                self.console_logger.log('INFO', f'📊 Market Analysis: Trend={trend.upper()}, Volatility={volatility:.2f}%, Volume={volume_strength:.1f}%')
+            
             prediction = self.ai_trader.get_prediction(market_conditions)
             
             if prediction:
@@ -1291,16 +1364,48 @@ class AIWorker:
         if not hasattr(self, 'active_trades') or not self.active_trades:
             return
         
+        if not self.bybit_session:
+            self.console_logger.log('WARNING', '⚠️ ByBit session not available for monitoring')
+            return
+        
         try:
-            # Get current orders to check TP status
-            orders = self.bybit_session.get_open_orders(category="linear")
+            # Get current orders to check TP status with retry logic
+            orders = None
+            for attempt in range(3):  # Retry up to 3 times
+                try:
+                    orders = self.bybit_session.get_open_orders(category="linear")
+                    if orders and 'result' in orders:
+                        break
+                    time.sleep(1)  # Wait 1 second between retries
+                except Exception as api_error:
+                    if attempt == 2:  # Last attempt
+                        self.console_logger.log('ERROR', f'❌ Failed to fetch orders after 3 attempts: {str(api_error)}')
+                        return
+                    time.sleep(2)  # Wait longer between retries
+            
             if not orders or 'result' not in orders:
+                self.console_logger.log('WARNING', '⚠️ Could not fetch open orders for monitoring after retries')
                 return
             
-            # Get current positions
-            positions = self.bybit_session.get_positions(category="linear")
+            # Get current positions with retry logic
+            positions = None
+            for attempt in range(3):  # Retry up to 3 times
+                try:
+                    positions = self.bybit_session.get_positions(category="linear")
+                    if positions and 'result' in positions:
+                        break
+                    time.sleep(1)  # Wait 1 second between retries
+                except Exception as api_error:
+                    if attempt == 2:  # Last attempt
+                        self.console_logger.log('ERROR', f'❌ Failed to fetch positions after 3 attempts: {str(api_error)}')
+                        return
+                    time.sleep(2)  # Wait longer between retries
+            
             if not positions or 'result' not in positions:
+                self.console_logger.log('WARNING', '⚠️ Could not fetch positions for monitoring after retries')
                 return
+            
+            self.console_logger.log('INFO', f'🔍 Monitoring {len(self.active_trades)} active trades for SL movement')
             
             for order_id, trade_data in list(self.active_trades.items()):
                 symbol = trade_data['symbol']
@@ -1309,6 +1414,8 @@ class AIWorker:
                 tp_levels = trade_data['take_profit_levels']
                 tp_order_ids = trade_data['tp_order_ids']
                 entry_order_id = trade_data['entry_order_id']
+                
+                self.console_logger.log('INFO', f'📊 Checking trade {symbol} - Entry filled: {trade_data.get("entry_filled", False)}, TP1 hit: {trade_data.get("tp1_hit", False)}')
                 
                 # First, check if entry order has been filled
                 entry_filled = trade_data.get('entry_filled', False)
@@ -1344,19 +1451,38 @@ class AIWorker:
                                 continue
                         
                         # Entry order still pending, continue monitoring
+                        self.console_logger.log('INFO', f'⏳ Entry order still pending for {symbol}')
                         continue
                 
                 # Entry is filled, now monitor TP levels
-                # Check if TP1 has been hit by looking at open orders
+                # Check if TP1 has been hit by looking at open orders - FIXED LOGIC
+                tp1_order_id = tp_levels[0].get('order_id')
                 tp1_still_open = False
-                for order in orders['result']['list']:
-                    if order['orderId'] in tp_order_ids and order['orderId'] == tp_levels[0].get('order_id'):
-                        tp1_still_open = True
-                        break
+                
+                if tp1_order_id:
+                    for order in orders['result']['list']:
+                        if order['orderId'] == tp1_order_id:
+                            tp1_still_open = True
+                            break
+                    
+                    self.console_logger.log('INFO', f'🎯 TP1 status for {symbol}: Order ID {tp1_order_id}, Still open: {tp1_still_open}')
                 
                 # If TP1 is no longer in open orders, it was filled
-                if not tp1_still_open and not trade_data.get('tp1_hit', False):
+                if tp1_order_id and not tp1_still_open and not trade_data.get('tp1_hit', False):
                     self.console_logger.log('SUCCESS', f'✅ TP1 hit for {symbol}! Moving stop loss to breakeven + 0.1%')
+                    
+                    # Get current position size to calculate correct SL quantity
+                    current_position_size = 0
+                    for position in positions['result']['list']:
+                        if position['symbol'] == symbol and float(position.get('size', 0)) > 0:
+                            current_position_size = float(position['size'])
+                            break
+                    
+                    if current_position_size == 0:
+                        self.console_logger.log('WARNING', f'⚠️ No position found for {symbol}, skipping SL movement')
+                        continue
+                    
+                    self.console_logger.log('INFO', f'📊 Current position size for {symbol}: {current_position_size}')
                     
                     # Calculate breakeven + 0.1% price
                     if side == 'Buy':
@@ -1368,16 +1494,23 @@ class AIWorker:
                     try:
                         # Cancel existing stop loss order first
                         if trade_data.get('sl_order_id'):
-                            self.bybit_session.cancel_order(category="linear", symbol=symbol, orderId=trade_data['sl_order_id'])
+                            self.console_logger.log('INFO', f'🚫 Cancelling existing SL order {trade_data["sl_order_id"]} for {symbol}')
+                            cancel_result = self.bybit_session.cancel_order(category="linear", symbol=symbol, orderId=trade_data['sl_order_id'])
+                            if cancel_result and 'result' in cancel_result:
+                                self.console_logger.log('SUCCESS', f'✅ Existing SL cancelled for {symbol}')
+                            else:
+                                self.console_logger.log('WARNING', f'⚠️ Failed to cancel existing SL for {symbol}')
                         
-                        # Place new stop loss at breakeven + 0.1%
+                        # Place new stop loss at breakeven + 0.1% with current position size
+                        self.console_logger.log('INFO', f'📤 Placing new SL order for {symbol}: qty={current_position_size}, price=${new_sl_price:.4f}')
                         sl_result = self.bybit_session.place_order(
                             category="linear",
                             symbol=symbol,
                             side="Sell" if side == "Buy" else "Buy",
                             orderType="StopMarket",
-                            qty=str(trade_data['quantity']),
+                            qty=str(current_position_size),  # Use actual position size, not original quantity
                             stopPrice=str(new_sl_price),
+                            timeInForce="GTC",
                             reduceOnly=True
                         )
                         
@@ -1387,15 +1520,28 @@ class AIWorker:
                             trade_data['sl_moved_to_breakeven'] = True
                             trade_data['stop_loss'] = new_sl_price
                             trade_data['sl_order_id'] = sl_result['result']['orderId']
+                            trade_data['quantity'] = current_position_size  # Update to current position size
                             trade_data['tp_levels'][0]['status'] = 'hit'
                             trade_data['tp_levels'][0]['hit_time'] = datetime.now().isoformat()
                             
-                            self.console_logger.log('SUCCESS', f'✅ Stop loss moved to breakeven+0.1% for {symbol}: ${new_sl_price:.4f}')
+                            self.console_logger.log('SUCCESS', f'✅ Stop loss moved to breakeven+0.1% for {symbol}: ${new_sl_price:.4f} (Order ID: {sl_result["result"]["orderId"]})')
+                            
+                            # Emit update to frontend
+                            if self.socketio:
+                                self.socketio.emit('sl_moved', {
+                                    'symbol': symbol,
+                                    'new_sl_price': new_sl_price,
+                                    'entry_price': entry_price,
+                                    'message': f'Stop loss moved to breakeven+0.1% for {symbol}'
+                                })
                         else:
-                            self.console_logger.log('ERROR', f'❌ Failed to move stop loss for {symbol}')
+                            error_msg = sl_result.get('retMsg', 'Unknown error') if sl_result else 'No response'
+                            self.console_logger.log('ERROR', f'❌ Failed to move stop loss for {symbol}: {error_msg}')
                             
                     except Exception as sl_error:
                         self.console_logger.log('ERROR', f'❌ Error moving stop loss for {symbol}: {str(sl_error)}')
+                        import traceback
+                        self.console_logger.log('ERROR', f'SL Error traceback: {traceback.format_exc()}')
                 
                 # Update TP level statuses
                 for i, tp_level in enumerate(tp_levels):
@@ -1495,6 +1641,46 @@ class AIWorker:
             self.console_logger.log('INFO', f'🚫 Cancelled all orders for {symbol}')
         except Exception as e:
             self.console_logger.log('ERROR', f'❌ Error cancelling orders for {symbol}: {str(e)}')
+    
+    def force_monitor_trades(self):
+        """Manually trigger trade monitoring - useful for testing"""
+        self.console_logger.log('INFO', '🔄 Manually triggering trade monitoring...')
+        self.monitor_trades_and_move_sl()
+    
+    def get_active_trades_status(self):
+        """Get detailed status of all active trades"""
+        if not hasattr(self, 'active_trades') or not self.active_trades:
+            return {'message': 'No active trades', 'trades': []}
+        
+        trades_status = []
+        for order_id, trade_data in self.active_trades.items():
+            status = {
+                'symbol': trade_data['symbol'],
+                'side': trade_data['side'],
+                'entry_price': trade_data['entry_price'],
+                'stop_loss': trade_data['stop_loss'],
+                'entry_filled': trade_data.get('entry_filled', False),
+                'tp1_hit': trade_data.get('tp1_hit', False),
+                'sl_moved_to_breakeven': trade_data.get('sl_moved_to_breakeven', False),
+                'quantity': trade_data['quantity'],
+                'entry_order_id': trade_data['entry_order_id'],
+                'sl_order_id': trade_data.get('sl_order_id'),
+                'tp_levels': [
+                    {
+                        'level': i+1,
+                        'price': tp['price'],
+                        'status': tp.get('status', 'pending'),
+                        'order_id': tp.get('order_id')
+                    }
+                    for i, tp in enumerate(trade_data['take_profit_levels'])
+                ]
+            }
+            trades_status.append(status)
+        
+        return {
+            'message': f'Found {len(self.active_trades)} active trades',
+            'trades': trades_status
+        }
 
 # Global worker instance
 ai_worker = None
