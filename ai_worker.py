@@ -918,7 +918,9 @@ class AIWorker:
                 self.console_logger.log('ERROR', f'❌ Order value ${total_order_value:.2f} is below ByBit minimum $5.00 for {symbol}')
                 return False
             
-            self.console_logger.log('INFO', f'💰 Trade: ${trade_amount_usd:.2f} ({risk_per_trade:.1f}% of ${total_balance:.2f}), Leverage: {leverage}x')
+            self.console_logger.log('INFO', f'💰 Trade Amount (Your Risk): ${trade_amount_usd:.2f} ({risk_per_trade:.1f}% of ${total_balance:.2f})')
+            self.console_logger.log('INFO', f'💰 Order Value (After Rounding): ${total_order_value:.2f} (Qty: {total_qty})')
+            self.console_logger.log('INFO', f'💰 Position Value (With {leverage}x Leverage): ${total_order_value * leverage:.2f}')
             self.console_logger.log('INFO', f'🔧 Settings: Min Lev: {min_leverage}x, Max Lev: {max_leverage}x, Strategy: {leverage_strategy}')
             self.console_logger.log('INFO', f'📊 Max Concurrent Trades: {self.max_concurrent_trades} (from user settings)')
             
