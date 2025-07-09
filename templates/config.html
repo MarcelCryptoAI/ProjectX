@@ -376,10 +376,32 @@
                                 <div>
                                     <label for="partialTakeProfit" class="form-label">Partial Take Profit</label>
                                     <label class="switch">
-                                        <input type="checkbox" id="partialTakeProfit">
+                                        <input type="checkbox" id="partialTakeProfit" onchange="togglePartialTakeProfitOptions()">
                                         <span class="slider"></span>
                                     </label>
                                     <div class="form-text">Take profit in steps (25%, 50%, 75%, 100%)</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Partial Take Profit Options -->
+                            <div id="partialTakeProfitOptions" class="grid grid-cols-2 gap-6 mt-4" style="display: none;">
+                                <div>
+                                    <label for="partialTakeProfitLevels" class="form-label">Take Profit Levels</label>
+                                    <input type="number" class="form-input w-full" id="partialTakeProfitLevels" min="2" max="10" value="4">
+                                    <div class="form-text">Number of take profit levels (2-10)</div>
+                                </div>
+                                <div>
+                                    <label for="partialTakeProfitPercentage" class="form-label">Sell Percentage per Level (%)</label>
+                                    <input type="number" class="form-input w-full" id="partialTakeProfitPercentage" min="10" max="50" value="25">
+                                    <div class="form-text">Percentage of position to sell at each level</div>
+                                </div>
+                                <div class="col-span-2">
+                                    <label for="moveStopLossOnPartialTP" class="form-label">Move Stop Loss to Breakeven</label>
+                                    <label class="switch">
+                                        <input type="checkbox" id="moveStopLossOnPartialTP" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="form-text">Move stop loss to breakeven after first take profit level is hit</div>
                                 </div>
                             </div>
                         </div>
@@ -713,6 +735,18 @@
                 valueInput.style.opacity = '0.5';
             }
         }
+        
+        // Toggle partial take profit options
+        function togglePartialTakeProfitOptions() {
+            const checkbox = document.getElementById('partialTakeProfit');
+            const optionsDiv = document.getElementById('partialTakeProfitOptions');
+            
+            if (checkbox.checked) {
+                optionsDiv.style.display = 'grid';
+            } else {
+                optionsDiv.style.display = 'none';
+            }
+        }
 
         // Save all settings
         function saveAllSettings() {
@@ -727,6 +761,9 @@
                 trailingStopValue: parseFloat(document.getElementById('trailingStopValue').value),
                 dynamicTakeProfit: document.getElementById('dynamicTakeProfit').checked,
                 partialTakeProfit: document.getElementById('partialTakeProfit').checked,
+                partialTakeProfitLevels: parseInt(document.getElementById('partialTakeProfitLevels').value),
+                partialTakeProfitPercentage: parseInt(document.getElementById('partialTakeProfitPercentage').value),
+                moveStopLossOnPartialTP: document.getElementById('moveStopLossOnPartialTP').checked,
                 tradingEnabled: document.getElementById('tradingEnabled').checked,
                 weekendTrading: document.getElementById('weekendTrading').checked,
                 
@@ -857,6 +894,10 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadCurrentBalance();
             loadSettings();
+            
+            // Initialize toggle options
+            toggleTrailingStopOptions();
+            togglePartialTakeProfitOptions();
             
             // Auto-refresh balance every 30 seconds
             setInterval(loadCurrentBalance, 30000);

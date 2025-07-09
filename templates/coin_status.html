@@ -436,7 +436,9 @@
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-3">
                             <div class="font-bold text-white">${coin.symbol}</div>
-                            <div class="text-xs text-gray-400">${coin.accuracy}%</div>
+                            <div class="text-xs px-2 py-1 rounded-full ${coin.accuracy > 80 ? 'bg-green-900/50 text-green-400' : coin.accuracy > 60 ? 'bg-yellow-900/50 text-yellow-400' : 'bg-red-900/50 text-red-400'}">
+                                ${coin.accuracy}% accuracy
+                            </div>
                         </div>
                     </td>
                     <td class="px-6 py-4">
@@ -624,6 +626,17 @@
                                 Based on technical analysis with ${coin.accuracy}% accuracy. 
                                 Confidence score of ${coin.confidence}% indicates ${coin.confidence > 75 ? 'strong' : coin.confidence > 50 ? 'moderate' : 'weak'} signal strength.
                                 ${coin.analysis === 'Bullish' ? 'Upward momentum detected.' : coin.analysis === 'Bearish' ? 'Downward momentum detected.' : 'Mixed signals detected.'}
+                            </div>
+                            
+                            <div class="mt-4 grid grid-cols-2 gap-4 text-xs">
+                                <div>
+                                    <div class="text-gray-400">Potential Profit</div>
+                                    <div class="text-neon-green font-bold">+${((100 * coin.takeProfit) / 100).toFixed(2)}</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-400">Potential Loss</div>
+                                    <div class="text-neon-red font-bold">-${((100 * coin.stopLoss) / 100).toFixed(2)}</div>
+                                </div>
                             </div>
                         </div>
                         

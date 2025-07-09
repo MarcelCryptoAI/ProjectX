@@ -2033,6 +2033,42 @@ def get_trading_signals():
                         
                         leverage = max(min_leverage, min(max_leverage, leverage))
                         
+                        # Calculate partial take profit levels - get from database settings
+                        try:
+                            from database import TradingDatabase
+                            db = TradingDatabase()
+                            db_settings = db.load_settings()
+                            partial_tp_enabled = db_settings.get('partialTakeProfit', False)
+                            partial_tp_levels = db_settings.get('partialTakeProfitLevels', 4)
+                            partial_tp_percentage = db_settings.get('partialTakeProfitPercentage', 25)
+                        except:
+                            # Fallback to environment variables
+                            partial_tp_enabled = os.getenv('PARTIAL_TAKE_PROFIT', 'false').lower() == 'true'
+                            partial_tp_levels = int(os.getenv('PARTIAL_TAKE_PROFIT_LEVELS', 4))
+                            partial_tp_percentage = int(os.getenv('PARTIAL_TAKE_PROFIT_PERCENTAGE', 25))
+                        
+                        take_profit_levels = []
+                        if partial_tp_enabled:
+                            base_tp = round(2 + (confidence / 25), 1)
+                            for i in range(partial_tp_levels):
+                                level = (i + 1) * (base_tp / partial_tp_levels)
+                                profit_amount = (amount * leverage * level) / 100
+                                take_profit_levels.append({
+                                    'level': i + 1,
+                                    'percentage': level,
+                                    'sell_percentage': partial_tp_percentage,
+                                    'profit_amount': round(profit_amount, 2)
+                                })
+                        else:
+                            base_tp = round(2 + (confidence / 25), 1)
+                            profit_amount = (amount * leverage * base_tp) / 100
+                            take_profit_levels.append({
+                                'level': 1,
+                                'percentage': base_tp,
+                                'sell_percentage': 100,
+                                'profit_amount': round(profit_amount, 2)
+                            })
+                        
                         signal = {
                             'id': f'signal_{signal_id}_{result["symbol"]}',
                             'symbol': result['symbol'],
@@ -2044,8 +2080,12 @@ def get_trading_signals():
                             'stop_loss': round(1 + (confidence / 50), 1),
                             'strategy': 'AI Technical Analysis',
                             'timestamp': signal_time.isoformat(),
+                            'status': 'ready_to_trade',
+                            'take_profit_levels': take_profit_levels,
+                            'partial_take_profit': partial_tp_enabled,
+                            'move_stop_loss_on_partial_tp': db_settings.get('moveStopLossOnPartialTP', True),
                             'analysis': {
-                                'accuracy': result['accuracy'],
+                                'accuracy': round(result['accuracy'], 1),
                                 'threshold': ai_confidence_threshold,
                                 'status': 'ready_to_trade',
                                 'leverage_strategy': leverage_strategy,
@@ -2637,6 +2677,9 @@ def load_settings():
             'trailingStopValue': 1.0,
             'dynamicTakeProfit': True,
             'partialTakeProfit': False,
+            'partialTakeProfitLevels': 4,  # Number of take profit levels
+            'partialTakeProfitPercentage': 25,  # Percentage to sell at each level
+            'moveStopLossOnPartialTP': True,  # Move stop loss to breakeven after first TP
             'tradingEnabled': True,
             'weekendTrading': False,
             'maxDailyLoss': 5.0,

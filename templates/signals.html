@@ -175,12 +175,46 @@
             </div>
         </div>
         
-        <!-- Trading Signals Grid -->
-        <div id="signalsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Loading state -->
-            <div class="col-span-full text-center py-16">
-                <i class="fas fa-spinner fa-spin text-6xl text-neon-cyan mb-4"></i>
-                <p class="text-gray-400">Loading AI trading signals...</p>
+        <!-- Trading Signals Table -->
+        <div class="glass-card rounded-xl overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-dark-panel/50 border-b border-neon-cyan/20">
+                        <tr>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('symbol')">
+                                Symbol <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('side')">
+                                Side <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('confidence')">
+                                Confidence <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('accuracy')">
+                                Accuracy <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('amount')">
+                                Amount <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan cursor-pointer hover:text-neon-yellow" onclick="sortTable('leverage')">
+                                Leverage <i class="fas fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan">Profit/Loss</th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan">TP/SL</th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan">Time</th>
+                            <th class="px-6 py-4 text-left font-medium text-neon-cyan">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="signalsTableBody">
+                        <!-- Loading state -->
+                        <tr>
+                            <td colspan="10" class="text-center py-16">
+                                <i class="fas fa-spinner fa-spin text-4xl text-neon-cyan mb-4"></i>
+                                <div class="text-gray-400">Loading AI trading signals...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
         
@@ -240,7 +274,7 @@
         }
         
         function displaySignals() {
-            const grid = document.getElementById('signalsGrid');
+            const tableBody = document.getElementById('signalsTableBody');
             let filteredSignals = [...allSignals];
             
             // Apply filter
@@ -253,81 +287,117 @@
             }
             
             if (filteredSignals.length === 0) {
-                document.getElementById('signalsGrid').classList.add('hidden');
                 document.getElementById('noSignalsMessage').classList.remove('hidden');
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="10" class="text-center py-12">
+                            <i class="fas fa-search text-4xl text-gray-600 mb-4"></i>
+                            <div class="text-gray-400">No signals match your filter criteria</div>
+                        </td>
+                    </tr>
+                `;
                 return;
             }
             
-            document.getElementById('signalsGrid').classList.remove('hidden');
             document.getElementById('noSignalsMessage').classList.add('hidden');
             
-            grid.innerHTML = filteredSignals.map(signal => {
-                const confidenceClass = signal.confidence >= 75 ? 'high-confidence' : 
-                                       signal.confidence >= 60 ? 'medium-confidence' : 'low-confidence';
+            tableBody.innerHTML = filteredSignals.map(signal => {
+                // Calculate potential profit and loss
+                const amount = signal.amount || 100;
+                const leverage = signal.leverage || 1;
+                const takeProfit = signal.take_profit || 0;
+                const stopLoss = signal.stop_loss || 0;
+                const accuracy = signal.analysis?.accuracy || 0;
+                
+                // Calculate position size with leverage
+                const positionSize = amount * leverage;
+                
+                // Calculate potential profit and loss in dollars
+                const potentialProfit = (positionSize * takeProfit) / 100;
+                const potentialLoss = (positionSize * stopLoss) / 100;
+                
+                // Format time
+                const signalTime = new Date(signal.timestamp);
+                const now = new Date();
+                const timeDiff = now - signalTime;
+                const timeAgo = timeDiff < 3600000 ? 
+                    `${Math.floor(timeDiff / 60000)}min` : 
+                    `${Math.floor(timeDiff / 3600000)}h ${Math.floor((timeDiff % 3600000) / 60000)}m`;
                 
                 return `
-                    <div class="glass-card signal-card ${confidenceClass} rounded-xl p-6 hover:scale-105 transition-all duration-300">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-xl font-bold text-white">${signal.symbol}</h3>
+                    <tr class="border-b border-dark-border hover:bg-dark-panel/30 transition-colors">
+                        <td class="px-6 py-4">
+                            <div class="font-bold text-white">${signal.symbol}</div>
+                            <div class="text-xs text-gray-400">${signal.strategy || 'AI Analysis'}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full ${signal.side === 'Buy' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}">
+                                <i class="fas fa-arrow-${signal.side === 'Buy' ? 'up' : 'down'} mr-1"></i>
+                                ${signal.side}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
                             <div class="flex items-center gap-2">
-                                <span class="px-3 py-1 rounded-full text-sm font-bold ${signal.side === 'Buy' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}">
-                                    ${signal.side}
-                                </span>
-                                <span class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-300">
-                                    ${signal.strategy || 'AI Analysis'}
-                                </span>
-                            </div>
-                        </div>
-                        
-                        <div class="space-y-4">
-                            <div>
-                                <div class="flex justify-between text-sm mb-2">
-                                    <span class="text-gray-400">Confidence</span>
-                                    <span class="text-neon-cyan font-bold">${signal.confidence}%</span>
-                                </div>
-                                <div class="confidence-bar">
-                                    <div class="confidence-fill" style="width: ${signal.confidence}%"></div>
+                                <div class="text-neon-cyan font-bold">${signal.confidence}%</div>
+                                <div class="w-16 h-2 bg-dark-bg rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-neon-red to-neon-green transition-all duration-300" 
+                                         style="width: ${signal.confidence}%"></div>
                                 </div>
                             </div>
-                            
-                            <div class="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <span class="text-gray-400">Take Profit:</span>
-                                    <div class="text-neon-green font-bold">${signal.take_profit}%</div>
-                                </div>
-                                <div>
-                                    <span class="text-gray-400">Stop Loss:</span>
-                                    <div class="text-neon-red font-bold">${signal.stop_loss}%</div>
-                                </div>
-                                <div>
-                                    <span class="text-gray-400">Amount:</span>
-                                    <div class="text-white font-bold">$${signal.amount || 100}</div>
-                                </div>
-                                <div>
-                                    <span class="text-gray-400">Leverage:</span>
-                                    <div class="text-neon-yellow font-bold">${signal.leverage || 1}x</div>
-                                </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-neon-green font-bold">${accuracy}%</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-white font-bold">$${amount.toFixed(2)}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-neon-yellow font-bold">${leverage}x</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-xs">
+                                ${signal.partial_take_profit ? 
+                                    signal.take_profit_levels.map(level => 
+                                        `<div class="text-neon-green">L${level.level}: +$${level.profit_amount}</div>`
+                                    ).join('') :
+                                    `<div class="text-neon-green">+$${potentialProfit.toFixed(2)}</div>`
+                                }
+                                <div class="text-neon-red">-$${potentialLoss.toFixed(2)}</div>
                             </div>
-                            
-                            <div class="text-xs text-gray-500">
-                                <div>Signal ID: ${signal.id}</div>
-                                <div>Generated: ${new Date(signal.timestamp).toLocaleString()}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-xs">
+                                ${signal.partial_take_profit ? 
+                                    signal.take_profit_levels.map(level => 
+                                        `<div class="text-neon-green">TP${level.level}: ${level.percentage}% (${level.sell_percentage}%)</div>`
+                                    ).join('') :
+                                    `<div class="text-neon-green">TP: ${takeProfit}%</div>`
+                                }
+                                <div class="text-neon-red">SL: ${stopLoss}%</div>
+                                ${signal.move_stop_loss_on_partial_tp ? 
+                                    `<div class="text-neon-yellow text-xs">Move SL to BE</div>` : 
+                                    ''
+                                }
                             </div>
-                            
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-xs text-gray-400">${timeAgo}</div>
+                        </td>
+                        <td class="px-6 py-4">
                             <div class="flex gap-2">
-                                <button class="flex-1 cyber-button py-2 px-4 rounded-lg text-sm" 
-                                        onclick="executeSignal('${signal.id}', '${signal.symbol}', '${signal.side}', ${signal.take_profit}, ${signal.stop_loss})"
+                                <button class="cyber-button py-1 px-3 rounded text-xs" 
+                                        onclick="executeSignal('${signal.id}', '${signal.symbol}', '${signal.side}', ${takeProfit}, ${stopLoss})"
                                         ${signal.status === 'executed' ? 'disabled' : ''}>
-                                    <i class="fas fa-rocket mr-2"></i>
+                                    <i class="fas fa-rocket mr-1"></i>
                                     ${signal.status === 'executed' ? 'EXECUTED' : 'EXECUTE'}
                                 </button>
-                                <button class="cyber-button py-2 px-3 rounded-lg text-sm" 
+                                <button class="cyber-button py-1 px-3 rounded text-xs" 
                                         onclick="analyzeSignal('${signal.symbol}')">
                                     <i class="fas fa-chart-bar"></i>
                                 </button>
                             </div>
-                        </div>
-                    </div>
+                        </td>
+                    </tr>
                 `;
             }).join('');
         }
@@ -395,22 +465,64 @@
         }
         
         function showNoSignals() {
-            document.getElementById('signalsGrid').innerHTML = `
-                <div class="col-span-full text-center py-16">
-                    <i class="fas fa-exclamation-triangle text-6xl text-neon-red mb-4"></i>
-                    <p class="text-gray-400">Failed to load trading signals</p>
-                </div>
+            document.getElementById('signalsTableBody').innerHTML = `
+                <tr>
+                    <td colspan="10" class="text-center py-16">
+                        <i class="fas fa-exclamation-triangle text-6xl text-neon-red mb-4"></i>
+                        <div class="text-gray-400">Failed to load trading signals</div>
+                    </td>
+                </tr>
             `;
         }
         
         function refreshSignals() {
-            document.getElementById('signalsGrid').innerHTML = `
-                <div class="col-span-full text-center py-16">
-                    <i class="fas fa-spinner fa-spin text-6xl text-neon-cyan mb-4"></i>
-                    <p class="text-gray-400">Refreshing signals...</p>
-                </div>
+            document.getElementById('signalsTableBody').innerHTML = `
+                <tr>
+                    <td colspan="10" class="text-center py-16">
+                        <i class="fas fa-spinner fa-spin text-6xl text-neon-cyan mb-4"></i>
+                        <div class="text-gray-400">Refreshing signals...</div>
+                    </td>
+                </tr>
             `;
             loadSignals();
+        }
+        
+        // Table sorting functionality
+        let sortColumn = 'confidence';
+        let sortDirection = 'desc';
+        
+        function sortTable(column) {
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'desc';
+            }
+            
+            allSignals.sort((a, b) => {
+                let aVal = a[column];
+                let bVal = b[column];
+                
+                // Handle nested values
+                if (column === 'accuracy') {
+                    aVal = a.analysis?.accuracy || 0;
+                    bVal = b.analysis?.accuracy || 0;
+                }
+                
+                // Convert to numbers for numeric columns
+                if (column === 'confidence' || column === 'accuracy' || column === 'amount' || column === 'leverage') {
+                    aVal = parseFloat(aVal);
+                    bVal = parseFloat(bVal);
+                }
+                
+                if (sortDirection === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+            
+            displaySignals();
         }
         
         function toggleAutoExecute() {
