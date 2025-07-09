@@ -1723,6 +1723,54 @@ def close_position():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/close_all_positions', methods=['POST'])
+def close_all_positions():
+    try:
+        # Get all open positions
+        positions = bybit_session.get_positions(
+            category="linear",
+            settleCoin="USDT"
+        )
+        
+        if not positions or 'result' not in positions:
+            return jsonify({'success': False, 'error': 'Could not get positions'}), 500
+        
+        closed_positions = []
+        errors = []
+        
+        for position in positions['result']['list']:
+            if float(position.get('size', 0)) > 0:  # Only close positions with size > 0
+                try:
+                    # Close the position
+                    result = bybit_session.place_order(
+                        category="linear",
+                        symbol=position['symbol'],
+                        side="Sell" if position['side'] == "Buy" else "Buy",
+                        orderType="Market",
+                        qty=str(position['size']),
+                        reduceOnly=True
+                    )
+                    
+                    if result and 'result' in result:
+                        closed_positions.append(position['symbol'])
+                    else:
+                        errors.append(f"Failed to close {position['symbol']}")
+                        
+                except Exception as e:
+                    errors.append(f"Error closing {position['symbol']}: {str(e)}")
+        
+        if closed_positions:
+            return jsonify({
+                'success': True, 
+                'closed_positions': closed_positions,
+                'errors': errors if errors else None
+            })
+        else:
+            return jsonify({'success': False, 'error': 'No positions to close or all failed', 'errors': errors})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/chart_data/<symbol>')
 def get_chart_data(symbol):
     try:

@@ -799,7 +799,7 @@
                             ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%
                         </td>
                         <td class="py-3">
-                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="closePosition('${pos.symbol}')">
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="closePosition('${pos.symbol}', '${pos.side}', '${pos.size}')">
                                 Close
                             </button>
                         </td>
@@ -1225,12 +1225,16 @@
         });
         
         // Position management
-        function closePosition(symbol) {
+        function closePosition(symbol, side, size) {
             if (confirm(`Close position for ${symbol}?`)) {
                 fetch('/api/close_position', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbol: symbol })
+                    body: JSON.stringify({ 
+                        symbol: symbol,
+                        side: side,
+                        size: size
+                    })
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -1238,7 +1242,7 @@
                         addConsoleMessage('SUCCESS', `Position closed: ${symbol}`);
                         updateDashboard();
                     } else {
-                        addConsoleMessage('ERROR', `Failed to close position: ${data.message}`);
+                        addConsoleMessage('ERROR', `Failed to close position: ${data.error || data.message}`);
                     }
                 });
             }
@@ -1250,11 +1254,21 @@
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            addConsoleMessage('SUCCESS', 'All positions closed');
+                            const closedCount = data.closed_positions ? data.closed_positions.length : 0;
+                            addConsoleMessage('SUCCESS', `All positions closed (${closedCount} positions)`);
+                            if (data.errors && data.errors.length > 0) {
+                                data.errors.forEach(error => addConsoleMessage('WARNING', error));
+                            }
                             updateDashboard();
                         } else {
-                            addConsoleMessage('ERROR', 'Failed to close positions');
+                            addConsoleMessage('ERROR', `Failed to close positions: ${data.error}`);
+                            if (data.errors && data.errors.length > 0) {
+                                data.errors.forEach(error => addConsoleMessage('ERROR', error));
+                            }
                         }
+                    })
+                    .catch(error => {
+                        addConsoleMessage('ERROR', `Error closing positions: ${error}`);
                     });
             }
         }
