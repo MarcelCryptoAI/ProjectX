@@ -1976,6 +1976,7 @@ def get_trading_signals():
             # Fallback to environment variables
             ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 75))
             auto_execute = os.getenv('AUTO_EXECUTE', 'false').lower() == 'true'
+            db_settings = {}  # Empty dict for fallback
         
         # Try to get AI worker
         ai_worker = None
@@ -2033,9 +2034,14 @@ def get_trading_signals():
                         # Determine side based on analysis
                         side = "Buy" if result['accuracy'] > 70 else "Sell"
                         
-                        # Calculate position size based on settings
-                        risk_per_trade = float(os.getenv('RISK_PER_TRADE', 2.0))  # Default 2%
-                        min_trade_amount = float(os.getenv('MIN_TRADE_AMOUNT', 19))  # Default $19
+                        # Calculate position size based on settings from database
+                        try:
+                            risk_per_trade = float(db_settings.get('riskPerTrade', 2.0))
+                            min_trade_amount = float(db_settings.get('minTradeAmount', 19))
+                        except:
+                            # Fallback to environment variables
+                            risk_per_trade = float(os.getenv('RISK_PER_TRADE', 2.0))
+                            min_trade_amount = float(os.getenv('MIN_TRADE_AMOUNT', 19))
                         
                         # Get current balance
                         try:
@@ -2049,9 +2055,15 @@ def get_trading_signals():
                         amount = max(calculated_amount, min_trade_amount)
                         
                         # Calculate leverage based on settings and confidence
-                        min_leverage = int(os.getenv('MIN_LEVERAGE', 1))
-                        max_leverage = int(os.getenv('MAX_LEVERAGE', 10))
-                        leverage_strategy = os.getenv('LEVERAGE_STRATEGY', 'confidence_based')
+                        try:
+                            min_leverage = int(db_settings.get('minLeverage', 1))
+                            max_leverage = int(db_settings.get('maxLeverage', 10))
+                            leverage_strategy = db_settings.get('leverageStrategy', 'confidence_based')
+                        except:
+                            # Fallback to environment variables
+                            min_leverage = int(os.getenv('MIN_LEVERAGE', 1))
+                            max_leverage = int(os.getenv('MAX_LEVERAGE', 10))
+                            leverage_strategy = os.getenv('LEVERAGE_STRATEGY', 'confidence_based')
                         
                         if leverage_strategy == 'confidence_based':
                             # Higher confidence = higher leverage
