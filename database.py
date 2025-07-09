@@ -285,6 +285,7 @@ class TradingDatabase:
                     qty_step DECIMAL(20,8),
                     min_leverage DECIMAL(10,2),
                     max_leverage DECIMAL(10,2),
+                    leverage_multiplier DECIMAL(10,2) DEFAULT 1.0,
                     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
@@ -300,6 +301,7 @@ class TradingDatabase:
                     qty_step REAL,
                     min_leverage REAL,
                     max_leverage REAL,
+                    leverage_multiplier REAL DEFAULT 1.0,
                     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
@@ -391,7 +393,8 @@ class TradingDatabase:
             # Check if columns exist and add them if they don't
             new_columns = [
                 ('min_leverage', 'DECIMAL(10,2)' if self.use_postgres else 'REAL'),
-                ('max_leverage', 'DECIMAL(10,2)' if self.use_postgres else 'REAL')
+                ('max_leverage', 'DECIMAL(10,2)' if self.use_postgres else 'REAL'),
+                ('leverage_multiplier', 'DECIMAL(10,2)' if self.use_postgres else 'REAL')
             ]
             
             for column_name, column_type in new_columns:
@@ -1005,8 +1008,8 @@ class TradingDatabase:
             for symbol_data in symbols_data:
                 cursor.execute(f'''
                     INSERT INTO supported_symbols 
-                    (symbol, base_currency, quote_currency, status, min_order_qty, qty_step, min_leverage, max_leverage)
-                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                    (symbol, base_currency, quote_currency, status, min_order_qty, qty_step, min_leverage, max_leverage, leverage_multiplier)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
                 ''', (
                     symbol_data['symbol'],
                     symbol_data.get('base_currency', ''),
@@ -1015,7 +1018,8 @@ class TradingDatabase:
                     symbol_data.get('min_order_qty', 0),
                     symbol_data.get('qty_step', 0),
                     symbol_data.get('min_leverage', 1),
-                    symbol_data.get('max_leverage', 10)
+                    symbol_data.get('max_leverage', 10),
+                    symbol_data.get('leverage_multiplier', 1.0)
                 ))
             
             conn.commit()
@@ -1026,13 +1030,57 @@ class TradingDatabase:
         
         conn.close()
     
+    def update_leverage_multiplier(self, symbol, leverage_multiplier):
+        """Update leverage multiplier for a specific symbol"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            placeholder = '%s' if self.use_postgres else '?'
+            cursor.execute(f'''
+                UPDATE supported_symbols 
+                SET leverage_multiplier = {placeholder}
+                WHERE symbol = {placeholder}
+            ''', (leverage_multiplier, symbol))
+            
+            conn.commit()
+            return cursor.rowcount > 0
+            
+        except Exception as e:
+            print(f"Error updating leverage multiplier: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+    
+    def get_leverage_multiplier(self, symbol):
+        """Get leverage multiplier for a specific symbol"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            placeholder = '%s' if self.use_postgres else '?'
+            cursor.execute(f'''
+                SELECT leverage_multiplier FROM supported_symbols 
+                WHERE symbol = {placeholder}
+            ''', (symbol,))
+            
+            result = cursor.fetchone()
+            return float(result[0]) if result and result[0] else 1.0
+            
+        except Exception as e:
+            print(f"Error getting leverage multiplier: {e}")
+            return 1.0
+        finally:
+            conn.close()
+    
     def get_supported_symbols(self):
         """Get supported symbols list"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
         try:
-            cursor.execute('SELECT symbol, status, last_updated, min_leverage, max_leverage FROM supported_symbols ORDER BY symbol')
+            cursor.execute('SELECT symbol, status, last_updated, min_leverage, max_leverage, leverage_multiplier FROM supported_symbols ORDER BY symbol')
             results = cursor.fetchall()
             
             symbols = []
@@ -1042,7 +1090,8 @@ class TradingDatabase:
                     'status': row[1],
                     'last_updated': row[2],
                     'min_leverage': float(row[3]) if row[3] else 1,
-                    'max_leverage': float(row[4]) if row[4] else 10
+                    'max_leverage': float(row[4]) if row[4] else 10,
+                    'leverage_multiplier': float(row[5]) if row[5] else 1.0
                 })
             
             return symbols

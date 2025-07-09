@@ -681,6 +681,48 @@
                         </div>
                     </div>
                 </div>
+                
+                <div class="settings-group">
+                    <h3 class="text-xl font-bold text-neon-cyan mb-4">
+                        <i class="fas fa-sliders-h mr-2"></i>Leverage Multipliers
+                    </h3>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <label class="form-label">Global Default Multiplier</label>
+                            <input type="number" class="form-input w-full" id="globalLeverageMultiplier" min="0.1" max="20" step="0.1" value="1.0">
+                            <div class="form-text">Default leverage multiplier for all symbols</div>
+                        </div>
+                        <div>
+                            <label class="form-label">Supported Symbols</label>
+                            <div class="text-lg font-mono text-neon-yellow" id="leverageSymbolsCount">Loading...</div>
+                            <div class="form-text">Number of symbols with leverage multipliers</div>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button class="cyber-button py-2 px-4 rounded-lg" onclick="loadLeverageMultipliers()" id="loadLeverageBtn">
+                            <i class="fas fa-cog mr-2"></i>Manage Leverage Multipliers
+                        </button>
+                        <div class="form-text mt-2">Set individual leverage multipliers for each supported coin</div>
+                    </div>
+                    <div class="mt-4 p-4 border border-neon-orange/30 rounded-lg bg-orange-900/20">
+                        <div class="text-sm text-neon-orange">
+                            <i class="fas fa-info-circle mr-2"></i><strong>Leverage Multiplier Usage:</strong> These multipliers are applied to the base leverage calculated by the AI. A value of 1.0 means no modification, 2.0 doubles the leverage, and 0.5 halves it.
+                        </div>
+                    </div>
+                    <div class="mt-4" id="leverageMultipliersList" style="display: none;">
+                        <div class="bg-dark-bg rounded-lg p-4 border border-neon-cyan/20">
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-sm font-bold text-neon-cyan">Leverage Multipliers per Symbol</span>
+                                <button class="cyber-button py-1 px-3 rounded text-xs" onclick="saveLeverageMultipliers()">
+                                    <i class="fas fa-save mr-1"></i>Save Changes
+                                </button>
+                            </div>
+                            <div class="max-h-60 overflow-y-auto">
+                                <div id="leverageMultipliersTable" class="space-y-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <!-- Telegram Tab -->
@@ -1085,11 +1127,121 @@
                 });
         }
         
+        // Load leverage multipliers
+        function loadLeverageMultipliers() {
+            const btn = document.getElementById('loadLeverageBtn');
+            const list = document.getElementById('leverageMultipliersList');
+            const table = document.getElementById('leverageMultipliersTable');
+            
+            // Show loading
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Loading...';
+            list.style.display = 'block';
+            
+            fetch('/api/leverage_multipliers')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update count
+                        document.getElementById('leverageSymbolsCount').textContent = data.symbols.length;
+                        
+                        // Build table
+                        let tableHTML = '';
+                        data.symbols.forEach(symbol => {
+                            tableHTML += `
+                                <div class="flex items-center justify-between p-2 border border-gray-600 rounded">
+                                    <div class="flex items-center space-x-3">
+                                        <span class="text-sm font-mono text-neon-cyan">${symbol.symbol}</span>
+                                        <span class="text-xs text-gray-400">${symbol.min_leverage}-${symbol.max_leverage}x</span>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" class="form-input w-20 text-sm" 
+                                               value="${symbol.leverage_multiplier}" 
+                                               min="0.1" max="20" step="0.1"
+                                               data-symbol="${symbol.symbol}"
+                                               id="mult_${symbol.symbol}">
+                                        <span class="text-xs text-gray-400">x</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        table.innerHTML = tableHTML;
+                        
+                        showNotification('Leverage multipliers loaded successfully!', 'success');
+                    } else {
+                        showNotification('Failed to load leverage multipliers: ' + data.error, 'error');
+                        table.innerHTML = '<div class="text-center text-gray-400">Failed to load symbols</div>';
+                    }
+                })
+                .catch(error => {
+                    showNotification('Error loading leverage multipliers: ' + error.message, 'error');
+                    table.innerHTML = '<div class="text-center text-gray-400">Error loading symbols</div>';
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-cog mr-2"></i>Manage Leverage Multipliers';
+                });
+        }
+        
+        // Save leverage multipliers
+        function saveLeverageMultipliers() {
+            const inputs = document.querySelectorAll('#leverageMultipliersTable input[data-symbol]');
+            const multipliers = {};
+            
+            inputs.forEach(input => {
+                const symbol = input.dataset.symbol;
+                const value = parseFloat(input.value);
+                if (!isNaN(value) && value >= 0.1 && value <= 20) {
+                    multipliers[symbol] = value;
+                }
+            });
+            
+            if (Object.keys(multipliers).length === 0) {
+                showNotification('No valid multipliers to save', 'error');
+                return;
+            }
+            
+            fetch('/api/save_leverage_multipliers', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ multipliers })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(`Successfully updated ${data.updated_count} leverage multipliers!`, 'success');
+                } else {
+                    showNotification('Failed to save leverage multipliers: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Error saving leverage multipliers: ' + error.message, 'error');
+            });
+        }
+        
+        // Load leverage symbols count
+        function loadLeverageSymbolsCount() {
+            fetch('/api/leverage_symbols_count')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('leverageSymbolsCount').textContent = data.count || 0;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading leverage symbols count:', error);
+                    document.getElementById('leverageSymbolsCount').textContent = 'Error';
+                });
+        }
+        
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadCurrentBalance();
             loadSettings();
             loadSymbolsInfo();
+            loadLeverageSymbolsCount();
             
             // Initialize toggle options
             toggleTrailingStopOptions();

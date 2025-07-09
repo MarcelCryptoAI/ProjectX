@@ -93,6 +93,12 @@ class TradeExecutor:
                 self.log('SUCCESS', f'✅ Order placed: {order_id}')
                 self.log('INFO', f'📊 Size: {position_size}, Price: ${order_price:.4f}')
                 
+                # Log leverage information
+                base_leverage = self.settings.bot.get('default_leverage', 1)
+                leverage_multiplier = self._get_leverage_multiplier(symbol)
+                final_leverage = base_leverage * leverage_multiplier
+                self.log('INFO', f'⚡ Leverage: {base_leverage}x (base) × {leverage_multiplier}x (multiplier) = {final_leverage}x (final)')
+                
                 # Store order for tracking
                 self.active_orders[order_id] = {
                     'symbol': symbol,
@@ -158,8 +164,14 @@ class TradeExecutor:
                 base_position_size = risk_amount / current_price
                 
                 # Apply leverage if configured
-                leverage = self.settings.bot.get('default_leverage', 1)
-                position_size = base_position_size * leverage
+                base_leverage = self.settings.bot.get('default_leverage', 1)
+                
+                # Get symbol-specific leverage multiplier from database
+                leverage_multiplier = self._get_leverage_multiplier(symbol)
+                
+                # Calculate final leverage
+                final_leverage = base_leverage * leverage_multiplier
+                position_size = base_position_size * final_leverage
                 
                 # Round to appropriate decimal places
                 if symbol.endswith('USDT'):
@@ -175,6 +187,16 @@ class TradeExecutor:
         except Exception as e:
             self.log('ERROR', f'Position size calculation error: {str(e)}')
             return 0.001
+    
+    def _get_leverage_multiplier(self, symbol):
+        """Get leverage multiplier for a specific symbol from database"""
+        try:
+            from database import TradingDatabase
+            db = TradingDatabase()
+            return db.get_leverage_multiplier(symbol)
+        except Exception as e:
+            self.log('WARNING', f'Failed to get leverage multiplier for {symbol}: {str(e)}')
+            return 1.0  # Default to 1x multiplier if database lookup fails
     
     def _calculate_stop_take_profit(self, entry_price, side):
         """Calculate stop loss and take profit prices"""

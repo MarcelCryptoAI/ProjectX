@@ -3971,6 +3971,80 @@ def get_training_symbols():
             'error': str(e)
         }), 500
 
+@app.route('/api/leverage_multipliers')
+def get_leverage_multipliers():
+    """Get leverage multipliers for all supported symbols"""
+    try:
+        from database import TradingDatabase
+        db = TradingDatabase()
+        
+        symbols = db.get_supported_symbols()
+        
+        return jsonify({
+            'success': True,
+            'symbols': symbols,
+            'count': len(symbols)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/save_leverage_multipliers', methods=['POST'])
+def save_leverage_multipliers():
+    """Save leverage multipliers for symbols"""
+    try:
+        data = request.get_json()
+        multipliers = data.get('multipliers', {})
+        
+        if not multipliers:
+            return jsonify({
+                'success': False,
+                'error': 'No multipliers provided'
+            }), 400
+        
+        from database import TradingDatabase
+        db = TradingDatabase()
+        
+        updated_count = 0
+        for symbol, multiplier in multipliers.items():
+            if db.update_leverage_multiplier(symbol, multiplier):
+                updated_count += 1
+        
+        return jsonify({
+            'success': True,
+            'updated_count': updated_count,
+            'message': f'Updated {updated_count} leverage multipliers'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/leverage_symbols_count')
+def get_leverage_symbols_count():
+    """Get count of symbols with leverage multipliers"""
+    try:
+        from database import TradingDatabase
+        db = TradingDatabase()
+        
+        symbols = db.get_supported_symbols()
+        
+        return jsonify({
+            'success': True,
+            'count': len(symbols)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     print("🤖 AI Worker ready...")
     
