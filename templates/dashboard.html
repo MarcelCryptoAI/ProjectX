@@ -1040,16 +1040,16 @@
         
         // Update trading parameters from settings
         function updateTradingParameters() {
-            fetch('/api/settings')
+            fetch('/api/config')
                 .then(response => response.json())
                 .then(data => {
-                    if (data && data.bot) {
+                    if (data && data.success) {
                         // Update AI confidence threshold
-                        const confidence = data.bot.ai_confidence_threshold || 75;
+                        const confidence = data.ai_confidence_threshold || 75;
                         document.getElementById('aiConfidence').textContent = `${confidence}%`;
                         
                         // Update max concurrent trades
-                        const maxTrades = data.bot.max_concurrent_trades || 5;
+                        const maxTrades = data.max_positions || 5;
                         document.getElementById('maxPositions').textContent = maxTrades;
                     }
                 })
