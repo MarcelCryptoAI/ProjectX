@@ -518,9 +518,17 @@ class AIWorker:
             return {}
         
         try:
-            # Convert to numpy arrays for calculations
-            closes = np.array([float(kline[4]) for kline in market_data])
-            volumes = np.array([float(kline[5]) for kline in market_data])
+            # Convert to numpy arrays for calculations with None checks
+            try:
+                closes = np.array([float(kline[4]) for kline in market_data if kline[4] is not None])
+                volumes = np.array([float(kline[5]) for kline in market_data if kline[5] is not None])
+                
+                if len(closes) == 0 or len(volumes) == 0:
+                    self.console_logger.log('WARNING', f'Invalid kline data for {symbol} - all values are None')
+                    return {}
+            except (ValueError, TypeError) as e:
+                self.console_logger.log('ERROR', f'❌ Error converting kline data for {symbol}: {e}')
+                return {}
             
             # Simple moving averages
             sma_20 = np.mean(closes[-20:]) if len(closes) >= 20 else closes[-1]
@@ -1058,10 +1066,17 @@ class AIWorker:
                 self.console_logger.log('ERROR', f'❌ Failed to get ticker for {symbol}')
                 return False
             
-            current_price = float(ticker['result']['list'][0]['lastPrice'])
+            last_price = ticker['result']['list'][0].get('lastPrice')
+            if last_price is None:
+                self.console_logger.log('ERROR', f'❌ lastPrice is None for {symbol}')
+                return False
+            current_price = float(last_price)
             
             # Calculate AI-advised entry price
-            ai_entry_adjustment = float(signal.get('entry_price', 0.0))  # Get AI price adjustment
+            ai_entry_raw = signal.get('entry_price', 0.0)
+            if ai_entry_raw is None:
+                ai_entry_raw = 0.0
+            ai_entry_adjustment = float(ai_entry_raw)  # Get AI price adjustment
             ai_entry_price = current_price * (1 + ai_entry_adjustment)
             
             self.console_logger.log('INFO', f'📈 Market Price: ${current_price:.4f}, AI Entry Price: ${ai_entry_price:.4f} ({ai_entry_adjustment*100:+.2f}%)')
@@ -1454,7 +1469,11 @@ class AIWorker:
                             )
                             
                             if executions and 'result' in executions and executions['result']['list']:
-                                actual_entry_price = float(executions['result']['list'][0]['execPrice'])
+                                exec_price = executions['result']['list'][0].get('execPrice')
+                                if exec_price is None:
+                                    self.console_logger.log('ERROR', f'❌ execPrice is None for {symbol}')
+                                    continue
+                                actual_entry_price = float(exec_price)
                                 trade_data['actual_entry_price'] = actual_entry_price
                                 
                                 # Update signal in database with actual entry price
@@ -1665,8 +1684,17 @@ class AIWorker:
                                 total_exit_value = 0
                                 
                                 for exit_trade in exit_trades:
-                                    qty = float(exit_trade.get('execQty', 0))
-                                    price = float(exit_trade.get('execPrice', 0))
+                                    exec_qty = exit_trade.get('execQty')
+                                    exec_price = exit_trade.get('execPrice')
+                                    
+                                    if exec_qty is None or exec_price is None:
+                                        continue  # Skip trades with missing data
+                                        
+                                    qty = float(exec_qty)
+                                    price = float(exec_price)
+                                    
+                                    if qty <= 0:  # Skip zero quantity trades
+                                        continue
                                     
                                     total_exit_qty += qty
                                     total_exit_value += qty * price
@@ -1814,8 +1842,10 @@ class AIWorker:
                                     for execution in executions['result']['list']:
                                         if (execution.get('symbol') == symbol and 
                                             execution.get('side') == side):
-                                            entry_price = float(execution.get('execPrice', 0))
-                                            break
+                                            exec_price = execution.get('execPrice')
+                                            if exec_price is not None:
+                                                entry_price = float(exec_price)
+                                                break
                                     
                                     if entry_price:
                                         # Update the signal with entry price and mark as pending
@@ -1924,8 +1954,17 @@ class AIWorker:
                                 total_exit_value = 0
                                 
                                 for exit_trade in exit_trades:
-                                    qty = float(exit_trade.get('execQty', 0))
-                                    price = float(exit_trade.get('execPrice', 0))
+                                    exec_qty = exit_trade.get('execQty')
+                                    exec_price = exit_trade.get('execPrice')
+                                    
+                                    if exec_qty is None or exec_price is None:
+                                        continue  # Skip trades with missing data
+                                        
+                                    qty = float(exec_qty)
+                                    price = float(exec_price)
+                                    
+                                    if qty <= 0:  # Skip zero quantity trades
+                                        continue
                                     
                                     total_exit_qty += qty
                                     total_exit_value += qty * price
