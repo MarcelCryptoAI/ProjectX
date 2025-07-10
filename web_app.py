@@ -670,9 +670,20 @@ def get_order_history():
                 # Calculate quantity from amount and entry price
                 quantity = amount / entry_price if entry_price > 0 else 0
                 
-                # Calculate P&L percentage
+                # Get leverage multiplier for better P&L calculation
+                leverage_multiplier = 1.0
+                try:
+                    from database import TradingDatabase
+                    db = TradingDatabase()
+                    leverage_multiplier = db.get_leverage_multiplier(symbol)
+                except:
+                    pass
+                
+                # Calculate P&L percentage with leverage consideration
                 entry_value = quantity * entry_price
-                pnl_percentage = (realized_pnl / entry_value * 100) if entry_value > 0 else 0
+                # P&L should be calculated on margin used, not full position value
+                margin_used = entry_value / leverage_multiplier if leverage_multiplier > 0 else entry_value
+                pnl_percentage = (realized_pnl / margin_used * 100) if margin_used > 0 else 0
                 
                 # Convert exit_time to timestamp format
                 exit_time = signal.get('exit_time')
@@ -725,9 +736,20 @@ def get_order_history():
                 avg_exit_price = float(pnl_entry.get('avgExitPrice', 0))
                 closed_pnl = float(pnl_entry.get('closedPnl', 0))
                 
-                # Calculate P&L percentage
+                # Get leverage multiplier for better P&L calculation
+                leverage_multiplier = 1.0
+                try:
+                    from database import TradingDatabase
+                    db = TradingDatabase()
+                    leverage_multiplier = db.get_leverage_multiplier(symbol)
+                except:
+                    pass
+                
+                # Calculate P&L percentage with leverage consideration
                 entry_value = qty * avg_entry_price
-                pnl_percentage = (closed_pnl / entry_value * 100) if entry_value > 0 else 0
+                # P&L should be calculated on margin used, not full position value
+                margin_used = entry_value / leverage_multiplier if leverage_multiplier > 0 else entry_value
+                pnl_percentage = (closed_pnl / margin_used * 100) if margin_used > 0 else 0
                 
                 # Note: ByBit API already returns correct P&L for both long and short positions
                 # Short positions: profit when price goes down (positive closed_pnl)
@@ -772,8 +794,19 @@ def get_order_history():
                 # Use realized P&L from API (often 0 for individual executions)
                 realized_pnl = float(execution.get('closedPnl', 0)) or float(execution.get('realizedPnl', 0))
                 
-                # Calculate percentage (approximation based on trade value)
-                pnl_percentage = (realized_pnl / trade_value * 100) if trade_value > 0 else 0
+                # Get leverage multiplier for better P&L calculation
+                leverage_multiplier = 1.0
+                try:
+                    from database import TradingDatabase
+                    db = TradingDatabase()
+                    leverage_multiplier = db.get_leverage_multiplier(execution.get('symbol', ''))
+                except:
+                    pass
+                
+                # Calculate percentage with leverage consideration
+                # P&L should be calculated on margin used, not full position value
+                margin_used = trade_value / leverage_multiplier if leverage_multiplier > 0 else trade_value
+                pnl_percentage = (realized_pnl / margin_used * 100) if margin_used > 0 else 0
                 
                 formatted_order = {
                     'orderId': execution.get('execId', ''),

@@ -7,8 +7,8 @@ class AITrader:
     def __init__(self, settings):
         self.settings = settings
         self.logger = logging.getLogger(__name__)
-        self.strategy_mode = 'balanced'  # Default strategy mode
-        self._load_strategy_mode()
+        self.strategy_mode = 'disabled'  # Strategy mode disabled - use pure user settings
+        # self._load_strategy_mode()  # Disabled
         
     def _load_strategy_mode(self):
         """Load strategy mode from database settings"""
@@ -21,10 +21,23 @@ class AITrader:
         except Exception as e:
             self.logger.warning(f"Could not load strategy mode from database: {e}, using default: {self.strategy_mode}")
     
+    def _get_user_accuracy_setting(self):
+        """Get exact user accuracy setting from database"""
+        try:
+            from database import TradingDatabase
+            db = TradingDatabase()
+            db_settings = db.load_settings()
+            user_accuracy = float(db_settings.get('accuracyThreshold', 88))  # Default to 88
+            self.logger.info(f"Using user accuracy setting: {user_accuracy}%")
+            return user_accuracy
+        except Exception as e:
+            self.logger.warning(f"Could not load user accuracy from database: {e}, using default: 88")
+            return 88.0  # Default fallback
+    
     def get_prediction(self, market_conditions=None):
         """Get AI prediction for trading with dynamic take profit within bounds and perfect entry price"""
-        # Reload strategy mode to get latest settings
-        self._load_strategy_mode()
+        # Strategy mode disabled - use original market conditions
+        # self._load_strategy_mode()  # Disabled
         
         # Log original market conditions
         if market_conditions:
@@ -32,8 +45,8 @@ class AITrader:
             volatility = market_conditions.get('avg_volatility', 0)
             self.logger.info(f"🧠 AI analyzing: Market trend={trend.upper()}, Volatility={volatility:.2f}%")
         
-        # Apply strategy mode specific adjustments to market conditions
-        adjusted_market_conditions = self._apply_strategy_mode_adjustments(market_conditions)
+        # Use original market conditions without strategy mode adjustments
+        adjusted_market_conditions = market_conditions or {}
         
         # Get take profit bounds from settings
         min_tp = self.settings.min_take_profit_percent
@@ -69,7 +82,7 @@ class AITrader:
             'entry_price': perfect_entry_price,
             'leverage': self._calculate_dynamic_leverage(confidence, adjusted_market_conditions),
             'amount': 100,
-            'accuracy': 70 + random.uniform(0, 25),  # 70-95% range
+            'accuracy': self._get_user_accuracy_setting(),  # Use exact user setting
             'strategy_mode': self.strategy_mode
         }
     
@@ -163,12 +176,10 @@ class AITrader:
             # Calculate AI take profit
             ai_tp = base_tp + volatility_adjustment + trend_bonus + volume_adjustment
             
-            # Apply strategy mode multiplier
-            tp_multiplier = market_conditions.get('tp_multiplier', 1.0)
-            ai_tp = ai_tp * tp_multiplier
+            # Strategy mode disabled - no multipliers applied
             
             # Log the calculation breakdown
-            self.logger.info(f"🎯 TP Calculation: Base={base_tp:.2f}% + Volatility={volatility_adjustment:.2f}% + Trend={trend_bonus:.2f}% + Volume={volume_adjustment:.2f}% × Strategy={tp_multiplier:.1f} = {ai_tp:.2f}%")
+            self.logger.info(f"🎯 TP Calculation: Base={base_tp:.2f}% + Volatility={volatility_adjustment:.2f}% + Trend={trend_bonus:.2f}% + Volume={volume_adjustment:.2f}% = {ai_tp:.2f}%")
             
             # Add some randomness for variation (10% of the calculated value)
             variation = random.uniform(-0.1, 0.1) * ai_tp
@@ -218,9 +229,7 @@ class AITrader:
             # Add some randomness
             confidence += random.uniform(-5, 10)
             
-            # Apply strategy mode confidence bonus/penalty
-            confidence_bonus = market_conditions.get('confidence_bonus', 0)
-            confidence += confidence_bonus
+            # Strategy mode disabled - no confidence bonus/penalty applied
         else:
             confidence = base_confidence + random.uniform(-10, 15)
         
@@ -268,9 +277,7 @@ class AITrader:
             # Calculate final adjustment
             final_adjustment = base_adjustment + volatility_factor + trend_factor + volume_factor
             
-            # Apply strategy mode entry conservatism
-            entry_conservatism = market_conditions.get('entry_conservatism', 0)
-            final_adjustment += abs(entry_conservatism)  # Add to total adjustment
+            # Strategy mode disabled - no entry conservatism applied
             
             # For buy orders, place slightly below market
             # For sell orders, place slightly above market
@@ -301,9 +308,7 @@ class AITrader:
             
             ai_sl = base_sl + volatility_adjustment + ai_variation
             
-            # Apply strategy mode stop loss multiplier
-            sl_multiplier = market_conditions.get('sl_multiplier', 1.0)
-            ai_sl = ai_sl * sl_multiplier
+            # Strategy mode disabled - no stop loss multiplier applied
             
             # Ensure reasonable bounds (0.5% - 5%)
             ai_sl = max(0.5, min(5.0, ai_sl))
@@ -338,10 +343,7 @@ class AITrader:
         # Apply confidence factor
         leverage = leverage * (0.8 + confidence_factor * 0.4)  # 80% to 120% of base
         
-        # Apply strategy mode risk multiplier
-        if market_conditions:
-            risk_multiplier = market_conditions.get('risk_multiplier', 1.0)
-            leverage = leverage * risk_multiplier
+        # Strategy mode disabled - no risk multiplier applied
         
         # Ensure within bounds
         leverage = int(max(min_leverage, min(max_leverage, leverage)))
