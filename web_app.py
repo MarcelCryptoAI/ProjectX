@@ -555,7 +555,7 @@ def performance():
 
 @app.route('/api/order_history')
 def get_order_history():
-    """Get order history for this app's trades with pagination"""
+    """Get order history for this app's trades with pagination - now includes AI signals data"""
     try:
         ensure_components_initialized()
         
@@ -563,6 +563,16 @@ def get_order_history():
         period = request.args.get('period', '7d')
         page = int(request.args.get('page', 1))
         per_page = 50
+        
+        # First, get completed trades from our trading_signals database
+        from database import TradingDatabase
+        db = TradingDatabase()
+        ai_signals = db.get_trading_signals()
+        
+        # Filter completed signals with P&L data
+        completed_signals = [s for s in ai_signals if s.get('status') == 'completed' and s.get('realized_pnl') is not None]
+        
+        app.logger.info(f"Found {len(completed_signals)} completed AI signals with P&L data")
         
         # Calculate time range
         now = datetime.now()
@@ -647,7 +657,65 @@ def get_order_history():
             'total_pnl': 0
         }
         
-        # Process closed P&L data (more accurate P&L)
+        # First, process our AI signals data (most accurate)
+        for signal in completed_signals:
+            try:
+                symbol = signal.get('symbol', '')
+                side = signal.get('side', '')
+                entry_price = float(signal.get('entry_price', 0))
+                exit_price = float(signal.get('exit_price', 0))
+                realized_pnl = float(signal.get('realized_pnl', 0))
+                amount = float(signal.get('amount', 0))
+                
+                # Calculate quantity from amount and entry price
+                quantity = amount / entry_price if entry_price > 0 else 0
+                
+                # Calculate P&L percentage
+                entry_value = quantity * entry_price
+                pnl_percentage = (realized_pnl / entry_value * 100) if entry_value > 0 else 0
+                
+                # Convert exit_time to timestamp format
+                exit_time = signal.get('exit_time')
+                if exit_time:
+                    if isinstance(exit_time, str):
+                        try:
+                            exit_dt = datetime.fromisoformat(exit_time.replace('Z', '+00:00'))
+                            timestamp = str(int(exit_dt.timestamp() * 1000))
+                        except:
+                            timestamp = str(int(datetime.now().timestamp() * 1000))
+                    else:
+                        timestamp = str(int(exit_time.timestamp() * 1000))
+                else:
+                    timestamp = str(int(datetime.now().timestamp() * 1000))
+                
+                formatted_order = {
+                    'orderId': signal.get('signal_id', ''),
+                    'symbol': symbol,
+                    'side': side,
+                    'type': 'AI Signal',
+                    'quantity': quantity,
+                    'price': exit_price,
+                    'entry_price': entry_price,
+                    'status': 'Completed',
+                    'timestamp': timestamp,
+                    'pnl': realized_pnl,
+                    'pnl_percentage': pnl_percentage,
+                    'fee': 0,  # Fee data not tracked in signals yet
+                    'source': 'AI_SIGNAL'
+                }
+                
+                formatted_orders.append(formatted_order)
+                
+                # Update stats
+                stats['total_orders'] += 1
+                stats['completed_orders'] += 1
+                stats['total_volume'] += entry_value
+                stats['total_pnl'] += realized_pnl
+                
+            except Exception as signal_error:
+                app.logger.warning(f"Error processing AI signal {signal.get('signal_id', 'unknown')}: {signal_error}")
+        
+        # Process closed P&L data from ByBit (backup/additional data)
         if closed_pnl_data:
             for pnl_entry in closed_pnl_data:
                 symbol = pnl_entry.get('symbol', '')
@@ -808,6 +876,115 @@ def get_order_history():
             },
             'error': f'Using sample data due to API error: {str(e)}'
         })
+
+@app.route('/api/ai_signals_analytics')
+def get_ai_signals_analytics():
+    """Get detailed analytics for AI trading signals"""
+    try:
+        from database import TradingDatabase
+        db = TradingDatabase()
+        
+        # Get all signals
+        all_signals = db.get_trading_signals()
+        
+        # Categorize signals
+        completed_signals = [s for s in all_signals if s.get('status') == 'completed']
+        pending_signals = [s for s in all_signals if s.get('status') == 'pending']
+        waiting_signals = [s for s in all_signals if s.get('status') == 'waiting']
+        failed_signals = [s for s in all_signals if s.get('status') == 'failed']
+        
+        # Calculate analytics for completed trades with P&L data
+        trades_with_pnl = [s for s in completed_signals if s.get('realized_pnl') is not None]
+        
+        analytics = {
+            'total_signals': len(all_signals),
+            'completed': len(completed_signals),
+            'pending': len(pending_signals),
+            'waiting': len(waiting_signals),
+            'failed': len(failed_signals),
+            'trades_with_pnl': len(trades_with_pnl)
+        }
+        
+        if trades_with_pnl:
+            # Calculate detailed performance metrics
+            total_pnl = sum(float(t['realized_pnl']) for t in trades_with_pnl)
+            winning_trades = [t for t in trades_with_pnl if float(t['realized_pnl']) > 0]
+            losing_trades = [t for t in trades_with_pnl if float(t['realized_pnl']) < 0]
+            
+            win_rate = (len(winning_trades) / len(trades_with_pnl)) * 100
+            avg_win = sum(float(t['realized_pnl']) for t in winning_trades) / len(winning_trades) if winning_trades else 0
+            avg_loss = sum(float(t['realized_pnl']) for t in losing_trades) / len(losing_trades) if losing_trades else 0
+            
+            profit_factor = abs(avg_win * len(winning_trades)) / abs(avg_loss * len(losing_trades)) if avg_loss != 0 else float('inf')
+            
+            # Best and worst trades
+            best_trade = max(trades_with_pnl, key=lambda x: float(x['realized_pnl']))
+            worst_trade = min(trades_with_pnl, key=lambda x: float(x['realized_pnl']))
+            
+            # Recent completed trades (last 10)
+            recent_trades = sorted(completed_signals, key=lambda x: x.get('exit_time', ''), reverse=True)[:10]
+            
+            analytics.update({
+                'performance': {
+                    'total_pnl': total_pnl,
+                    'winning_trades': len(winning_trades),
+                    'losing_trades': len(losing_trades),
+                    'win_rate': win_rate,
+                    'avg_win': avg_win,
+                    'avg_loss': avg_loss,
+                    'profit_factor': profit_factor,
+                    'best_trade': {
+                        'signal_id': best_trade.get('signal_id'),
+                        'symbol': best_trade.get('symbol'),
+                        'pnl': float(best_trade.get('realized_pnl', 0)),
+                        'exit_time': best_trade.get('exit_time')
+                    },
+                    'worst_trade': {
+                        'signal_id': worst_trade.get('signal_id'),
+                        'symbol': worst_trade.get('symbol'),
+                        'pnl': float(worst_trade.get('realized_pnl', 0)),
+                        'exit_time': worst_trade.get('exit_time')
+                    }
+                },
+                'recent_trades': [
+                    {
+                        'signal_id': t.get('signal_id'),
+                        'symbol': t.get('symbol'),
+                        'side': t.get('side'),
+                        'entry_price': float(t.get('entry_price', 0)) if t.get('entry_price') else None,
+                        'exit_price': float(t.get('exit_price', 0)) if t.get('exit_price') else None,
+                        'pnl': float(t.get('realized_pnl', 0)) if t.get('realized_pnl') is not None else None,
+                        'exit_time': t.get('exit_time'),
+                        'status': t.get('status')
+                    }
+                    for t in recent_trades
+                ]
+            })
+        else:
+            analytics.update({
+                'performance': {
+                    'total_pnl': 0,
+                    'winning_trades': 0,
+                    'losing_trades': 0,
+                    'win_rate': 0,
+                    'avg_win': 0,
+                    'avg_loss': 0,
+                    'profit_factor': 0
+                },
+                'recent_trades': []
+            })
+        
+        return jsonify({
+            'success': True,
+            'analytics': analytics
+        })
+        
+    except Exception as e:
+        app.logger.error(f"AI signals analytics error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/api/balance')
 def get_balance():
