@@ -277,9 +277,9 @@ class TradingDatabase:
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS supported_symbols (
                     id SERIAL PRIMARY KEY,
-                    symbol VARCHAR(20) UNIQUE NOT NULL,
-                    base_currency VARCHAR(10),
-                    quote_currency VARCHAR(10),
+                    symbol VARCHAR(50) UNIQUE NOT NULL,
+                    base_currency VARCHAR(20),
+                    quote_currency VARCHAR(20),
                     status VARCHAR(20) DEFAULT 'active',
                     min_order_qty DECIMAL(20,8),
                     qty_step DECIMAL(20,8),
@@ -394,18 +394,59 @@ class TradingDatabase:
         cursor = conn.cursor()
         
         try:
-            # First fix symbol column size for long crypto names like 1000000BABYDOGEUSDT
             if self.use_postgres:
+                # Check if we need to recreate table due to small varchar sizes
                 try:
                     cursor.execute('''
-                        ALTER TABLE supported_symbols 
-                        ALTER COLUMN symbol TYPE VARCHAR(50)
+                        SELECT column_name, character_maximum_length 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'supported_symbols' 
+                        AND column_name IN ('symbol', 'base_currency', 'quote_currency')
                     ''')
-                    print("✅ Symbol column extended to VARCHAR(50)")
-                except Exception as e:
-                    print(f"Symbol column resize note: {e}")
+                    columns_info = cursor.fetchall()
+                    
+                    needs_recreation = False
+                    for col_name, max_length in columns_info:
+                        if col_name == 'symbol' and max_length < 50:
+                            needs_recreation = True
+                            print(f"❌ {col_name} column too small: {max_length}")
+                        elif col_name in ['base_currency', 'quote_currency'] and max_length < 20:
+                            needs_recreation = True
+                            print(f"❌ {col_name} column too small: {max_length}")
+                    
+                    if needs_recreation:
+                        print("🔄 Recreating supported_symbols table with proper column sizes...")
+                        
+                        # Backup existing data
+                        cursor.execute('SELECT * FROM supported_symbols LIMIT 5')
+                        existing_data = cursor.fetchall()
+                        print(f"📦 Backing up {len(existing_data)} existing symbols")
+                        
+                        # Drop and recreate table
+                        cursor.execute('DROP TABLE IF EXISTS supported_symbols')
+                        cursor.execute('''
+                            CREATE TABLE supported_symbols (
+                                id SERIAL PRIMARY KEY,
+                                symbol VARCHAR(50) UNIQUE NOT NULL,
+                                base_currency VARCHAR(20),
+                                quote_currency VARCHAR(20),
+                                status VARCHAR(20) DEFAULT 'active',
+                                min_order_qty DECIMAL(20,8),
+                                qty_step DECIMAL(20,8),
+                                min_leverage DECIMAL(10,2),
+                                max_leverage DECIMAL(10,2),
+                                leverage_multiplier DECIMAL(10,2) DEFAULT 1.0,
+                                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        print("✅ Table recreated with proper VARCHAR sizes")
+                    else:
+                        print("✅ Table schema already correct")
+                        
+                except Exception as schema_error:
+                    print(f"Schema check error (probably table doesn't exist): {schema_error}")
             
-            # Check if columns exist and add them if they don't
+            # Add missing columns if needed
             new_columns = [
                 ('min_leverage', 'DECIMAL(10,2)' if self.use_postgres else 'REAL'),
                 ('max_leverage', 'DECIMAL(10,2)' if self.use_postgres else 'REAL'),
@@ -421,7 +462,6 @@ class TradingDatabase:
                         ''')
                     else:
                         # SQLite doesn't support IF NOT EXISTS for ALTER TABLE
-                        # First check if column exists
                         cursor.execute("PRAGMA table_info(supported_symbols)")
                         columns = [col[1] for col in cursor.fetchall()]
                         
@@ -431,8 +471,7 @@ class TradingDatabase:
                                 ADD COLUMN {column_name} {column_type}
                             ''')
                 except Exception as e:
-                    # Column might already exist, ignore the error
-                    pass
+                    pass  # Column might already exist
             
             conn.commit()
             
