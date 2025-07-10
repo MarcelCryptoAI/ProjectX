@@ -4786,7 +4786,7 @@ def get_worker_status():
         }), 500
 
 @app.route('/api/active_trades_status')
-def get_active_trades_status():
+def get_active_trades_status_api():
     """Get detailed status of active trades"""
     try:
         ensure_components_initialized()
