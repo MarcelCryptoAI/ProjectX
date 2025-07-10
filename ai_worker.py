@@ -1228,31 +1228,10 @@ class AIWorker:
                 self.console_logger.log('SUCCESS', f'✅ LIMIT Order placed: {entry_order_id}')
                 self.console_logger.log('INFO', f'📊 Details: {total_qty} {symbol} @ ${ai_entry_price:.4f} (waiting for fill)')
                 
-                # Place stop loss order immediately (conditional order)
+                # Don't place stop loss immediately - wait for entry fill
+                # Store stop loss price for later placement
                 sl_order_id = None
-                try:
-                    sl_order_params = {
-                        'category': 'linear',
-                        'symbol': symbol,
-                        'side': 'Sell' if side == 'Buy' else 'Buy',
-                        'orderType': 'StopMarket',
-                        'qty': str(total_qty),
-                        'stopPrice': str(stop_loss_price),
-                        'timeInForce': 'GTC',
-                        'reduceOnly': True
-                    }
-                    
-                    sl_result = self.bybit_session.place_order(**sl_order_params)
-                    
-                    if sl_result and 'result' in sl_result:
-                        sl_order_id = sl_result['result']['orderId']
-                        self.console_logger.log('SUCCESS', f'✅ Stop Loss placed: {sl_order_id} @ ${stop_loss_price:.4f}')
-                    else:
-                        error_msg = sl_result.get('retMsg', 'Unknown error') if sl_result else 'No response'
-                        self.console_logger.log('WARNING', f'⚠️ SL order failed: {error_msg}')
-                        
-                except Exception as sl_error:
-                    self.console_logger.log('ERROR', f'❌ SL order error: {str(sl_error)}')
+                self.console_logger.log('INFO', f'📋 Stop Loss will be placed at ${stop_loss_price:.4f} after entry fills')
                 
                 # Calculate 4 TP levels with equal quantity distribution
                 tp_levels = []
@@ -1317,10 +1296,12 @@ class AIWorker:
                     'entry_price': ai_entry_price,  # Use AI entry price
                     'market_price': current_price,  # Store market price for comparison
                     'stop_loss': stop_loss_price,
+                    'stop_loss_price': stop_loss_price,  # Store for later placement
                     'original_stop_loss': stop_loss_price,  # Keep original for reference
                     'take_profit_levels': tp_levels,
                     'tp_order_ids': tp_order_ids,
                     'sl_order_id': sl_order_id,
+                    'sl_order_placed': False,  # Track if SL has been placed after entry fill
                     'entry_order_id': entry_order_id,
                     'entry_filled': False,  # Track if entry order is filled
                     'tp1_hit': False,
@@ -1502,6 +1483,38 @@ class AIWorker:
                                     self.console_logger.log('SUCCESS', f'✅ Entry order filled for {symbol} @ ${actual_entry_price:.4f}')
                             else:
                                 self.console_logger.log('SUCCESS', f'✅ Entry order filled for {symbol} @ ${entry_price:.4f} (using limit price)')
+                                
+                            # Place stop loss order NOW that entry is filled
+                            if not trade_data.get('sl_order_placed', False):
+                                stop_loss_price = trade_data.get('stop_loss_price')
+                                if stop_loss_price:
+                                    try:
+                                        sl_order_params = {
+                                            'category': 'linear',
+                                            'symbol': symbol,
+                                            'side': 'Sell' if side == 'Buy' else 'Buy',
+                                            'orderType': 'Market',
+                                            'qty': str(trade_data['quantity']),
+                                            'triggerPrice': str(stop_loss_price),
+                                            'triggerBy': 'LastPrice',
+                                            'triggerDirection': 2 if side == 'Buy' else 1,  # 2=fall for long SL, 1=rise for short SL
+                                            'timeInForce': 'IOC',
+                                            'reduceOnly': True
+                                        }
+                                        
+                                        sl_result = self.bybit_session.place_order(**sl_order_params)
+                                        
+                                        if sl_result and 'result' in sl_result:
+                                            sl_order_id = sl_result['result']['orderId']
+                                            trade_data['sl_order_id'] = sl_order_id
+                                            trade_data['sl_order_placed'] = True
+                                            self.console_logger.log('SUCCESS', f'✅ Stop Loss placed after entry fill: {sl_order_id} @ ${stop_loss_price:.4f}')
+                                        else:
+                                            error_msg = sl_result.get('retMsg', 'Unknown error') if sl_result else 'No response'
+                                            self.console_logger.log('ERROR', f'❌ Failed to place SL after entry: {error_msg}')
+                                    except Exception as sl_error:
+                                        self.console_logger.log('ERROR', f'❌ SL placement error after entry: {str(sl_error)}')
+                                        
                         except Exception as exec_error:
                             self.console_logger.log('WARNING', f'⚠️ Could not get execution details for {symbol}: {exec_error}')
                             self.console_logger.log('SUCCESS', f'✅ Entry order filled for {symbol} @ ${entry_price:.4f} (using limit price)')
@@ -1581,10 +1594,12 @@ class AIWorker:
                             category="linear",
                             symbol=symbol,
                             side="Sell" if side == "Buy" else "Buy",
-                            orderType="StopMarket",
+                            orderType="Market",
                             qty=str(current_position_size),  # Use actual position size, not original quantity
-                            stopPrice=str(new_sl_price),
-                            timeInForce="GTC",
+                            triggerPrice=str(new_sl_price),
+                            triggerBy="LastPrice",
+                            triggerDirection=2 if side == "Buy" else 1,  # 2=fall for long SL, 1=rise for short SL
+                            timeInForce="IOC",
                             reduceOnly=True
                         )
                         
