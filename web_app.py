@@ -4828,31 +4828,6 @@ def get_production_analytics():
             'recommendations': ['Check database connection and AI worker status']
         }), 500
 
-@app.route('/api/force_monitor_trades', methods=['POST'])
-def force_monitor_trades():
-    """Force trade monitoring for debugging"""
-    try:
-        ensure_components_initialized()
-        global ai_worker_instance
-        ai_worker = ai_worker_instance or get_ai_worker(socketio=socketio, bybit_session=bybit_session)
-        
-        if ai_worker and hasattr(ai_worker, 'force_monitor_trades'):
-            ai_worker.force_monitor_trades()
-            return jsonify({
-                'success': True,
-                'message': 'Trade monitoring forced successfully'
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': 'AI worker not available or monitoring method not found'
-            }), 400
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'Error forcing trade monitoring: {str(e)}'
-        }), 500
 
 @app.route('/api/manual_complete_trade', methods=['POST'])
 def manual_complete_trade():
