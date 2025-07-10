@@ -389,11 +389,22 @@ class TradingDatabase:
             conn.close()
     
     def migrate_supported_symbols_table(self):
-        """Add leverage columns to existing supported_symbols table"""
+        """Add leverage columns and fix symbol column size for existing supported_symbols table"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
         try:
+            # First fix symbol column size for long crypto names like 1000000BABYDOGEUSDT
+            if self.use_postgres:
+                try:
+                    cursor.execute('''
+                        ALTER TABLE supported_symbols 
+                        ALTER COLUMN symbol TYPE VARCHAR(50)
+                    ''')
+                    print("✅ Symbol column extended to VARCHAR(50)")
+                except Exception as e:
+                    print(f"Symbol column resize note: {e}")
+            
             # Check if columns exist and add them if they don't
             new_columns = [
                 ('min_leverage', 'DECIMAL(10,2)' if self.use_postgres else 'REAL'),
