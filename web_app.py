@@ -1030,6 +1030,21 @@ def debug_balance_call():
             'timestamp': int(time.time())
         }), 500
 
+@app.route('/api/debug_analytics')
+def debug_analytics():
+    """Debug endpoint to check why analytics shows 0 completed trades"""
+    try:
+        from check_production_analytics import check_production_analytics
+        results = check_production_analytics()
+        return jsonify(results)
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+            'timestamp': int(time.time())
+        }), 500
+
 @app.route('/api/balance_header')
 def get_balance_header():
     """Fetch balance for header display (verbeterde versie met nieuwe balance functie)"""
