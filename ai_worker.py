@@ -246,6 +246,9 @@ class AIWorker:
                 # Monitor trades and move stop loss if needed
                 self.monitor_trades_and_move_sl()
                 
+                # Check for orphaned positions (positions not being tracked)
+                self._check_orphaned_positions()
+                
                 # Update statistics
                 self._update_statistics()
                 
@@ -875,8 +878,8 @@ class AIWorker:
                 trade_result = self.execute_signal_direct(signal)
                 
                 if trade_result:
-                    # Update signal status to executed
-                    db.update_signal_status(signal['signal_id'], 'executed')
+                    # Update signal status to executing (not executed until position is actually filled)
+                    db.update_signal_status(signal['signal_id'], 'executing')
                     trades_executed += 1
                     
                     # Get updated count after execution
@@ -1437,7 +1440,49 @@ class AIWorker:
                     # If entry order is no longer in open orders, it was filled
                     if not entry_still_open:
                         trade_data['entry_filled'] = True
-                        self.console_logger.log('SUCCESS', f'✅ Entry order filled for {symbol} @ ${entry_price:.4f}')
+                        
+                        # Get the actual fill price from execution history
+                        try:
+                            executions = self.bybit_session.get_executions(
+                                category="linear",
+                                symbol=symbol,
+                                orderId=entry_order_id,
+                                limit=1
+                            )
+                            
+                            if executions and 'result' in executions and executions['result']['list']:
+                                actual_entry_price = float(executions['result']['list'][0]['execPrice'])
+                                trade_data['actual_entry_price'] = actual_entry_price
+                                
+                                # Update signal in database with actual entry price
+                                signal_id = trade_data.get('signal_id')
+                                if signal_id:
+                                    # Update signal status to 'pending' (position now open, waiting for exit)
+                                    from database import TradingDatabase
+                                    db = TradingDatabase()
+                                    
+                                    # Update both status and entry price
+                                    conn = db.get_connection()
+                                    cursor = conn.cursor()
+                                    placeholder = '%s' if db.use_postgres else '?'
+                                    
+                                    cursor.execute(f'''
+                                        UPDATE trading_signals 
+                                        SET status = {placeholder}, entry_price = {placeholder}, updated_at = CURRENT_TIMESTAMP
+                                        WHERE signal_id = {placeholder}
+                                    ''', ('pending', actual_entry_price, signal_id))
+                                    
+                                    conn.commit()
+                                    conn.close()
+                                    
+                                    self.console_logger.log('SUCCESS', f'✅ Entry filled for {symbol} @ ${actual_entry_price:.4f} (signal updated to pending)')
+                                else:
+                                    self.console_logger.log('SUCCESS', f'✅ Entry order filled for {symbol} @ ${actual_entry_price:.4f}')
+                            else:
+                                self.console_logger.log('SUCCESS', f'✅ Entry order filled for {symbol} @ ${entry_price:.4f} (using limit price)')
+                        except Exception as exec_error:
+                            self.console_logger.log('WARNING', f'⚠️ Could not get execution details for {symbol}: {exec_error}')
+                            self.console_logger.log('SUCCESS', f'✅ Entry order filled for {symbol} @ ${entry_price:.4f} (using limit price)')
                     else:
                         # Entry order still pending - check if TP is reached (cancel signal)
                         ticker = self.bybit_session.get_tickers(category="linear", symbol=symbol)
@@ -1573,62 +1618,69 @@ class AIWorker:
                 
                 if not position_exists:
                     # Position is closed, calculate P&L and update signal
+                    self.console_logger.log('INFO', f'📊 Position closed for {symbol}, calculating P&L...')
+                    
                     try:
                         # Get the signal_id from trade_data
                         signal_id = trade_data.get('signal_id')
-                        entry_price = trade_data.get('entry_price')
+                        entry_price = trade_data.get('actual_entry_price', trade_data.get('entry_price'))
                         
                         if signal_id and entry_price:
                             # Get execution history to calculate actual P&L
                             executions = self.bybit_session.get_executions(
                                 category="linear",
                                 symbol=symbol,
-                                limit=50
+                                limit=100  # Get more executions to ensure we catch all trades
                             )
                             
                             total_pnl = 0
                             exit_price = 0
                             exit_trades = []
+                            entry_trades = []
                             
                             if executions and 'result' in executions:
-                                # Find recent executions for this symbol
+                                # Find recent executions for this symbol (within last 2 hours)
+                                current_time = int(datetime.now().timestamp() * 1000)
+                                
                                 for execution in executions['result']['list']:
                                     if execution.get('symbol') == symbol:
-                                        # Check if this execution is recent (within last hour)
                                         exec_time = int(execution.get('execTime', 0))
-                                        current_time = int(datetime.now().timestamp() * 1000)
-                                        if current_time - exec_time < 3600000:  # 1 hour
-                                            if execution.get('side') != trade_data.get('side'):  # Exit trades
+                                        if current_time - exec_time < 7200000:  # 2 hours
+                                            exec_side = execution.get('side', '')
+                                            
+                                            # Categorize executions
+                                            if exec_side == trade_data.get('side'):
+                                                entry_trades.append(execution)
+                                            else:
                                                 exit_trades.append(execution)
+                            
+                            self.console_logger.log('INFO', f'📊 Found {len(entry_trades)} entry trades, {len(exit_trades)} exit trades for {symbol}')
                             
                             if exit_trades:
                                 # Calculate weighted average exit price
-                                total_qty = 0
-                                total_value = 0
+                                total_exit_qty = 0
+                                total_exit_value = 0
                                 
                                 for exit_trade in exit_trades:
                                     qty = float(exit_trade.get('execQty', 0))
                                     price = float(exit_trade.get('execPrice', 0))
                                     
-                                    total_qty += qty
-                                    total_value += qty * price
+                                    total_exit_qty += qty
+                                    total_exit_value += qty * price
                                 
-                                exit_price = total_value / total_qty if total_qty > 0 else 0
+                                exit_price = total_exit_value / total_exit_qty if total_exit_qty > 0 else 0
                                 
                                 # Calculate P&L based on entry/exit prices and side
-                                # Get the total position quantity from trade_data
-                                position_qty = float(trade_data.get('quantity', 0))
                                 side = trade_data.get('side', '').upper()
                                 
                                 if side == 'BUY':
                                     # For long positions: profit = (exit_price - entry_price) * amount
-                                    total_pnl = (exit_price - entry_price) * position_qty
+                                    total_pnl = (exit_price - entry_price) * total_exit_qty
                                 else:  # SELL
                                     # For short positions: profit = (entry_price - exit_price) * amount
-                                    total_pnl = (entry_price - exit_price) * position_qty
-                            
-                            # Update the signal with P&L data
-                            if exit_price > 0:
+                                    total_pnl = (entry_price - exit_price) * total_exit_qty
+                                
+                                # Update the signal with P&L data
                                 self.database.update_signal_with_pnl(
                                     signal_id=signal_id,
                                     entry_price=entry_price,
@@ -1637,13 +1689,55 @@ class AIWorker:
                                 )
                                 
                                 win_loss = "WIN" if total_pnl > 0 else "LOSS"
-                                self.console_logger.log('SUCCESS', f'📊 Signal {signal_id} completed: {win_loss} ${total_pnl:.2f}')
+                                pnl_pct = (total_pnl / (entry_price * total_exit_qty)) * 100 if entry_price > 0 and total_exit_qty > 0 else 0
+                                
+                                self.console_logger.log('SUCCESS', f'📊 Signal {signal_id} completed: {win_loss} ${total_pnl:.2f} ({pnl_pct:+.2f}%)')
+                                self.console_logger.log('INFO', f'📊 Entry: ${entry_price:.4f}, Exit: ${exit_price:.4f}, Qty: {total_exit_qty}')
+                                
+                                # Emit completion event to frontend
+                                if self.socketio:
+                                    self.socketio.emit('trade_completed', {
+                                        'signal_id': signal_id,
+                                        'symbol': symbol,
+                                        'side': side,
+                                        'entry_price': entry_price,
+                                        'exit_price': exit_price,
+                                        'pnl': total_pnl,
+                                        'pnl_percent': pnl_pct,
+                                        'win_loss': win_loss,
+                                        'quantity': total_exit_qty
+                                    })
+                            else:
+                                # No exit trades found, but position is closed - might be liquidated or manual close
+                                self.console_logger.log('WARNING', f'⚠️ Position closed for {symbol} but no exit trades found')
+                                
+                                # Still update signal to completed status without P&L
+                                from database import TradingDatabase
+                                db = TradingDatabase()
+                                conn = db.get_connection()
+                                cursor = conn.cursor()
+                                placeholder = '%s' if db.use_postgres else '?'
+                                
+                                cursor.execute(f'''
+                                    UPDATE trading_signals 
+                                    SET status = {placeholder}, exit_time = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                                    WHERE signal_id = {placeholder}
+                                ''', ('completed', signal_id))
+                                
+                                conn.commit()
+                                conn.close()
+                                
+                                self.console_logger.log('INFO', f'📊 Signal {signal_id} marked as completed (no P&L data)')
+                        else:
+                            self.console_logger.log('WARNING', f'⚠️ Missing signal_id or entry_price for {symbol}')
                     
                     except Exception as pnl_error:
                         self.console_logger.log('ERROR', f'❌ Error calculating P&L for {symbol}: {str(pnl_error)}')
+                        import traceback
+                        self.console_logger.log('ERROR', f'PnL calculation traceback: {traceback.format_exc()}')
                     
                     # Remove from active trades
-                    self.console_logger.log('INFO', f'📊 Position closed for {symbol}, removing from active trades')
+                    self.console_logger.log('INFO', f'📊 Removing {symbol} from active trades monitoring')
                     del self.active_trades[order_id]
                     
         except Exception as e:
@@ -1657,6 +1751,105 @@ class AIWorker:
             self.console_logger.log('INFO', f'🚫 Cancelled all orders for {symbol}')
         except Exception as e:
             self.console_logger.log('ERROR', f'❌ Error cancelling orders for {symbol}: {str(e)}')
+    
+    def _check_orphaned_positions(self):
+        """Check for positions that exist but aren't being tracked and attempt to track them"""
+        try:
+            if not self.bybit_session:
+                return
+                
+            # Get all current positions
+            positions = self.bybit_session.get_positions(category="linear")
+            if not positions or 'result' not in positions:
+                return
+                
+            # Get symbols that are currently tracked
+            tracked_symbols = set()
+            for trade_data in self.active_trades.values():
+                tracked_symbols.add(trade_data['symbol'])
+            
+            # Check for untracked positions
+            for position in positions['result']['list']:
+                if float(position.get('size', 0)) > 0:
+                    symbol = position['symbol']
+                    side = position['side']
+                    
+                    if symbol not in tracked_symbols:
+                        # Found an orphaned position
+                        self.console_logger.log('WARNING', f'⚠️ Found orphaned position: {symbol} {side}')
+                        
+                        try:
+                            # Try to find a matching signal in the database
+                            from database import TradingDatabase
+                            db = TradingDatabase()
+                            
+                            # Look for recent signals with this symbol that are in 'pending' or 'executing' status
+                            signals = db.get_trading_signals()
+                            matching_signal = None
+                            
+                            for signal in signals:
+                                if (signal.get('symbol') == symbol and 
+                                    signal.get('side') == side and 
+                                    signal.get('status') in ['pending', 'executing']):
+                                    matching_signal = signal
+                                    break
+                            
+                            if matching_signal:
+                                # Found a matching signal, update it to completed and calculate P&L
+                                self.console_logger.log('INFO', f'📊 Found matching signal for orphaned position {symbol}')
+                                
+                                # Get execution history for this symbol
+                                executions = self.bybit_session.get_executions(
+                                    category="linear",
+                                    symbol=symbol,
+                                    limit=50
+                                )
+                                
+                                if executions and 'result' in executions:
+                                    # Find the entry execution
+                                    entry_price = None
+                                    for execution in executions['result']['list']:
+                                        if (execution.get('symbol') == symbol and 
+                                            execution.get('side') == side):
+                                            entry_price = float(execution.get('execPrice', 0))
+                                            break
+                                    
+                                    if entry_price:
+                                        # Update the signal with entry price and mark as pending
+                                        db.update_signal_with_pnl(
+                                            signal_id=matching_signal['signal_id'],
+                                            entry_price=entry_price,
+                                            exit_price=0,  # Position still open
+                                            realized_pnl=0
+                                        )
+                                        
+                                        # Update status to pending
+                                        conn = db.get_connection()
+                                        cursor = conn.cursor()
+                                        placeholder = '%s' if db.use_postgres else '?'
+                                        
+                                        cursor.execute(f'''
+                                            UPDATE trading_signals 
+                                            SET status = {placeholder}, updated_at = CURRENT_TIMESTAMP
+                                            WHERE signal_id = {placeholder}
+                                        ''', ('pending', matching_signal['signal_id']))
+                                        
+                                        conn.commit()
+                                        conn.close()
+                                        
+                                        self.console_logger.log('SUCCESS', f'✅ Orphaned position {symbol} linked to signal {matching_signal["signal_id"]}')
+                                    else:
+                                        self.console_logger.log('WARNING', f'⚠️ Could not find entry execution for orphaned position {symbol}')
+                                else:
+                                    self.console_logger.log('WARNING', f'⚠️ Could not get execution history for orphaned position {symbol}')
+                            else:
+                                self.console_logger.log('WARNING', f'⚠️ No matching signal found for orphaned position {symbol}')
+                                
+                        except Exception as orphan_error:
+                            self.console_logger.log('ERROR', f'❌ Error processing orphaned position {symbol}: {str(orphan_error)}')
+                            
+        except Exception as e:
+            self.console_logger.log('ERROR', f'❌ Error checking orphaned positions: {str(e)}')
     
     def force_monitor_trades(self):
         """Manually trigger trade monitoring - useful for testing"""
