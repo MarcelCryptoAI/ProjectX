@@ -3865,6 +3865,58 @@ def save_settings():
             'error': f'Failed to save settings: {str(e)}'
         })
 
+@app.route('/api/fix_pnl', methods=['POST'])
+def fix_pnl():
+    """Fix realized P&L calculations in the database"""
+    try:
+        from database import TradingDatabase
+        db = TradingDatabase()
+        
+        # Get all completed signals with P&L data
+        signals = db.get_trading_signals()
+        
+        fixed_count = 0
+        
+        for signal in signals:
+            if signal['status'] == 'completed' and signal.get('entry_price') and signal.get('exit_price'):
+                # Calculate correct P&L
+                entry_price = float(signal['entry_price'])
+                exit_price = float(signal['exit_price'])
+                amount = float(signal['amount'])
+                
+                if signal['side'] == 'Buy':
+                    # For long positions: profit when price goes up
+                    correct_pnl = (exit_price - entry_price) * amount
+                else:
+                    # For short positions: profit when price goes down
+                    correct_pnl = (entry_price - exit_price) * amount
+                
+                # Update if different from stored value
+                current_pnl = signal.get('realized_pnl', 0) or 0
+                if abs(float(current_pnl) - correct_pnl) > 0.01:
+                    # Update in database
+                    db.update_signal_with_pnl(
+                        signal['signal_id'],
+                        entry_price,
+                        exit_price,
+                        correct_pnl
+                    )
+                    fixed_count += 1
+        
+        # Calculate new totals
+        all_signals = db.get_trading_signals()
+        total_pnl = sum(float(s.get('realized_pnl', 0) or 0) for s in all_signals if s['status'] == 'completed')
+        
+        return jsonify({
+            'success': True,
+            'fixed_count': fixed_count,
+            'total_realized_pnl': total_pnl,
+            'message': f'Fixed {fixed_count} P&L values. Total realized P&L: ${total_pnl:.2f}'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/api/load_settings')
 def load_settings():
     """Load trading settings from database"""
