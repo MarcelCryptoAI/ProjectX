@@ -1602,24 +1602,33 @@ class AIWorker:
                                                 exit_trades.append(execution)
                             
                             if exit_trades:
-                                # Calculate weighted average exit price and total P&L
+                                # Calculate weighted average exit price
                                 total_qty = 0
                                 total_value = 0
                                 
                                 for exit_trade in exit_trades:
                                     qty = float(exit_trade.get('execQty', 0))
                                     price = float(exit_trade.get('execPrice', 0))
-                                    # Try different field names for realized PnL
-                                    pnl = float(exit_trade.get('closedPnl', 0)) or float(exit_trade.get('realizedPnl', 0))
                                     
                                     total_qty += qty
                                     total_value += qty * price
-                                    total_pnl += pnl
                                 
                                 exit_price = total_value / total_qty if total_qty > 0 else 0
+                                
+                                # Calculate P&L based on entry/exit prices and side
+                                # Get the total position quantity from trade_data
+                                position_qty = float(trade_data.get('quantity', 0))
+                                side = trade_data.get('side', '').upper()
+                                
+                                if side == 'BUY':
+                                    # For long positions: profit = (exit_price - entry_price) * amount
+                                    total_pnl = (exit_price - entry_price) * position_qty
+                                else:  # SELL
+                                    # For short positions: profit = (entry_price - exit_price) * amount
+                                    total_pnl = (entry_price - exit_price) * position_qty
                             
                             # Update the signal with P&L data
-                            if total_pnl != 0 or exit_price != 0:
+                            if exit_price > 0:
                                 self.database.update_signal_with_pnl(
                                     signal_id=signal_id,
                                     entry_price=entry_price,
