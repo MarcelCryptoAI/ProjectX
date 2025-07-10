@@ -345,11 +345,11 @@
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">AI Confidence:</span>
-                                <span class="text-neon-yellow" id="aiConfidence">85%</span>
+                                <span class="text-neon-yellow" id="aiConfidence">95%</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Min Accuracy:</span>
-                                <span class="text-neon-yellow" id="minAccuracy">80%</span>
+                                <span class="text-neon-yellow" id="minAccuracy">88%</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Amount per Trade:</span>
@@ -1401,15 +1401,15 @@
                         document.getElementById('trailingPercent').textContent = '0.1%';
                         
                         // Update min accuracy (fixed at 60% for signals)
-                        document.getElementById('minAccuracy').textContent = '60%';
+                        document.getElementById('minAccuracy').textContent = '88%';
                         console.log('Trading parameters updated successfully');
                         
                         // Update AI confidence from settings
-                        const confidenceThreshold = data.settings.confidenceThreshold || 75;
+                        const confidenceThreshold = data.settings.confidenceThreshold || 95;
                         document.getElementById('aiConfidence').textContent = `${confidenceThreshold}%`;
                         
                         // Update accuracy threshold from settings
-                        const accuracyThreshold = data.settings.accuracyThreshold || 80;
+                        const accuracyThreshold = data.settings.accuracyThreshold || 88;
                         document.getElementById('minAccuracy').textContent = `${accuracyThreshold}%`;
                         
                         // Update auto execute from settings
