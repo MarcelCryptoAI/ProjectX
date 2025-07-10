@@ -435,17 +435,34 @@
                     <div class="text-sm mt-2 text-gray-500">TRADES</div>
                 </div>
                 
-                <!-- Daily P&L -->
+                <!-- P&L Stats -->
                 <div class="glass-panel rounded-xl p-6 hover:scale-105 transition-transform">
                     <div class="flex items-center justify-between mb-2">
-                        <h4 class="text-sm font-medium text-gray-400">24H P&L</h4>
+                        <h4 class="text-sm font-medium text-gray-400">P&L OVERVIEW</h4>
                         <i class="fas fa-chart-area text-neon-yellow text-xl"></i>
                     </div>
-                    <div class="text-3xl font-bold font-bold" id="dailyPnL">
-                        <span class="profit-text">+$0.00</span>
-                    </div>
-                    <div class="text-sm mt-2" id="dailyPnLPercent">
-                        <span class="profit-text">+0.00%</span>
+                    <div class="space-y-2">
+                        <!-- Unrealized P&L -->
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-500">Unrealized:</span>
+                            <span class="text-lg font-bold" id="unrealizedPnL">
+                                <span class="profit-text">+$0.00</span>
+                            </span>
+                        </div>
+                        <!-- Realized P&L 24h -->
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-500">24h Realized:</span>
+                            <span class="text-lg font-bold" id="realizedPnL24h">
+                                <span class="profit-text">+$0.00</span>
+                            </span>
+                        </div>
+                        <!-- Realized P&L All-time -->
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-500">All-time Realized:</span>
+                            <span class="text-lg font-bold" id="realizedPnLAllTime">
+                                <span class="profit-text">+$0.00</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
                 
@@ -796,17 +813,32 @@
                         document.getElementById('activePositions').textContent = data.active_positions_count;
                         
                         // Update P&L with real data
-                        const pnlElement = document.getElementById('dailyPnL');
-                        const pnlPercentElement = document.getElementById('dailyPnLPercent');
-                        const pnl = data.unrealized_pnl;
-                        const pnlPercent = data.total_balance > 0 ? (pnl / data.total_balance * 100) : 0;
+                        const unrealizedPnL = data.unrealized_pnl || 0;
+                        const realizedPnL24h = data.realized_pnl_24h || 0;
+                        const realizedPnLAllTime = data.realized_pnl_all_time || 0;
                         
-                        if (pnl >= 0) {
-                            pnlElement.innerHTML = `<span class="profit-text">+$${Math.abs(pnl).toFixed(2)}</span>`;
-                            pnlPercentElement.innerHTML = `<span class="profit-text">+${Math.abs(pnlPercent).toFixed(2)}%</span>`;
+                        // Update Unrealized P&L
+                        const unrealizedElement = document.getElementById('unrealizedPnL');
+                        if (unrealizedPnL >= 0) {
+                            unrealizedElement.innerHTML = `<span class="profit-text">+$${Math.abs(unrealizedPnL).toFixed(2)}</span>`;
                         } else {
-                            pnlElement.innerHTML = `<span class="loss-text">-$${Math.abs(pnl).toFixed(2)}</span>`;
-                            pnlPercentElement.innerHTML = `<span class="loss-text">-${Math.abs(pnlPercent).toFixed(2)}%</span>`;
+                            unrealizedElement.innerHTML = `<span class="loss-text">-$${Math.abs(unrealizedPnL).toFixed(2)}</span>`;
+                        }
+                        
+                        // Update Realized P&L 24h
+                        const realized24hElement = document.getElementById('realizedPnL24h');
+                        if (realizedPnL24h >= 0) {
+                            realized24hElement.innerHTML = `<span class="profit-text">+$${Math.abs(realizedPnL24h).toFixed(2)}</span>`;
+                        } else {
+                            realized24hElement.innerHTML = `<span class="loss-text">-$${Math.abs(realizedPnL24h).toFixed(2)}</span>`;
+                        }
+                        
+                        // Update Realized P&L All-time
+                        const realizedAllTimeElement = document.getElementById('realizedPnLAllTime');
+                        if (realizedPnLAllTime >= 0) {
+                            realizedAllTimeElement.innerHTML = `<span class="profit-text">+$${Math.abs(realizedPnLAllTime).toFixed(2)}</span>`;
+                        } else {
+                            realizedAllTimeElement.innerHTML = `<span class="loss-text">-$${Math.abs(realizedPnLAllTime).toFixed(2)}</span>`;
                         }
                         
                         // Calculate real win rate from trading history
@@ -827,6 +859,9 @@
                     // Show error state
                     document.getElementById('totalBalance').textContent = 'Error';
                     document.getElementById('activePositions').textContent = '0';
+                    document.getElementById('unrealizedPnL').innerHTML = '<span class="text-gray-500">Error</span>';
+                    document.getElementById('realizedPnL24h').innerHTML = '<span class="text-gray-500">Error</span>';
+                    document.getElementById('realizedPnLAllTime').innerHTML = '<span class="text-gray-500">Error</span>';
                 });
                 
             // Update trading parameters from settings

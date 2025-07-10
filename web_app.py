@@ -2412,6 +2412,36 @@ def get_analytics_data():
                         pass  # Skip if date parsing fails
             
             trades_data['trades_by_date'] = trades_by_date
+            
+            # Calculate realized P&L for 24h and all-time periods
+            realized_pnl_24h = 0
+            realized_pnl_all_time = 0
+            
+            # Get current UTC time for 24h calculation
+            now = datetime.utcnow()
+            yesterday = now - timedelta(days=1)
+            
+            for signal in completed_signals:
+                pnl = float(signal.get('realized_pnl', 0))
+                realized_pnl_all_time += pnl
+                
+                # Check if trade was completed in the last 24 hours
+                if signal.get('exit_time'):
+                    try:
+                        exit_time = datetime.fromisoformat(str(signal.get('exit_time')).replace('Z', '+00:00'))
+                        # Convert to UTC if it has timezone info
+                        if exit_time.tzinfo is not None:
+                            exit_time = exit_time.utctimetuple()
+                            exit_time = datetime(*exit_time[:6])
+                        
+                        if exit_time >= yesterday:
+                            realized_pnl_24h += pnl
+                    except:
+                        pass  # Skip if date parsing fails
+            
+            # Add realized P&L data to trades_data
+            trades_data['realized_pnl_24h'] = realized_pnl_24h
+            trades_data['realized_pnl_all_time'] = realized_pnl_all_time
                 
         except Exception as signal_error:
             # Fallback to empty data if signal database access fails
@@ -2426,7 +2456,9 @@ def get_analytics_data():
                 'largest_win': 0,
                 'largest_loss': 0,
                 'total_profit': 0,
-                'total_loss': 0
+                'total_loss': 0,
+                'realized_pnl_24h': 0,
+                'realized_pnl_all_time': 0
             }
         
         # Calculate performance metrics - ONLY real data
@@ -2594,6 +2626,8 @@ def get_analytics_data():
             'largest_loss': trades_data['largest_loss'],
             'total_profit': trades_data['total_profit'],
             'total_loss': trades_data['total_loss'],
+            'realized_pnl_24h': trades_data['realized_pnl_24h'],
+            'realized_pnl_all_time': trades_data['realized_pnl_all_time'],
             'sharpe_ratio': trades_data['total_profit'] / trades_data['total_loss'] if trades_data['total_loss'] > 0 else 0,
             'max_drawdown': abs(trades_data['largest_loss']) if trades_data['largest_loss'] < 0 else 0,
             'profit_factor': trades_data['total_profit'] / trades_data['total_loss'] if trades_data['total_loss'] > 0 else 0,
