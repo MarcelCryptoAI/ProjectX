@@ -249,6 +249,9 @@ class AIWorker:
                 # Check for orphaned positions (positions not being tracked)
                 self._check_orphaned_positions()
                 
+                # Check for manually closed positions (tracked positions that no longer exist)
+                self._check_manually_closed_positions()
+                
                 # Update statistics
                 self._update_statistics()
                 
@@ -1850,6 +1853,188 @@ class AIWorker:
                             
         except Exception as e:
             self.console_logger.log('ERROR', f'❌ Error checking orphaned positions: {str(e)}')
+    
+    def _check_manually_closed_positions(self):
+        """Check for tracked positions that have been manually closed and update their P&L"""
+        try:
+            if not self.bybit_session or not hasattr(self, 'active_trades') or not self.active_trades:
+                return
+                
+            # Get all current positions
+            positions = self.bybit_session.get_positions(category="linear")
+            if not positions or 'result' not in positions:
+                return
+                
+            # Create a set of symbols with active positions
+            active_position_symbols = set()
+            for position in positions['result']['list']:
+                if float(position.get('size', 0)) > 0:
+                    symbol = position['symbol']
+                    side = position['side']
+                    active_position_symbols.add(f"{symbol}_{side}")
+            
+            # Check tracked trades to see if any positions have been manually closed
+            trades_to_remove = []
+            for order_id, trade_data in list(self.active_trades.items()):
+                symbol = trade_data['symbol']
+                side = trade_data['side']
+                trade_key = f"{symbol}_{side}"
+                
+                # If the position is no longer active but was being tracked
+                if trade_key not in active_position_symbols:
+                    # Position was manually closed
+                    self.console_logger.log('WARNING', f'🔍 Detected manually closed position: {symbol} {side}')
+                    
+                    try:
+                        # Get the signal_id from trade_data
+                        signal_id = trade_data.get('signal_id')
+                        entry_price = trade_data.get('actual_entry_price', trade_data.get('entry_price'))
+                        
+                        if signal_id and entry_price:
+                            # Get execution history to calculate actual P&L for manual close
+                            executions = self.bybit_session.get_executions(
+                                category="linear",
+                                symbol=symbol,
+                                limit=100  # Get more executions to catch recent trades
+                            )
+                            
+                            total_pnl = 0
+                            exit_price = 0
+                            exit_trades = []
+                            
+                            if executions and 'result' in executions:
+                                # Find recent executions for this symbol (within last 1 hour for manual close)
+                                current_time = int(datetime.now().timestamp() * 1000)
+                                
+                                for execution in executions['result']['list']:
+                                    if execution.get('symbol') == symbol:
+                                        exec_time = int(execution.get('execTime', 0))
+                                        if current_time - exec_time < 3600000:  # 1 hour
+                                            exec_side = execution.get('side', '')
+                                            
+                                            # Find exit trades (opposite side of entry)
+                                            if exec_side != trade_data.get('side'):
+                                                exit_trades.append(execution)
+                            
+                            self.console_logger.log('INFO', f'📊 Found {len(exit_trades)} recent exit trades for manually closed {symbol}')
+                            
+                            if exit_trades:
+                                # Calculate weighted average exit price
+                                total_exit_qty = 0
+                                total_exit_value = 0
+                                
+                                for exit_trade in exit_trades:
+                                    qty = float(exit_trade.get('execQty', 0))
+                                    price = float(exit_trade.get('execPrice', 0))
+                                    
+                                    total_exit_qty += qty
+                                    total_exit_value += qty * price
+                                
+                                exit_price = total_exit_value / total_exit_qty if total_exit_qty > 0 else 0
+                                
+                                # Calculate P&L based on entry/exit prices and side
+                                if side.upper() == 'BUY':
+                                    # For long positions: profit = (exit_price - entry_price) * amount
+                                    total_pnl = (exit_price - entry_price) * total_exit_qty
+                                else:  # SELL
+                                    # For short positions: profit = (entry_price - exit_price) * amount
+                                    total_pnl = (entry_price - exit_price) * total_exit_qty
+                                
+                                # Update the signal with P&L data
+                                self.database.update_signal_with_pnl(
+                                    signal_id=signal_id,
+                                    entry_price=entry_price,
+                                    exit_price=exit_price,
+                                    realized_pnl=total_pnl
+                                )
+                                
+                                win_loss = "WIN" if total_pnl > 0 else "LOSS"
+                                pnl_pct = (total_pnl / (entry_price * total_exit_qty)) * 100 if entry_price > 0 and total_exit_qty > 0 else 0
+                                
+                                self.console_logger.log('SUCCESS', f'✅ Manual close detected and recorded: {symbol} {win_loss} ${total_pnl:.2f} ({pnl_pct:+.2f}%)')
+                                self.console_logger.log('INFO', f'📊 Entry: ${entry_price:.4f}, Exit: ${exit_price:.4f}, Qty: {total_exit_qty}')
+                                
+                                # Emit completion event to frontend
+                                if self.socketio:
+                                    self.socketio.emit('trade_completed', {
+                                        'signal_id': signal_id,
+                                        'symbol': symbol,
+                                        'side': side,
+                                        'entry_price': entry_price,
+                                        'exit_price': exit_price,
+                                        'pnl': total_pnl,
+                                        'pnl_percent': pnl_pct,
+                                        'win_loss': win_loss,
+                                        'quantity': total_exit_qty,
+                                        'manual_close': True
+                                    })
+                            else:
+                                # No exit trades found in recent time, but position is closed
+                                # This might be a very recent close or system liquidation
+                                self.console_logger.log('WARNING', f'⚠️ Position manually closed for {symbol} but no recent exit trades found')
+                                
+                                # Get current market price for estimation
+                                try:
+                                    ticker = self.bybit_session.get_tickers(category="linear", symbol=symbol)
+                                    if ticker and 'result' in ticker and ticker['result']['list']:
+                                        current_price = float(ticker['result']['list'][0]['lastPrice'])
+                                        
+                                        # Estimate P&L based on current price
+                                        quantity = trade_data.get('quantity', 0)
+                                        if side.upper() == 'BUY':
+                                            estimated_pnl = (current_price - entry_price) * quantity
+                                        else:
+                                            estimated_pnl = (entry_price - current_price) * quantity
+                                        
+                                        # Update signal with estimated data
+                                        self.database.update_signal_with_pnl(
+                                            signal_id=signal_id,
+                                            entry_price=entry_price,
+                                            exit_price=current_price,
+                                            realized_pnl=estimated_pnl
+                                        )
+                                        
+                                        self.console_logger.log('INFO', f'📊 Manual close recorded with estimated P&L: {symbol} ${estimated_pnl:.2f} (estimated)')
+                                    else:
+                                        # Still update signal to completed status without P&L
+                                        from database import TradingDatabase
+                                        db = TradingDatabase()
+                                        conn = db.get_connection()
+                                        cursor = conn.cursor()
+                                        placeholder = '%s' if db.use_postgres else '?'
+                                        
+                                        cursor.execute(f'''
+                                            UPDATE trading_signals 
+                                            SET status = {placeholder}, exit_time = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                                            WHERE signal_id = {placeholder}
+                                        ''', ('completed', signal_id))
+                                        
+                                        conn.commit()
+                                        conn.close()
+                                        
+                                        self.console_logger.log('INFO', f'📊 Manual close recorded without P&L data: {symbol}')
+                                except Exception as price_error:
+                                    self.console_logger.log('WARNING', f'⚠️ Could not get current price for {symbol}: {price_error}')
+                        else:
+                            self.console_logger.log('WARNING', f'⚠️ Missing signal_id or entry_price for manually closed {symbol}')
+                    
+                    except Exception as pnl_error:
+                        self.console_logger.log('ERROR', f'❌ Error calculating P&L for manually closed {symbol}: {str(pnl_error)}')
+                    
+                    # Mark for removal from active trades
+                    trades_to_remove.append(order_id)
+            
+            # Remove manually closed trades from tracking
+            for order_id in trades_to_remove:
+                if order_id in self.active_trades:
+                    symbol = self.active_trades[order_id]['symbol']
+                    self.console_logger.log('INFO', f'📊 Removing manually closed {symbol} from active trades monitoring')
+                    del self.active_trades[order_id]
+                    
+        except Exception as e:
+            self.console_logger.log('ERROR', f'❌ Error checking manually closed positions: {str(e)}')
+            import traceback
+            self.console_logger.log('ERROR', f'Manual close check traceback: {traceback.format_exc()}')
     
     def force_monitor_trades(self):
         """Manually trigger trade monitoring - useful for testing"""

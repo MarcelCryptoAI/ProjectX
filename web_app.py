@@ -4739,6 +4739,180 @@ def debug_stop_loss():
             'error': str(e)
         }), 500
 
+@app.route('/api/worker_status')
+def get_worker_status():
+    """Get comprehensive AI worker status"""
+    try:
+        ensure_components_initialized()
+        global ai_worker_instance
+        ai_worker = ai_worker_instance or get_ai_worker(socketio=socketio, bybit_session=bybit_session)
+        
+        if ai_worker:
+            status = {
+                'is_running': ai_worker.is_running,
+                'training_in_progress': ai_worker.training_in_progress,
+                'signal_count': ai_worker.signal_count,
+                'active_trades': ai_worker.get_active_positions_count(),
+                'max_trades': ai_worker.max_concurrent_trades,
+                'last_model_update': ai_worker.last_model_update.isoformat() if ai_worker.last_model_update else None,
+                'bybit_connected': bool(ai_worker.bybit_session),
+                'uptime': getattr(ai_worker, '_start_time', 0)
+            }
+        else:
+            status = {
+                'is_running': False,
+                'training_in_progress': False,
+                'signal_count': 0,
+                'active_trades': 0,
+                'max_trades': 0,
+                'last_model_update': None,
+                'bybit_connected': False,
+                'uptime': 0
+            }
+        
+        return jsonify(status)
+        
+    except Exception as e:
+        return jsonify({
+            'is_running': False,
+            'training_in_progress': False,
+            'signal_count': 0,
+            'active_trades': 0,
+            'max_trades': 0,
+            'last_model_update': None,
+            'bybit_connected': False,
+            'uptime': 0,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/active_trades_status')
+def get_active_trades_status():
+    """Get detailed status of active trades"""
+    try:
+        ensure_components_initialized()
+        global ai_worker_instance
+        ai_worker = ai_worker_instance or get_ai_worker(socketio=socketio, bybit_session=bybit_session)
+        
+        if ai_worker and hasattr(ai_worker, 'get_active_trades_status'):
+            return jsonify(ai_worker.get_active_trades_status())
+        else:
+            return jsonify({
+                'message': 'No AI worker available or no active trades method',
+                'trades': []
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'message': f'Error getting active trades: {str(e)}',
+            'trades': []
+        }), 500
+
+@app.route('/api/production_analytics')
+def get_production_analytics():
+    """Get production analytics data"""
+    try:
+        from check_production_analytics import check_production_analytics
+        results = check_production_analytics()
+        return jsonify(results)
+        
+    except Exception as e:
+        return jsonify({
+            'database_type': 'Unknown',
+            'total_signals': 0,
+            'status_breakdown': {},
+            'completed_signals': 0,
+            'completed_with_pnl': 0,
+            'analytics_data': {},
+            'sample_signals': [],
+            'issues': [f'Error: {str(e)}'],
+            'recommendations': ['Check database connection and AI worker status']
+        }), 500
+
+@app.route('/api/force_monitor_trades', methods=['POST'])
+def force_monitor_trades():
+    """Force trade monitoring for debugging"""
+    try:
+        ensure_components_initialized()
+        global ai_worker_instance
+        ai_worker = ai_worker_instance or get_ai_worker(socketio=socketio, bybit_session=bybit_session)
+        
+        if ai_worker and hasattr(ai_worker, 'force_monitor_trades'):
+            ai_worker.force_monitor_trades()
+            return jsonify({
+                'success': True,
+                'message': 'Trade monitoring forced successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'AI worker not available or monitoring method not found'
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error forcing trade monitoring: {str(e)}'
+        }), 500
+
+@app.route('/api/manual_complete_trade', methods=['POST'])
+def manual_complete_trade():
+    """Manually complete a trade for testing P&L calculation"""
+    try:
+        ensure_components_initialized()
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': 'No data provided'
+            }), 400
+        
+        signal_id = data.get('signal_id')
+        entry_price = data.get('entry_price')
+        exit_price = data.get('exit_price')
+        realized_pnl = data.get('realized_pnl')
+        
+        if not all([signal_id, entry_price, exit_price, realized_pnl is not None]):
+            return jsonify({
+                'success': False,
+                'message': 'Missing required fields: signal_id, entry_price, exit_price, realized_pnl'
+            }), 400
+        
+        # Get AI worker to access database
+        global ai_worker_instance
+        ai_worker = ai_worker_instance or get_ai_worker(socketio=socketio, bybit_session=bybit_session)
+        
+        if not ai_worker:
+            return jsonify({
+                'success': False,
+                'message': 'AI worker not available'
+            }), 500
+        
+        # Update signal with P&L data
+        ai_worker.database.update_signal_with_pnl(
+            signal_id=signal_id,
+            entry_price=float(entry_price),
+            exit_price=float(exit_price),
+            realized_pnl=float(realized_pnl)
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'Trade {signal_id} manually completed with P&L: {realized_pnl}',
+            'data': {
+                'signal_id': signal_id,
+                'entry_price': entry_price,
+                'exit_price': exit_price,
+                'realized_pnl': realized_pnl
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error manually completing trade: {str(e)}'
+        }), 500
+
 if __name__ == '__main__':
     print("🤖 AI Worker ready...")
     
