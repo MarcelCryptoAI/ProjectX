@@ -4299,6 +4299,9 @@ def refresh_symbols():
         from database import TradingDatabase
         db = TradingDatabase()
         
+        # Force migration to fix symbol column size
+        db.migrate_supported_symbols_table()
+        
         # Check current database state
         current_symbols = db.get_supported_symbols()
         current_count = len(current_symbols)
