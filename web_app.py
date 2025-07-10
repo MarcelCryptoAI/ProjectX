@@ -1235,9 +1235,31 @@ def get_balance_header():
             available_balance = balance_result['available_balance']
             used_margin = balance_result['used_margin']
             
-            # Calculate 24h P&L (placeholder - zou historical data nodig hebben)
-            pnl_24h = 0.0  
-            pnl_24h_percent = 0.0
+            # Calculate 24h P&L from database
+            try:
+                from database import TradingDatabase
+                db = TradingDatabase()
+                signal_trades = db.get_trading_signals()
+                
+                # Calculate 24h realized P&L
+                now = datetime.now()
+                twenty_four_hours_ago = now - timedelta(hours=24)
+                
+                pnl_24h = 0.0
+                for trade in signal_trades:
+                    if trade.get('status') == 'completed' and trade.get('realized_pnl') is not None:
+                        if trade.get('exit_time'):
+                            exit_time = datetime.fromisoformat(trade['exit_time'].replace('Z', '+00:00')) if isinstance(trade['exit_time'], str) else trade['exit_time']
+                            if exit_time.replace(tzinfo=None) >= twenty_four_hours_ago:
+                                pnl_24h += float(trade['realized_pnl'])
+                
+                # Calculate percentage based on starting balance (approximate)
+                pnl_24h_percent = (pnl_24h / total_balance * 100) if total_balance > 0 else 0.0
+                
+            except Exception as e:
+                app.logger.warning(f"Could not calculate 24h P&L: {e}")
+                pnl_24h = 0.0
+                pnl_24h_percent = 0.0
             
             # Debug logging voor troubleshooting
             app.logger.info(f"✅ Balance header success: Total={total_balance}, Available={available_balance}, Margin={used_margin}")
@@ -1255,13 +1277,34 @@ def get_balance_header():
         else:
             # Fallback naar cached balance bij API problemen
             app.logger.warning(f"⚠️ Balance API error: {balance_result['error']} - returning cached balance")
+            
+            # Still try to get P&L from database even if balance API fails
+            pnl_24h = 0.0
+            pnl_24h_percent = 0.0
+            try:
+                from database import TradingDatabase
+                db = TradingDatabase()
+                signal_trades = db.get_trading_signals()
+                
+                now = datetime.now()
+                twenty_four_hours_ago = now - timedelta(hours=24)
+                
+                for trade in signal_trades:
+                    if trade.get('status') == 'completed' and trade.get('realized_pnl') is not None:
+                        if trade.get('exit_time'):
+                            exit_time = datetime.fromisoformat(trade['exit_time'].replace('Z', '+00:00')) if isinstance(trade['exit_time'], str) else trade['exit_time']
+                            if exit_time.replace(tzinfo=None) >= twenty_four_hours_ago:
+                                pnl_24h += float(trade['realized_pnl'])
+            except:
+                pass
+            
             return jsonify({
                 'success': True,
                 'balance': 0.0,
                 'available_balance': 0.0,
                 'used_margin': 0.0,
-                'pnl_24h': 0.0,
-                'pnl_24h_percent': 0.0,
+                'pnl_24h': pnl_24h,
+                'pnl_24h_percent': pnl_24h_percent,
                 'cached': True,
                 'message': f"Using cached balance due to: {balance_result['error']}"
             })
@@ -3008,16 +3051,24 @@ def get_cumulative_roi():
             # Sort by exit time
             completed_signals.sort(key=lambda x: x['exit_time'])
             
-            # Get initial balance (estimate based on first trades or use default)
-            initial_balance = 1000.0  # Default starting balance
+            # Get actual current balance for proper ROI calculation
+            try:
+                balance_result = get_bybit_balance()
+                if balance_result['success']:
+                    current_balance = balance_result['total_wallet_balance']
+                    # Calculate what the initial balance was by subtracting total P&L
+                    total_pnl = sum(signal['realized_pnl'] for signal in completed_signals)
+                    initial_balance = current_balance - total_pnl
+                    if initial_balance <= 0:
+                        initial_balance = 1000.0  # Fallback
+                else:
+                    initial_balance = 1000.0  # Default starting balance
+            except:
+                initial_balance = 1000.0  # Default starting balance
             
-            # Try to get actual balance from first trade
-            if completed_signals:
-                # Use the first trade to estimate initial balance
-                first_trade_amount = completed_signals[0]['amount']
-                if first_trade_amount > 0:
-                    # Estimate initial balance as 50x the first trade amount
-                    initial_balance = max(first_trade_amount * 50, 1000.0)
+            # Ensure minimum balance for calculation
+            if initial_balance < 100:
+                initial_balance = 1000.0
             
             # Generate time series data
             roi_data = []
