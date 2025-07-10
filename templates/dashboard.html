@@ -852,21 +852,30 @@
             const tp = tpLevels[level - 1];
             const distance = tp.distance_percent || 0;
             const status = tp.status || 'pending';
+            const price = tp.price || 0;
             const isHit = status === 'hit' || status === 'filled';
             
             let colorClass = 'text-gray-400';
             let statusIcon = '';
+            let bgClass = '';
             
             if (isHit) {
                 colorClass = 'text-green-400';
                 statusIcon = '✓ ';
+                bgClass = 'bg-green-900/20';
             } else if (distance > 0) {
                 colorClass = 'text-neon-yellow';
+                bgClass = 'bg-yellow-900/20';
             } else {
                 colorClass = 'text-gray-500';
+                bgClass = 'bg-gray-900/20';
             }
             
-            return `<span class="${colorClass}">${statusIcon}${Math.abs(distance).toFixed(1)}%</span>`;
+            const tooltip = `TP${level}: $${price.toFixed(4)} (${distance.toFixed(2)}% from current)`;
+            
+            return `<span class="${colorClass} ${bgClass} px-1 py-0.5 rounded text-xs" title="${tooltip}">
+                ${statusIcon}${Math.abs(distance).toFixed(1)}%
+            </span>`;
         }
         
         // Helper function to format stop loss
@@ -880,7 +889,20 @@
                 return '<span class="text-gray-500">-</span>';
             }
             
-            return `<span class="text-neon-pink">$${parseFloat(slPrice).toFixed(4)}</span>`;
+            const price = parseFloat(slPrice);
+            const currentPrice = parseFloat(markPrice) || 0;
+            
+            // Calculate distance percentage
+            let distancePercent = 0;
+            if (currentPrice > 0) {
+                distancePercent = Math.abs((price - currentPrice) / currentPrice * 100);
+            }
+            
+            const tooltip = `Stop Loss: $${price.toFixed(4)} (${distancePercent.toFixed(2)}% from current)`;
+            
+            return `<span class="text-neon-pink bg-red-900/20 px-1 py-0.5 rounded text-xs" title="${tooltip}">
+                $${price.toFixed(4)}
+            </span>`;
         }
         
         // Helper function to get TP distance for sorting
