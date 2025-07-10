@@ -1052,8 +1052,10 @@ class TradingDatabase:
             import traceback
             traceback.print_exc()
             conn.rollback()
+            raise  # Re-raise the exception so the caller knows it failed
         
-        conn.close()
+        finally:
+            conn.close()
     
     def update_leverage_multiplier(self, symbol, leverage_multiplier):
         """Update leverage multiplier for a specific symbol"""

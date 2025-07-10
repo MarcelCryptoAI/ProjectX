@@ -126,9 +126,9 @@ class AIWorker:
             # Filter only active symbols and extract symbol names
             active_symbols = [s['symbol'] for s in symbols if s.get('status') == 'active']
             
-            # Check if database has too few symbols (indicating incomplete or old refresh)
-            # ByBit should have 100+ USDT pairs, so anything less than 50 is likely incomplete
-            if len(active_symbols) < 50:
+            # Check if database has symbols - if we have any active symbols, use them
+            # Only refresh if database is completely empty or has very few symbols
+            if len(active_symbols) < 10:
                 self.console_logger.log('WARNING', f'Only {len(active_symbols)} symbols in database, attempting to refresh from ByBit')
                 # Try to refresh symbols from ByBit
                 self._refresh_symbols_from_bybit()
@@ -1205,7 +1205,7 @@ class AIWorker:
                 self.console_logger.log('WARNING', f'⚠️ TP already reached! Market: ${current_price:.4f}, TP: ${take_profit_price:.4f} - Cancelling signal')
                 return False
             
-            # Place main LIMIT order (no stop loss in main order - will be placed separately)
+            # Place main LIMIT order WITH stop loss included
             order_params = {
                 'category': 'linear',
                 'symbol': symbol,
@@ -1213,7 +1213,9 @@ class AIWorker:
                 'orderType': 'Limit',  # LIMIT ORDER ONLY
                 'qty': str(total_qty),
                 'price': str(ai_entry_price),  # Use AI-advised entry price
-                'timeInForce': 'GTC'  # Good Till Cancelled
+                'timeInForce': 'GTC',  # Good Till Cancelled
+                'stopLoss': str(stop_loss_price),  # Include stop loss directly
+                'takeProfit': str(take_profit_price)  # Include main TP level
             }
             
             self.console_logger.log('INFO', f'📤 Placing {side} LIMIT order: {total_qty} {symbol} @ ${ai_entry_price:.4f} (AI-advised)')

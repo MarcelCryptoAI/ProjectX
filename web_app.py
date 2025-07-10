@@ -3196,9 +3196,14 @@ def get_coin_analysis():
                     if confidence < (ai_confidence_threshold * 0.75):  # 75% of threshold for neutral
                         analysis = "Neutral"
                     
-                    # Calculate take profit and stop loss based on confidence
-                    take_profit = round(2 + (confidence / 25), 1)  # 2-6% range
-                    stop_loss = round(1 + (confidence / 50), 1)    # 1-3% range
+                    # Calculate take profit and stop loss based on confidence and settings
+                    # Scale between min and max TP based on confidence (50-100 confidence maps to min-max TP)
+                    confidence_factor = max(0, min(1, (confidence - 50) / 50))  # 0-1 range
+                    take_profit = min_take_profit + (confidence_factor * (max_take_profit - min_take_profit))
+                    take_profit = round(max(min_take_profit, min(max_take_profit, take_profit)), 1)
+                    
+                    # Stop loss uses fixed percentage from settings
+                    stop_loss = round(stop_loss_percent, 1)
                     
                     coin_data = {
                         'symbol': result['symbol'],
@@ -3273,10 +3278,22 @@ def get_trading_signals():
             from database import TradingDatabase
             db = TradingDatabase()
             db_settings = db.load_settings()
-            ai_confidence_threshold = float(db_settings.get('confidenceThreshold', 80))
+            ai_confidence_threshold = float(db_settings.get('confidenceThreshold', ai_confidence_threshold))
+            ai_accuracy_threshold = float(db_settings.get('accuracyThreshold', ai_accuracy_threshold))
             auto_execute = db_settings.get('autoExecute', False)
+            
+            # Load TP/SL settings from database
+            min_take_profit = float(db_settings.get('minTakeProfitPercent', 1))
+            max_take_profit = float(db_settings.get('maxTakeProfitPercent', 10))
+            base_take_profit = float(db_settings.get('takeProfitPercent', 3))
+            stop_loss_percent = float(db_settings.get('stopLossPercent', 2))
         except Exception as settings_error:
             app.logger.warning(f"Could not load settings from database: {settings_error}")
+            # Fallback to default values
+            min_take_profit = 1
+            max_take_profit = 10
+            base_take_profit = 3
+            stop_loss_percent = 2
             # Fallback to environment variables
             ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 80))
             auto_execute = os.getenv('AUTO_EXECUTE', 'true').lower() == 'true'
@@ -3396,7 +3413,11 @@ def get_trading_signals():
                         
                         take_profit_levels = []
                         if partial_tp_enabled:
-                            base_tp = round(2 + (confidence / 25), 1)
+                            # Calculate base TP using settings-based formula
+                            confidence_factor = max(0, min(1, (confidence - 50) / 50))
+                            base_tp = min_take_profit + (confidence_factor * (max_take_profit - min_take_profit))
+                            base_tp = round(max(min_take_profit, min(max_take_profit, base_tp)), 1)
+                            
                             for i in range(partial_tp_levels):
                                 level = (i + 1) * (base_tp / partial_tp_levels)
                                 profit_amount = (amount * leverage * level) / 100
@@ -3407,7 +3428,11 @@ def get_trading_signals():
                                     'profit_amount': round(profit_amount, 2)
                                 })
                         else:
-                            base_tp = round(2 + (confidence / 25), 1)
+                            # Calculate base TP using settings-based formula
+                            confidence_factor = max(0, min(1, (confidence - 50) / 50))
+                            base_tp = min_take_profit + (confidence_factor * (max_take_profit - min_take_profit))
+                            base_tp = round(max(min_take_profit, min(max_take_profit, base_tp)), 1)
+                            
                             profit_amount = (amount * leverage * base_tp) / 100
                             take_profit_levels.append({
                                 'level': 1,
@@ -3453,8 +3478,8 @@ def get_trading_signals():
                             'confidence': round(confidence, 1),
                             'amount': round(amount, 2),
                             'leverage': leverage,
-                            'take_profit': round(2 + (confidence / 25), 1),
-                            'stop_loss': round(1 + (confidence / 50), 1),
+                            'take_profit': base_tp,
+                            'stop_loss': stop_loss_percent,
                             'strategy': 'AI Technical Analysis',
                             'timestamp': signal_time.isoformat(),
                             'status': signal_status,
@@ -3481,8 +3506,8 @@ def get_trading_signals():
                                 'accuracy': result['accuracy'],
                                 'amount': amount,
                                 'leverage': leverage,
-                                'take_profit': round(2 + (confidence / 25), 1),
-                                'stop_loss': round(1 + (confidence / 50), 1),
+                                'take_profit': base_tp,
+                                'stop_loss': stop_loss_percent,
                                 'status': signal_status
                             })
                         except Exception as save_error:
@@ -3799,51 +3824,6 @@ def account_name():
             'account_name': 'ByBit Account'
         })
 
-@app.route('/api/system_status')
-def system_status():
-    """Get system status for header indicators"""
-    try:
-        status = {
-            'bybit_api': {'status': 'online'},
-            'database': {'status': 'online'},
-            'dyno': {'status': 'online'}
-        }
-        
-        # Test ByBit API
-        try:
-            bybit_session.get_server_time()
-            status['bybit_api']['status'] = 'online'
-        except:
-            status['bybit_api']['status'] = 'offline'
-        
-        # Test Database
-        try:
-            ensure_components_initialized()
-            ai_worker = get_ai_worker(socketio, bybit_session)
-            ai_worker.database.get_latest_training_session()
-            status['database']['status'] = 'online'
-        except:
-            status['database']['status'] = 'offline'
-        
-        # Test AI Worker
-        try:
-            ensure_components_initialized()
-            ai_worker = get_ai_worker(socketio, bybit_session)
-            if ai_worker and hasattr(ai_worker, 'database'):
-                status['dyno']['status'] = 'online'
-            else:
-                status['dyno']['status'] = 'offline'
-        except:
-            status['dyno']['status'] = 'offline'
-        
-        return jsonify(status)
-    except Exception as e:
-        app.logger.error(f"System status error: {str(e)}")
-        return jsonify({
-            'bybit_api': {'status': 'unknown'},
-            'database': {'status': 'unknown'},
-            'dyno': {'status': 'unknown'}
-        })
 
 @app.route('/api/execute_ai_trade', methods=['POST'])
 def execute_ai_trade():
@@ -4195,7 +4175,7 @@ def load_settings():
             'testnetMode': False,
             'apiTimeout': 30,
             'confidenceThreshold': 80,
-            'accuracyThreshold': 80,
+            'accuracyThreshold': 70,
             'modelUpdateFreq': '4h',
             'technicalIndicators': 15,
             'strategyMode': 'balanced',
@@ -4325,6 +4305,12 @@ def refresh_symbols():
                     else:
                         inactive_count += 1
                     
+                    # Preserve existing leverage multiplier if symbol exists
+                    existing_leverage_multiplier = 1.0  # Default
+                    existing_symbol = next((s for s in current_symbols if s['symbol'] == instrument['symbol']), None)
+                    if existing_symbol and 'leverage_multiplier' in existing_symbol:
+                        existing_leverage_multiplier = existing_symbol['leverage_multiplier']
+                    
                     symbol_data = {
                         'symbol': instrument['symbol'],
                         'base_currency': instrument['baseCoin'],
@@ -4333,7 +4319,8 @@ def refresh_symbols():
                         'min_order_qty': float(instrument['lotSizeFilter']['minOrderQty']),
                         'qty_step': float(instrument['lotSizeFilter']['qtyStep']),
                         'min_leverage': min_leverage,
-                        'max_leverage': max_leverage
+                        'max_leverage': max_leverage,
+                        'leverage_multiplier': existing_leverage_multiplier  # Preserve existing value
                     }
                     symbols_data.append(symbol_data)
                     
@@ -4346,7 +4333,13 @@ def refresh_symbols():
         # Save to database
         app.logger.info(f"Saving {len(symbols_data)} symbols to database...")
         print("Saving symbols to database...")
-        db.refresh_supported_symbols(symbols_data)
+        try:
+            db.refresh_supported_symbols(symbols_data)
+            app.logger.info("Database refresh completed successfully")
+        except Exception as db_error:
+            app.logger.error(f"Database refresh failed: {db_error}")
+            print(f"Database refresh failed: {db_error}")
+            raise
         
         # Verify save
         new_symbols = db.get_supported_symbols()
