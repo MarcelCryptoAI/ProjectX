@@ -2471,7 +2471,10 @@ def get_analytics_data():
                 'tp_levels': [],
                 'tp1_hit': False,
                 'sl_moved_to_breakeven': False,
-                'distance_to_tp1': 0
+                'distance_to_tp1': 0,
+                'stop_loss': None,  # Will be populated below
+                'stop_loss_price': 0,
+                'stop_loss_distance': 0
             }
             
             # Add TP level information from AI worker if available
@@ -2505,6 +2508,21 @@ def get_analytics_data():
                         position_data['tp1_hit'] = trade_data.get('tp1_hit', False)
                         position_data['sl_moved_to_breakeven'] = trade_data.get('sl_moved_to_breakeven', False)
                         
+                        # Add stop loss information
+                        stop_loss_data = trade_data.get('stop_loss', {})
+                        if stop_loss_data:
+                            position_data['stop_loss'] = stop_loss_data
+                            sl_price = stop_loss_data.get('price', 0)
+                            if sl_price > 0:
+                                position_data['stop_loss_price'] = sl_price
+                                # Calculate distance to stop loss
+                                if current_price > 0:
+                                    if pos.get('side') == 'Buy':
+                                        sl_distance = ((current_price - sl_price) / current_price) * 100
+                                    else:
+                                        sl_distance = ((sl_price - current_price) / current_price) * 100
+                                    position_data['stop_loss_distance'] = sl_distance
+                        
                         # Calculate distance to TP1
                         if tp_levels and len(tp_levels) > 0:
                             tp1_price = tp_levels[0].get('price', 0)
@@ -2516,6 +2534,46 @@ def get_analytics_data():
                                 position_data['distance_to_tp1'] = distance
                         
                         break
+            
+            # If no AI worker data found, create default TP levels based on position
+            if not position_data['tp_levels']:
+                # Create default TP levels based on current position
+                current_price = position_data['markPrice']
+                entry_price = position_data['avgPrice']
+                side = position_data['side']
+                
+                # Calculate default TP levels (2%, 4%, 6%, 8% from entry)
+                default_tp_percentages = [2, 4, 6, 8]
+                
+                for i, tp_pct in enumerate(default_tp_percentages):
+                    if side == 'Buy':
+                        tp_price = entry_price * (1 + tp_pct / 100)
+                        distance = ((tp_price - current_price) / current_price) * 100 if current_price > 0 else 0
+                    else:
+                        tp_price = entry_price * (1 - tp_pct / 100)
+                        distance = ((current_price - tp_price) / current_price) * 100 if current_price > 0 else 0
+                    
+                    tp_info = {
+                        'level': i + 1,
+                        'price': tp_price,
+                        'status': 'pending',
+                        'hit_time': None,
+                        'distance_percent': distance
+                    }
+                    
+                    position_data['tp_levels'].append(tp_info)
+                
+                # Add default stop loss (1% from entry)
+                if side == 'Buy':
+                    sl_price = entry_price * 0.99
+                    sl_distance = ((current_price - sl_price) / current_price) * 100 if current_price > 0 else 0
+                else:
+                    sl_price = entry_price * 1.01
+                    sl_distance = ((sl_price - current_price) / current_price) * 100 if current_price > 0 else 0
+                
+                position_data['stop_loss'] = {'price': sl_price, 'status': 'pending'}
+                position_data['stop_loss_price'] = sl_price
+                position_data['stop_loss_distance'] = sl_distance
             
             formatted_positions.append(position_data)
         
