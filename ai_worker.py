@@ -98,6 +98,9 @@ class AIWorker:
         self.database = get_database()
         # Direct pybit integration - no separate executor needed
         self.max_concurrent_trades = int(os.getenv('MAX_CONCURRENT_TRADES', 20))
+        self.last_heartbeat = datetime.now()
+        self.heartbeat_interval = 30  # seconds
+        self.auto_restart_enabled = True
         self.active_trades = {}  # Track active trades for SL management
         if bybit_session:
             self.console_logger.log('INFO', '✅ Direct pybit trading ready')
@@ -253,11 +256,14 @@ class AIWorker:
         self.console_logger.log('INFO', '🔴 Training, signals, and trading have been disabled')
         
     def _worker_loop(self):
-        """Main worker loop"""
-        self.console_logger.log('INFO', 'AI Worker loop started')
+        """Main worker loop with heartbeat monitoring"""
+        self.console_logger.log('INFO', 'AI Worker loop started with auto-restart monitoring')
         
         while self.is_running:
             try:
+                # Update heartbeat
+                self.last_heartbeat = datetime.now()
+                
                 # Check if model needs retraining
                 self._check_model_training()
                 
@@ -295,8 +301,21 @@ class AIWorker:
             return
             
         # Check if enough time has passed since last training  
-        ai_settings = getattr(self.settings, 'ai', {})
-        update_interval_hours = ai_settings.get('model_update_interval', 24) if ai_settings else 24
+        # Get retrain interval from database - NO FALLBACK
+        try:
+            from db_singleton import get_database
+            db = get_database()
+            db_settings = db.load_settings()
+            if not db_settings:
+                self.console_logger.log('ERROR', '❌ Database not available - skipping retrain check')
+                return
+            
+            # Get retrain interval in minutes (default 60 minutes if not set)
+            retrain_interval_minutes = float(db_settings.get('retrainIntervalMinutes', 60))
+            update_interval_hours = retrain_interval_minutes / 60.0
+        except Exception as db_error:
+            self.console_logger.log('ERROR', f'❌ Database error for retrain interval: {db_error} - skipping retrain')
+            return
         
         if (self.last_model_update is None or 
             (datetime.now() - self.last_model_update).total_seconds() > update_interval_hours * 3600):

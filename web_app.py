@@ -275,6 +275,8 @@ risk_manager = None
 ai_trader = None
 ai_worker_instance = None
 is_trading = False
+monitoring_enabled = False
+monitoring_thread = None
 trade_stats = {
     'total_trades': 0,
     'winning_trades': 0,
@@ -1903,22 +1905,101 @@ def start_trading():
         ai_worker = get_ai_worker(socketio, bybit_session)
         ai_worker.start()
         
+        # Start monitoring thread to auto-restart if needed
+        start_ai_monitoring()
+        
         # Legacy trading loop disabled - AI worker handles all trading now
         # threading.Thread(target=trading_loop, daemon=True).start()
         
-        return jsonify({'success': True, 'message': 'Trading and AI worker started'})
+        return jsonify({'success': True, 'message': 'Trading and AI worker started with auto-restart monitoring'})
     return jsonify({'success': False, 'message': 'Trading already active'})
 
 @app.route('/api/stop_trading', methods=['POST'])
 def stop_trading():
-    global is_trading
+    global is_trading, monitoring_enabled
     is_trading = False
+    monitoring_enabled = False  # Disable monitoring when manually stopped
     
     # Stop AI worker
     ai_worker = get_ai_worker(socketio=socketio, bybit_session=bybit_session)
     ai_worker.stop()
     
-    return jsonify({'success': True, 'message': 'Trading and AI worker stopped'})
+    return jsonify({'success': True, 'message': 'Trading and AI worker stopped (monitoring disabled)'})
+
+def start_ai_monitoring():
+    """Start monitoring thread for AI worker"""
+    global monitoring_enabled, monitoring_thread
+    
+    if monitoring_thread is None or not monitoring_thread.is_alive():
+        monitoring_enabled = True
+        monitoring_thread = threading.Thread(target=monitor_ai_worker, daemon=True)
+        monitoring_thread.start()
+        print("🔍 AI Worker monitoring started")
+
+def monitor_ai_worker():
+    """Monitor AI worker and auto-restart if needed"""
+    global is_trading, monitoring_enabled
+    
+    while monitoring_enabled:
+        try:
+            if is_trading:
+                ai_worker = get_ai_worker(socketio, bybit_session)
+                
+                # Check if worker is still alive
+                if not ai_worker.is_running or not hasattr(ai_worker, 'worker_thread') or not ai_worker.worker_thread.is_alive():
+                    print("⚠️ AI Worker stopped unexpectedly - auto-restarting...")
+                    
+                    # Try to restart
+                    try:
+                        ai_worker.stop()  # Clean stop first
+                        time.sleep(2)  # Wait briefly
+                        ai_worker.start()  # Restart
+                        print("✅ AI Worker auto-restarted successfully")
+                        
+                        # Emit notification via SocketIO
+                        if socketio:
+                            socketio.emit('worker_restarted', {
+                                'message': 'AI Worker was automatically restarted',
+                                'timestamp': datetime.now().isoformat()
+                            })
+                    except Exception as restart_error:
+                        print(f"❌ Failed to restart AI Worker: {restart_error}")
+                        
+                        # Emit error notification
+                        if socketio:
+                            socketio.emit('worker_error', {
+                                'message': f'Failed to restart AI Worker: {restart_error}',
+                                'timestamp': datetime.now().isoformat()
+                            })
+                        
+                        # Stop trading if restart fails
+                        is_trading = False
+                        monitoring_enabled = False
+                
+                # Check heartbeat if available
+                if hasattr(ai_worker, 'last_heartbeat'):
+                    heartbeat_age = (datetime.now() - ai_worker.last_heartbeat).total_seconds()
+                    if heartbeat_age > 120:  # 2 minutes without heartbeat
+                        print(f"💓 AI Worker heartbeat stale ({heartbeat_age:.1f}s) - restarting...")
+                        
+                        try:
+                            ai_worker.stop()
+                            time.sleep(2)
+                            ai_worker.start()
+                            print("✅ AI Worker restarted due to stale heartbeat")
+                        except Exception as e:
+                            print(f"❌ Failed to restart worker after stale heartbeat: {e}")
+                            is_trading = False
+                            monitoring_enabled = False
+            
+            # Sleep for monitoring interval
+            time.sleep(30)  # Check every 30 seconds
+            
+        except Exception as e:
+            print(f"❌ Monitoring error: {e}")
+            time.sleep(30)  # Continue monitoring even if error occurs
+    
+    print("🔍 AI Worker monitoring stopped")
 
 @app.route('/api/place_order', methods=['POST'])
 def place_order():

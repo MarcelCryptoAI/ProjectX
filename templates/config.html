@@ -624,13 +624,9 @@
                             <div class="form-text">Minimum AI accuracy to show signals</div>
                         </div>
                         <div>
-                            <label for="modelUpdateFreq" class="form-label">Model Update Frequency</label>
-                            <select class="form-input w-full" id="modelUpdateFreq">
-                                <option value="1h">Every Hour</option>
-                                <option value="4h" selected>Every 4 Hours</option>
-                                <option value="12h">Every 12 Hours</option>
-                                <option value="24h">Daily</option>
-                            </select>
+                            <label for="retrainIntervalMinutes" class="form-label">Retrain Interval (minutes)</label>
+                            <input type="number" class="form-input w-full" id="retrainIntervalMinutes" min="15" max="1440" value="15">
+                            <div class="form-text">How often to retrain the AI model (15 minutes to 24 hours)</div>
                         </div>
                         <div>
                             <label for="technicalIndicators" class="form-label">Technical Indicators</label>
@@ -936,7 +932,7 @@
                 // AI settings
                 confidenceThreshold: parseInt(document.getElementById('confidenceThreshold').value),
                 accuracyThreshold: parseInt(document.getElementById('accuracyThreshold').value),
-                modelUpdateFreq: document.getElementById('modelUpdateFreq').value,
+                retrainIntervalMinutes: parseInt(document.getElementById('retrainIntervalMinutes').value),
                 technicalIndicators: parseInt(document.getElementById('technicalIndicators').value),
                 marketCondition: document.getElementById('marketCondition').value,
                 
