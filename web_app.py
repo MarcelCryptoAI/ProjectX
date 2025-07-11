@@ -3432,11 +3432,15 @@ def get_trading_signals():
                             min_leverage = int(db_settings.get('minLeverage', 1))
                             max_leverage = int(db_settings.get('maxLeverage', 10))
                             leverage_strategy = db_settings.get('leverageStrategy', 'confidence_based')
+                            min_take_profit = float(db_settings.get('minTakeProfit', 0.5))
+                            max_take_profit = float(db_settings.get('maxTakeProfit', 2.0))
                         except:
                             # Fallback to environment variables
                             min_leverage = int(os.getenv('MIN_LEVERAGE', 1))
                             max_leverage = int(os.getenv('MAX_LEVERAGE', 10))
                             leverage_strategy = os.getenv('LEVERAGE_STRATEGY', 'confidence_based')
+                            min_take_profit = float(os.getenv('MIN_TAKE_PROFIT', 0.5))
+                            max_take_profit = float(os.getenv('MAX_TAKE_PROFIT', 2.0))
                         
                         if leverage_strategy == 'confidence_based':
                             # Higher confidence = higher leverage
