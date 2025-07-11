@@ -819,25 +819,31 @@ class AIWorker:
                     confidence = confidence * 100
                 
                 # Check if prediction meets minimum confidence threshold FIRST
-                # Get thresholds from database first, then settings
+                # Get thresholds from database - NO FALLBACK, database is leading
                 try:
-                    # Try database first
                     from db_singleton import get_database
                     db = get_database()
                     db_settings = db.load_settings()
-                    if db_settings and 'confidenceThreshold' in db_settings:
-                        ai_threshold = float(db_settings['confidenceThreshold'])
-                        accuracy_threshold = float(db_settings.get('accuracyThreshold', 70))
-                    else:
-                        raise Exception("No database settings found")
+                    if not db_settings or 'confidenceThreshold' not in db_settings or 'accuracyThreshold' not in db_settings:
+                        self.console_logger.log('ERROR', '❌ Database settings not available or incomplete - STOPPING signal processing')
+                        return  # STOP processing if database not available
+                    
+                    ai_threshold = float(db_settings['confidenceThreshold'])
+                    accuracy_threshold = float(db_settings['accuracyThreshold'])
                 except Exception as db_error:
-                    # Fall back to get_ai_confidence_threshold method
-                    ai_threshold = self.get_ai_confidence_threshold()
-                    accuracy_threshold = self.settings.bot.get('ai_accuracy_threshold', 70)
+                    self.console_logger.log('ERROR', f'❌ Database error: {db_error} - STOPPING signal processing')
+                    return  # STOP processing if database error
                 
+                # Check confidence threshold
                 if confidence < ai_threshold:
-                    self.console_logger.log('INFO', f'⏭️ Signal {symbol} below threshold ({confidence:.1f}% < {ai_threshold}%) - not saving')
+                    self.console_logger.log('INFO', f'⏭️ Signal {symbol} below confidence threshold ({confidence:.1f}% < {ai_threshold}%) - not saving')
                     return  # Don't save or process low confidence signals
+                
+                # Check accuracy threshold
+                signal_accuracy = prediction.get('accuracy', 0)
+                if signal_accuracy < accuracy_threshold:
+                    self.console_logger.log('INFO', f'⏭️ Signal {symbol} below accuracy threshold ({signal_accuracy:.1f}% < {accuracy_threshold}%) - not saving')
+                    return  # Don't save or process low accuracy signals
                 
                 self.signal_count += 1
                 self.console_logger.log('INFO', 
@@ -846,8 +852,20 @@ class AIWorker:
                 # SAVE TO DATABASE ONLY - NO DIRECT EXECUTION
                 # Let the ranked system handle execution
                 try:
-                    from db_singleton import get_database
-                    db = get_database()
+                    # Get take profit limits from database - NO FALLBACK
+                    min_take_profit = float(db_settings.get('minTakeProfitPercent'))
+                    max_take_profit = float(db_settings.get('maxTakeProfitPercent'))
+                    stop_loss_percent = float(db_settings.get('stopLossPercent'))
+                    take_profit_percent = float(db_settings.get('takeProfitPercent'))
+                    
+                    # Enforce take profit limits - AI prediction must be within bounds
+                    ai_take_profit = prediction.get('take_profit', take_profit_percent)
+                    if ai_take_profit < min_take_profit:
+                        self.console_logger.log('WARNING', f'⚠️ AI take profit {ai_take_profit}% below minimum {min_take_profit}% - using minimum')
+                        ai_take_profit = min_take_profit
+                    elif ai_take_profit > max_take_profit:
+                        self.console_logger.log('WARNING', f'⚠️ AI take profit {ai_take_profit}% above maximum {max_take_profit}% - using maximum')
+                        ai_take_profit = max_take_profit
                     
                     # Save signal to database with waiting status
                     signal_id = f'signal_{self.signal_count}_{symbol}'
@@ -859,8 +877,8 @@ class AIWorker:
                         'accuracy': prediction.get('accuracy', accuracy_threshold),
                         'amount': prediction.get('amount', 100),
                         'leverage': prediction.get('leverage', 1),
-                        'stop_loss': prediction.get('stop_loss', db_settings.get('stopLossPercent', 2.0) if db_settings else 2.0),
-                        'take_profit': prediction.get('take_profit', db_settings.get('takeProfitPercent', 3.0) if db_settings else 3.0),
+                        'stop_loss': prediction.get('stop_loss', stop_loss_percent),
+                        'take_profit': ai_take_profit,  # Use enforced take profit
                         'entry_price': prediction.get('entry_price', 0.0),  # AI-advised entry price
                         'status': 'waiting'
                     }
@@ -1168,11 +1186,15 @@ class AIWorker:
             
             self.console_logger.log('INFO', f'📈 Market Price: ${current_price:.4f}, AI Entry Price: ${ai_entry_price:.4f} ({ai_entry_adjustment*100:+.2f}%)')
             
-            # Get user settings for leverage and trade amount
+            # Get user settings for leverage and trade amount - NO FALLBACK
             try:
                 from db_singleton import get_database
                 db = get_database()
                 db_settings = db.load_settings()
+                
+                if not db_settings:
+                    self.console_logger.log('ERROR', '❌ Database settings not available - STOPPING trade execution')
+                    return False
                 
                 # User leverage settings
                 min_leverage = int(db_settings.get('minLeverage', 1))
@@ -1186,18 +1208,16 @@ class AIWorker:
                 # User concurrent trades setting
                 max_concurrent_trades = int(db_settings.get('maxConcurrentTrades', 20))
                 
+                # Take profit limits - ENFORCE STRICTLY
+                min_take_profit = float(db_settings.get('minTakeProfitPercent', 1.0))
+                max_take_profit = float(db_settings.get('maxTakeProfitPercent', 10.0))
+                
                 # Update AI worker's max concurrent trades from user settings
                 self.max_concurrent_trades = max_concurrent_trades
                 
             except Exception as settings_error:
-                self.console_logger.log('WARNING', f'⚠️ Could not load settings: {settings_error}, using defaults')
-                min_leverage = 1
-                max_leverage = 10
-                leverage_strategy = 'confidence_based'
-                risk_per_trade = 2.0
-                min_trade_amount = 5.0
-                max_concurrent_trades = 20
-                self.max_concurrent_trades = max_concurrent_trades
+                self.console_logger.log('ERROR', f'❌ Database error: {settings_error} - STOPPING trade execution')
+                return False  # STOP execution if database error
             
             # Calculate leverage based on user settings and AI confidence
             if leverage_strategy == 'confidence_based':
@@ -1270,22 +1290,14 @@ class AIWorker:
             stop_loss_pct = float(signal.get('stop_loss', 2.0))  # AI determines SL
             take_profit_pct = float(signal.get('take_profit', 3.0))  # AI determines TP
             
-            # Ensure take profit is within configured bounds - load from database first
-            try:
-                from db_singleton import get_database
-                db = get_database()
-                db_settings = db.load_settings()
-                if db_settings:
-                    min_tp = float(db_settings.get('minTakeProfitPercent', 1))
-                    max_tp = float(db_settings.get('maxTakeProfitPercent', 10))
-                else:
-                    raise Exception("No database settings found")
-            except Exception as db_error:
-                # Fall back to YAML settings
-                min_tp = self.settings.min_take_profit_percent
-                max_tp = self.settings.max_take_profit_percent
-                
-            take_profit_pct = max(min_tp, min(max_tp, take_profit_pct))
+            # Ensure take profit is within configured bounds - ENFORCE STRICTLY from database
+            # Use the limits we already loaded earlier
+            take_profit_pct = max(min_take_profit, min(max_take_profit, take_profit_pct))
+            
+            if take_profit_pct != float(signal.get('take_profit', 3.0)):
+                self.console_logger.log('WARNING', f'⚠️ Take profit adjusted from {signal.get("take_profit", 3.0):.2f}% to {take_profit_pct:.2f}% (limits: {min_take_profit:.2f}-{max_take_profit:.2f}%)')
+            
+            self.console_logger.log('INFO', f'📊 Using TP: {take_profit_pct:.2f}% (bounds: {min_take_profit:.2f}-{max_take_profit:.2f}%)')
             
             self.console_logger.log('INFO', f'📊 Using AI-determined TP: {take_profit_pct:.2f}% (bounds: {min_tp}-{max_tp}%)')
             

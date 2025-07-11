@@ -3400,21 +3400,28 @@ def get_trading_signals():
                 for result in training_results:
                     confidence = result['confidence']
                     
-                    # ALLEEN signals boven threshold
+                    # ALLEEN signals boven confidence threshold
                     if confidence >= ai_confidence_threshold:
+                        # ALSO check accuracy threshold - ENFORCE STRICTLY
+                        signal_accuracy = result.get('accuracy', 0)
+                        if signal_accuracy < accuracy_threshold:
+                            continue  # Skip signals below accuracy threshold
+                        
                         signal_time = datetime.fromisoformat(result.get('timestamp', datetime.now().isoformat()).replace('Z', '+00:00'))
                         
                         # Determine side based on analysis
                         side = "Buy" if result['accuracy'] > ai_accuracy_threshold else "Sell"
                         
-                        # Calculate position size based on settings from database
+                        # Calculate position size based on settings from database - NO FALLBACK
+                        if not db_settings:
+                            continue  # Skip this signal if no database settings
+                        
                         try:
                             risk_per_trade = float(db_settings.get('riskPerTrade', 2.0))
                             min_trade_amount = float(db_settings.get('minTradeAmount', 19))
-                        except:
-                            # Fallback to environment variables
-                            risk_per_trade = float(os.getenv('RISK_PER_TRADE', 2.0))
-                            min_trade_amount = float(os.getenv('MIN_TRADE_AMOUNT', 19))
+                        except Exception as e:
+                            # Skip signal if database settings cannot be loaded
+                            continue
                         
                         # Get current balance
                         try:
@@ -3428,22 +3435,19 @@ def get_trading_signals():
                         calculated_amount = (total_balance * risk_per_trade / 1000)
                         amount = max(calculated_amount, min_trade_amount)
                         
-                        # Calculate leverage based on settings and confidence
+                        # Calculate leverage based on settings and confidence - NO FALLBACK
                         try:
                             min_leverage = int(db_settings.get('minLeverage', 1))
                             max_leverage = int(db_settings.get('maxLeverage', 10))
                             leverage_strategy = db_settings.get('leverageStrategy', 'confidence_based')
-                            min_take_profit = float(db_settings.get('minTakeProfit', 0.5))
-                            max_take_profit = float(db_settings.get('maxTakeProfit', 2.0))
-                            stop_loss_percent = float(db_settings.get('stopLoss', 1.0))
-                        except:
-                            # Fallback to environment variables
-                            min_leverage = int(os.getenv('MIN_LEVERAGE', 1))
-                            max_leverage = int(os.getenv('MAX_LEVERAGE', 10))
-                            leverage_strategy = os.getenv('LEVERAGE_STRATEGY', 'confidence_based')
-                            min_take_profit = float(os.getenv('MIN_TAKE_PROFIT', 0.5))
-                            max_take_profit = float(os.getenv('MAX_TAKE_PROFIT', 2.0))
-                            stop_loss_percent = float(os.getenv('STOP_LOSS', 1.0))
+                            min_take_profit = float(db_settings.get('minTakeProfitPercent', 0.5))
+                            max_take_profit = float(db_settings.get('maxTakeProfitPercent', 2.0))
+                            stop_loss_percent = float(db_settings.get('stopLossPercent', 1.0))
+                            # ENFORCE ACCURACY THRESHOLD
+                            accuracy_threshold = float(db_settings.get('accuracyThreshold', 87))
+                        except Exception as e:
+                            # Skip signal if database settings cannot be loaded
+                            continue
                         
                         if leverage_strategy == 'confidence_based':
                             # Higher confidence = higher leverage
