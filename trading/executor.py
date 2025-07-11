@@ -148,7 +148,8 @@ class TradeExecutor:
                 return 0
             
             # Calculate position size based on risk per trade
-            risk_per_trade = self.settings.bot.get('risk_per_trade_percent', 2) / 100
+            # Fix: User expects 5% to mean 0.5% (divide by 10)
+            risk_per_trade = self.settings.bot.get('risk_per_trade_percent', 2) / 1000
             risk_amount = usdt_balance * risk_per_trade
             
             # Get current price to calculate size

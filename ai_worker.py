@@ -1220,7 +1220,8 @@ class AIWorker:
                 total_balance = 1000  # Fallback if balance fetch fails
             
             # Calculate trade amount as percentage of balance (user's risk setting)
-            calculated_trade_amount = total_balance * (risk_per_trade / 100)
+            # Fix: User expects 5% to mean 0.5% (divide by 10)
+            calculated_trade_amount = total_balance * (risk_per_trade / 1000)
             
             # Ensure minimum trade amount (user's setting or $5 minimum)
             trade_amount_usd = max(min_trade_amount, calculated_trade_amount)

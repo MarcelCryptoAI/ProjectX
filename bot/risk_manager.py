@@ -6,7 +6,8 @@ class RiskManager:
         self.open_positions = 0
 
     def calculate_position_size(self, balance):
-        risk_amount = (self.settings.risk_per_trade_percent / 100) * balance
+        # Fix: User expects 5% to mean 0.5% (divide by 10)
+        risk_amount = (self.settings.risk_per_trade_percent / 1000) * balance
         return risk_amount
         
     def validate_trade(self, order_data):

@@ -3424,7 +3424,8 @@ def get_trading_signals():
                             total_balance = 1000  # Fallback
                         
                         # Calculate amount: percentage of balance with minimum
-                        calculated_amount = (total_balance * risk_per_trade / 100)
+                        # Fix: User expects 5% to mean 0.5% (divide by 10)
+                        calculated_amount = (total_balance * risk_per_trade / 1000)
                         amount = max(calculated_amount, min_trade_amount)
                         
                         # Calculate leverage based on settings and confidence
