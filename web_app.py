@@ -2745,16 +2745,43 @@ def get_analytics_data():
             # Filter for completed signal trades with P&L data
             completed_signals = [s for s in signal_trades if s.get('status') == 'completed' and s.get('realized_pnl') is not None]
             
-            # Also get closed P&L from ByBit API
-            closed_pnl_response = bybit_session.get_closed_pnl(
-                category="linear",
-                settleCoin="USDT",
-                limit=200
-            )
+            # Get ALL closed P&L from ByBit API using pagination
+            all_closed_pnl = []
+            cursor = None
+            
+            while True:
+                params = {
+                    "category": "linear",
+                    "settleCoin": "USDT",
+                    "limit": 200,
+                    # Get trades from the last 90 days to ensure we have all historical data
+                    "startTime": int((datetime.utcnow() - timedelta(days=90)).timestamp() * 1000)
+                }
+                if cursor:
+                    params["cursor"] = cursor
+                
+                closed_pnl_response = bybit_session.get_closed_pnl(**params)
+                
+                if closed_pnl_response and 'result' in closed_pnl_response and closed_pnl_response['result']['list']:
+                    all_closed_pnl.extend(closed_pnl_response['result']['list'])
+                    
+                    # Check if there are more pages
+                    if 'nextPageCursor' in closed_pnl_response['result'] and closed_pnl_response['result']['nextPageCursor']:
+                        cursor = closed_pnl_response['result']['nextPageCursor']
+                    else:
+                        break
+                else:
+                    break
+            
+            app.logger.info(f"Fetched total of {len(all_closed_pnl)} trades from ByBit API")
+            
+            # Update the response to use all paginated results
+            closed_pnl_response = {'result': {'list': all_closed_pnl}}
             
             app.logger.info(f"Found {len(completed_signals)} completed AI signals from database")
             
-            trades_data['total_trades'] = len(completed_signals)
+            # Don't start with just database signals - we'll add all trades below
+            trades_data['total_trades'] = 0
             
             # Calculate win/loss stats using stored P&L data
             trades_by_date = {}
@@ -2829,9 +2856,12 @@ def get_analytics_data():
             trades_data['realized_pnl_24h'] = realized_pnl_24h
             trades_data['realized_pnl_all_time'] = realized_pnl_all_time
             
-            # If no database signals, try to get P&L from ByBit closed P&L API
-            if len(completed_signals) == 0 and closed_pnl_response and 'result' in closed_pnl_response:
-                app.logger.info("No database signals found, using ByBit closed P&L data")
+            # Always process ByBit closed P&L data to get ALL trades (not just AI signals)
+            if closed_pnl_response and 'result' in closed_pnl_response:
+                app.logger.info(f"Processing {len(closed_pnl_response['result']['list'])} trades from ByBit closed P&L")
+                
+                # Store all trades for time-based calculations
+                all_trades_data = []
                 
                 for pnl_entry in closed_pnl_response['result']['list']:
                     pnl = float(pnl_entry.get('closedPnl', 0))
@@ -2851,11 +2881,18 @@ def get_analytics_data():
                     
                     trades_data['total_trades'] += 1
                     
-                    # Check if trade was in last 24 hours
+                    # Store trade data for time-based calculations
                     updated_time = pnl_entry.get('updatedTime')
                     if updated_time:
                         try:
                             trade_time = datetime.fromtimestamp(int(updated_time) / 1000)
+                            all_trades_data.append({
+                                'time': trade_time,
+                                'pnl': pnl,
+                                'symbol': pnl_entry.get('symbol', 'UNKNOWN')
+                            })
+                            
+                            # Check if trade was in last 24 hours
                             if trade_time >= yesterday:
                                 realized_pnl_24h += pnl
                         except:
@@ -2864,6 +2901,9 @@ def get_analytics_data():
                 # Update the data
                 trades_data['realized_pnl_24h'] = realized_pnl_24h
                 trades_data['realized_pnl_all_time'] = realized_pnl_all_time
+                
+                # Store all_trades_data for later use in time-based calculations
+                trades_data['all_trades_data'] = all_trades_data
                 
         except Exception as signal_error:
             # Fallback to empty data if signal database access fails
@@ -2903,34 +2943,30 @@ def get_analytics_data():
         yesterday = now - timedelta(days=1)
         month_ago = now - timedelta(days=30)
         
-        # Process signals for time-based stats
-        for signal in completed_signals:
-            if signal.get('exit_time'):
-                try:
-                    exit_time = datetime.fromisoformat(str(signal.get('exit_time')).replace('Z', '+00:00'))
-                    if exit_time.tzinfo is not None:
-                        exit_time = exit_time.utctimetuple()
-                        exit_time = datetime(*exit_time[:6])
-                    
-                    pnl = float(signal.get('realized_pnl', 0))
-                    
-                    # 24h stats
-                    if exit_time >= yesterday:
-                        trades_24h += 1
-                        if pnl > 0:
-                            wins_24h += 1
-                        elif pnl < 0:
-                            losses_24h += 1
-                    
-                    # 30 day stats  
-                    if exit_time >= month_ago:
-                        trades_month += 1
-                        if pnl > 0:
-                            wins_month += 1
-                        elif pnl < 0:
-                            losses_month += 1
-                except:
-                    pass
+        # Process ALL trades from ByBit API for time-based stats
+        if 'all_trades_data' in trades_data:
+            for trade in trades_data['all_trades_data']:
+                trade_time = trade['time']
+                pnl = trade['pnl']
+                
+                # 24h stats
+                if trade_time >= yesterday:
+                    trades_24h += 1
+                    if pnl > 0:
+                        wins_24h += 1
+                    elif pnl < 0:
+                        losses_24h += 1
+                
+                # 30 day stats  
+                if trade_time >= month_ago:
+                    trades_month += 1
+                    if pnl > 0:
+                        wins_month += 1
+                    elif pnl < 0:
+                        losses_month += 1
+            
+            # Remove the temporary data
+            del trades_data['all_trades_data']
         
         # Calculate winrates for different periods
         if trades_24h > 0:
@@ -2948,6 +2984,9 @@ def get_analytics_data():
         trades_data['wins_month'] = wins_month
         trades_data['losses_month'] = losses_month
         trades_data['trades_month'] = trades_month
+        
+        # Debug logging
+        app.logger.info(f"Trade counts - Total: {trades_data['total_trades']}, 24h: {trades_24h}, Month: {trades_month}")
         
         # Format positions for frontend with TP level information
         formatted_positions = []
