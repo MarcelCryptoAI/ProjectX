@@ -688,12 +688,7 @@ class AIWorker:
                         db_settings = self.database.load_settings()
                         major_pairs = db_settings.get('majorPairs', ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'])
                     except:
-                        # Get major pairs from database settings
-            try:
-                db_settings = self.database.load_settings()
-                major_pairs = db_settings.get('majorPairs', ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'])
-            except:
-                major_pairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
+                        major_pairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
                     
                     for symbol in major_pairs:
                         market_data = self._collect_market_data(symbol)
