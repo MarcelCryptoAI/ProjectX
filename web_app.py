@@ -2689,6 +2689,128 @@ def get_pnl_chart():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/balance_history')
+def get_balance_history():
+    """Get balance history data for the chart"""
+    try:
+        period = request.args.get('period', '1h')
+        
+        # Initialize ByBit session
+        testnet = os.getenv('BYBIT_TESTNET', 'False').lower() == 'true'
+        bybit_session = HTTP(
+            testnet=testnet,
+            api_key=os.getenv('BYBIT_API_KEY'),
+            api_secret=os.getenv('BYBIT_API_SECRET'),
+        )
+        
+        # Get current balance
+        balance_response = bybit_session.get_wallet_balance(accountType="UNIFIED")
+        current_balance = 0
+        
+        if balance_response and 'result' in balance_response:
+            for coin in balance_response['result']['list'][0]['coin']:
+                if coin['coin'] == 'USDT':
+                    current_balance = float(coin['equity'])
+                    break
+        
+        # Generate historical balance data based on closed P&L
+        # This is a simplified approach - ideally we'd store balance snapshots
+        now = datetime.utcnow()
+        
+        # Define time intervals
+        intervals = {
+            '1h': (timedelta(hours=1), timedelta(minutes=5), '%H:%M'),
+            '4h': (timedelta(hours=4), timedelta(minutes=20), '%H:%M'),
+            '12h': (timedelta(hours=12), timedelta(hours=1), '%H:%M'),
+            '1d': (timedelta(days=1), timedelta(hours=2), '%m/%d %H:00'),
+            '3d': (timedelta(days=3), timedelta(hours=6), '%m/%d'),
+            '7d': (timedelta(days=7), timedelta(hours=12), '%m/%d'),
+            '30d': (timedelta(days=30), timedelta(days=1), '%m/%d'),
+            '3m': (timedelta(days=90), timedelta(days=3), '%m/%d'),
+            '1y': (timedelta(days=365), timedelta(days=7), '%Y-%m-%d'),
+            'all': (timedelta(days=365), timedelta(days=7), '%Y-%m-%d')
+        }
+        
+        total_duration, interval, date_format = intervals.get(period, intervals['1h'])
+        start_time = now - total_duration
+        
+        # Get closed P&L history
+        closed_pnl = []
+        cursor = None
+        
+        while True:
+            params = {
+                "category": "linear",
+                "settleCoin": "USDT",
+                "limit": 200,
+                "startTime": int(start_time.timestamp() * 1000)
+            }
+            if cursor:
+                params["cursor"] = cursor
+            
+            response = bybit_session.get_closed_pnl(**params)
+            
+            if response and 'result' in response and response['result']['list']:
+                closed_pnl.extend(response['result']['list'])
+                
+                if 'nextPageCursor' in response['result'] and response['result']['nextPageCursor']:
+                    cursor = response['result']['nextPageCursor']
+                else:
+                    break
+            else:
+                break
+        
+        # Sort by time
+        closed_pnl.sort(key=lambda x: int(x.get('updatedTime', 0)))
+        
+        # Generate balance points
+        labels = []
+        balances = []
+        
+        # Calculate balance at each interval
+        current_time = start_time
+        running_balance = current_balance
+        
+        # Work backwards from current balance
+        for trade in reversed(closed_pnl):
+            pnl = float(trade.get('closedPnl', 0))
+            running_balance -= pnl
+        
+        # Now go forward to build the chart
+        balance_at_time = running_balance
+        pnl_index = 0
+        
+        while current_time <= now:
+            # Add P&L from trades that occurred before this time
+            while pnl_index < len(closed_pnl):
+                trade_time = datetime.fromtimestamp(int(closed_pnl[pnl_index]['updatedTime']) / 1000)
+                if trade_time <= current_time:
+                    balance_at_time += float(closed_pnl[pnl_index].get('closedPnl', 0))
+                    pnl_index += 1
+                else:
+                    break
+            
+            labels.append(current_time.strftime(date_format))
+            balances.append(round(balance_at_time, 2))
+            
+            current_time += interval
+        
+        # Add current balance as last point
+        if len(labels) == 0 or balances[-1] != current_balance:
+            labels.append(now.strftime(date_format))
+            balances.append(round(current_balance, 2))
+        
+        return jsonify({
+            'success': True,
+            'labels': labels,
+            'balances': balances,
+            'period': period
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Balance history error: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/api/debug_trades')
 def debug_trades():
     """Debug endpoint to check trade counts"""

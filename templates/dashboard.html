@@ -201,7 +201,7 @@
             transform: translateY(0);
         }
         
-        .performance-period-active {
+        .performance-period-active, .balance-period-active {
             background: linear-gradient(135deg, rgba(0, 217, 255, 0.3), rgba(161, 0, 255, 0.3));
             border-color: #00D9FF;
             box-shadow: 0 0 15px rgba(0, 217, 255, 0.4);
@@ -575,25 +575,25 @@
                     </div>
                 </div>
                 
-                <!-- Performance Analytics -->
+                <!-- Balance History -->
                 <div class="glass-panel rounded-xl p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold font-bold text-white">PERFORMANCE ANALYTICS</h3>
+                        <h3 class="text-lg font-bold font-bold text-white">BALANCE HISTORY</h3>
                         <div class="flex space-x-2">
-                            <button class="cyber-button py-1 px-3 rounded text-xs performance-period-active" onclick="changePerformancePeriod('1h', this)">1H</button>
-                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('4h', this)">4H</button>
-                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('12h', this)">12H</button>
-                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('1d', this)">1D</button>
-                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('3d', this)">3D</button>
-                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('7d', this)">7D</button>
-                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('30d', this)">30D</button>
-                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('3m', this)">3M</button>
-                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('1y', this)">1Y</button>
-                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changePerformancePeriod('all', this)">ALL</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs balance-period-active" onclick="changeBalancePeriod('1h', this)">1H</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeBalancePeriod('4h', this)">4H</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeBalancePeriod('12h', this)">12H</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeBalancePeriod('1d', this)">1D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeBalancePeriod('3d', this)">3D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeBalancePeriod('7d', this)">7D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeBalancePeriod('30d', this)">30D</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeBalancePeriod('3m', this)">3M</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeBalancePeriod('1y', this)">1Y</button>
+                            <button class="cyber-button py-1 px-3 rounded text-xs" onclick="changeBalancePeriod('all', this)">ALL</button>
                         </div>
                     </div>
                     <div class="chart-container">
-                        <canvas id="performanceChart"></canvas>
+                        <canvas id="balanceChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -672,7 +672,7 @@
             reconnectionDelay: 1000,
             timeout: 20000
         });
-        let roiChart, performanceChart;
+        let roiChart, balanceChart;
         let currentROIPeriod = '1h';
         
         // Table sorting variables
@@ -758,30 +758,34 @@
                 }
             });
             
-            // Performance Chart
-            const perfCtx = document.getElementById('performanceChart').getContext('2d');
-            performanceChart = new Chart(perfCtx, {
-                type: 'bar',
+            // Balance History Chart
+            const balanceCtx = document.getElementById('balanceChart').getContext('2d');
+            balanceChart = new Chart(balanceCtx, {
+                type: 'line',
                 data: {
-                    labels: ['Wins', 'Losses', 'Pending'],
+                    labels: [],
                     datasets: [{
-                        data: [0, 0, 0],
-                        backgroundColor: [
-                            'rgba(0, 136, 68, 0.5)',
-                            'rgba(204, 0, 0, 0.5)',
-                            'rgba(255, 215, 0, 0.5)'
-                        ],
-                        borderColor: [
-                            '#008844',
-                            '#CC0000',
-                            '#FFD700'
-                        ],
-                        borderWidth: 2
+                        label: 'Balance',
+                        data: [],
+                        borderColor: '#00D9FF',
+                        backgroundColor: 'rgba(0, 217, 255, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointHoverBackgroundColor: '#00D9FF',
+                        pointHoverBorderColor: '#FFFFFF',
+                        pointHoverBorderWidth: 2
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
                     plugins: {
                         legend: {
                             display: false
@@ -792,7 +796,12 @@
                             bodyColor: '#FFFFFF',
                             borderColor: '#00D9FF',
                             borderWidth: 1,
-                            cornerRadius: 4
+                            cornerRadius: 4,
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Balance: $' + context.parsed.y.toFixed(2);
+                                }
+                            }
                         }
                     },
                     scales: {
@@ -804,9 +813,11 @@
                             ticks: {
                                 color: '#888',
                                 font: {
-                                    family: 'Orbitron',
-                                    weight: 'bold'
-                                }
+                                    family: 'JetBrains Mono'
+                                },
+                                maxRotation: 0,
+                                autoSkip: true,
+                                maxTicksLimit: 10
                             }
                         },
                         y: {
@@ -818,6 +829,9 @@
                                 color: '#888',
                                 font: {
                                     family: 'JetBrains Mono'
+                                },
+                                callback: function(value) {
+                                    return '$' + value.toFixed(0);
                                 }
                             }
                         }
@@ -883,8 +897,8 @@
                         // Update positions table with real data
                         updatePositionsTable(data.positions || []);
                         
-                        // Update performance chart with real data
-                        updatePerformanceChart(data);
+                        // Update balance chart with initial data
+                        updateBalanceChart(currentBalancePeriod);
                     }
                 })
                 .catch(error => {
@@ -947,7 +961,7 @@
         }
         
         // Helper function to format stop loss
-        function formatStopLoss(stopLoss, markPrice) {
+        function formatStopLoss(stopLoss, markPrice, side) {
             if (!stopLoss || stopLoss === 0) {
                 return '<span class="text-gray-500">-</span>';
             }
@@ -963,13 +977,17 @@
             // Calculate distance percentage
             let distancePercent = 0;
             if (currentPrice > 0) {
-                distancePercent = Math.abs((price - currentPrice) / currentPrice * 100);
+                if (side === 'Buy') {
+                    distancePercent = ((currentPrice - price) / currentPrice) * 100;
+                } else {
+                    distancePercent = ((price - currentPrice) / currentPrice) * 100;
+                }
             }
             
-            const tooltip = `Stop Loss: $${price.toFixed(4)} (${distancePercent.toFixed(2)}% from current)`;
+            const tooltip = `Stop Loss: $${price.toFixed(4)}`;
             
             return `<span class="text-neon-pink bg-red-900/20 px-1 py-0.5 rounded text-xs" title="${tooltip}">
-                $${price.toFixed(4)}
+                -${Math.abs(distancePercent).toFixed(1)}%
             </span>`;
         }
         
@@ -1054,7 +1072,7 @@
                             ${formatTPLevel(pos.tp_levels, 4, pos.markPrice)}
                         </td>
                         <td class="py-3 text-center text-xs">
-                            ${formatStopLoss(pos.stop_loss, pos.markPrice)}
+                            ${formatStopLoss(pos.stop_loss, pos.markPrice, pos.side)}
                         </td>
                         <td class="py-3 text-center text-xs">
                             <span class="px-1 py-0.5 rounded text-xs ${pos.sl_moved_to_breakeven ? 'bg-green-900/50 text-green-400' : 'bg-gray-900/50 text-gray-400'}">
@@ -1294,20 +1312,34 @@
                 });
         }
         
-        // Performance period change
-        let currentPerformancePeriod = '1h';
+        // Balance period change
+        let currentBalancePeriod = '1h';
         
-        function changePerformancePeriod(period, button) {
-            currentPerformancePeriod = period;
+        function changeBalancePeriod(period, button) {
+            currentBalancePeriod = period;
             
             // Update button states
             button.parentElement.querySelectorAll('.cyber-button').forEach(btn => {
-                btn.classList.remove('performance-period-active');
+                btn.classList.remove('balance-period-active');
             });
-            button.classList.add('performance-period-active');
+            button.classList.add('balance-period-active');
             
             // Update chart data
-            updatePerformanceChart({}, period);
+            updateBalanceChart(period);
+        }
+        
+        function updateBalanceChart(period) {
+            // Fetch balance history data
+            fetch(`/api/balance_history?period=${period}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        balanceChart.data.labels = data.labels;
+                        balanceChart.data.datasets[0].data = data.balances;
+                        balanceChart.update();
+                    }
+                })
+                .catch(error => console.error('Error fetching balance history:', error));
         }
         
         // ROI period change
@@ -1387,41 +1419,6 @@
                 });
         }
         
-        // Update performance chart with real data
-        function updatePerformanceChart(data, period = '1h') {
-            // Get performance data for the specified period
-            fetch(`/api/performance_analytics?period=${period}`)
-                .then(response => response.json())
-                .then(perfData => {
-                    if (perfData.success) {
-                        // Use real data from the API
-                        const wins = perfData.winning_trades || 0;
-                        const losses = perfData.losing_trades || 0;
-                        const pending = perfData.pending_trades || 0;
-                        
-                        performanceChart.data.datasets[0].data = [wins, losses, pending];
-                        performanceChart.update();
-                    } else {
-                        // Fallback to analytics data
-                        const wins = data.winning_trades || 0;
-                        const losses = data.losing_trades || 0;
-                        const pending = data.active_positions_count || 0;
-                        
-                        performanceChart.data.datasets[0].data = [wins, losses, pending];
-                        performanceChart.update();
-                    }
-                })
-                .catch(error => {
-                    console.error('Performance chart error:', error);
-                    // Fallback to analytics data on error
-                    const wins = data.winning_trades || 0;
-                    const losses = data.losing_trades || 0;
-                    const pending = data.active_positions_count || 0;
-                    
-                    performanceChart.data.datasets[0].data = [wins, losses, pending];
-                    performanceChart.update();
-                });
-        }
         
         // Update trading parameters from settings
         function updateTradingParameters() {
