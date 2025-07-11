@@ -6,11 +6,12 @@ from pybit.unified_trading import HTTP
 import os
 
 class BreakevenMonitor:
-    def __init__(self):
+    def __init__(self, ai_worker=None):
         self.logger = logging.getLogger(__name__)
         self.database = get_database()
         self.bybit_session = None
         self.monitored_positions = {}  # Track which positions we're monitoring
+        self.ai_worker = ai_worker  # Reference to AI worker for updating active_trades
         
     def initialize_bybit(self):
         """Initialize ByBit session"""
@@ -161,6 +162,24 @@ class BreakevenMonitor:
             
             if response.get('retCode') == 0:
                 self.logger.info(f"✅ Moved stop loss to breakeven for {symbol}: {current_sl} → {breakeven_price}")
+                
+                # Update AI worker's active trades if available
+                if self.ai_worker and hasattr(self.ai_worker, 'active_trades'):
+                    for order_id, trade_data in self.ai_worker.active_trades.items():
+                        if trade_data.get('symbol') == symbol and trade_data.get('side') == side:
+                            # Mark TP1 as hit and SL moved to breakeven
+                            trade_data['tp1_hit'] = True
+                            trade_data['sl_moved_to_breakeven'] = True
+                            trade_data['stop_loss']['price'] = breakeven_price
+                            
+                            # Update TP1 status
+                            if len(trade_data.get('take_profit_levels', [])) > 0:
+                                trade_data['take_profit_levels'][0]['status'] = 'hit'
+                                trade_data['take_profit_levels'][0]['hit_time'] = datetime.now().isoformat()
+                            
+                            self.logger.info(f"📝 Updated active_trades for {symbol}: TP1 hit, SL moved to BE")
+                            break
+                
                 return True
             else:
                 self.logger.error(f"❌ Failed to move stop loss for {symbol}: {response}")

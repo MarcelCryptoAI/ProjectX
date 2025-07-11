@@ -120,8 +120,8 @@ class AIWorker:
             'batch_results': []
         }
         
-        # Initialize breakeven monitor
-        self.breakeven_monitor = BreakevenMonitor()
+        # Initialize breakeven monitor with reference to self
+        self.breakeven_monitor = BreakevenMonitor(ai_worker=self)
         self.breakeven_thread = None
     
     def get_supported_symbols(self):
