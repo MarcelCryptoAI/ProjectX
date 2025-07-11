@@ -11,6 +11,7 @@ from utils.settings_loader import Settings
 from ai.trader import AITrader
 from utils.trade_logger import TradeLogger
 from db_singleton import get_database
+from breakeven_monitor import BreakevenMonitor
 # Trading.executor removed - using direct pybit calls
 import logging
 
@@ -118,6 +119,10 @@ class AIWorker:
             'overall_progress': 0,
             'batch_results': []
         }
+        
+        # Initialize breakeven monitor
+        self.breakeven_monitor = BreakevenMonitor()
+        self.breakeven_thread = None
     
     def get_supported_symbols(self):
         """Get supported symbols from database, with fallback to settings and ByBit refresh"""
@@ -228,6 +233,10 @@ class AIWorker:
             
             self.worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
             self.worker_thread.start()
+            
+            # Start breakeven monitor
+            self.start_breakeven_monitor()
+            
             self.console_logger.log('SUCCESS', '🚀 AI WORKER STARTED - Ready for training and signal generation!')
             self.console_logger.log('INFO', '📊 System initialized with ByBit API connection')
             if self.bybit_session:
@@ -236,6 +245,10 @@ class AIWorker:
     def stop(self):
         """Stop the AI worker"""
         self.is_running = False
+        
+        # Stop breakeven monitor
+        self.stop_breakeven_monitor()
+        
         self.console_logger.log('WARNING', '⏹️ AI WORKER STOPPED - All operations halted')
         self.console_logger.log('INFO', '🔴 Training, signals, and trading have been disabled')
         
@@ -2234,6 +2247,43 @@ class AIWorker:
             'message': f'Found {len(self.active_trades)} active trades',
             'trades': trades_status
         }
+    
+    def start_breakeven_monitor(self):
+        """Start the breakeven monitoring thread"""
+        try:
+            if self.breakeven_thread and self.breakeven_thread.is_alive():
+                self.console_logger.log('INFO', '🔄 Breakeven monitor already running')
+                return
+            
+            def monitor_loop():
+                self.console_logger.log('INFO', '🚀 Starting breakeven monitor thread')
+                try:
+                    while self.is_running:
+                        self.breakeven_monitor.monitor_positions()
+                        time.sleep(30)  # Check every 30 seconds
+                except Exception as e:
+                    self.console_logger.log('ERROR', f'❌ Breakeven monitor error: {e}')
+                finally:
+                    self.console_logger.log('INFO', '⏹️ Breakeven monitor stopped')
+            
+            self.breakeven_thread = threading.Thread(target=monitor_loop, daemon=True)
+            self.breakeven_thread.start()
+            self.console_logger.log('INFO', '✅ Breakeven monitor started successfully')
+            
+        except Exception as e:
+            self.console_logger.log('ERROR', f'❌ Failed to start breakeven monitor: {e}')
+    
+    def stop_breakeven_monitor(self):
+        """Stop the breakeven monitoring thread"""
+        try:
+            if self.breakeven_thread and self.breakeven_thread.is_alive():
+                # The thread will stop when is_running becomes False
+                self.console_logger.log('INFO', '⏹️ Stopping breakeven monitor...')
+                # Thread will stop automatically when is_running is False
+            else:
+                self.console_logger.log('INFO', '📴 Breakeven monitor not running')
+        except Exception as e:
+            self.console_logger.log('ERROR', f'❌ Error stopping breakeven monitor: {e}')
 
 # Global worker instance
 ai_worker = None

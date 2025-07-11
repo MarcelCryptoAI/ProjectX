@@ -434,13 +434,18 @@
                                     <input type="number" class="form-input w-full" id="partialTakeProfitPercentage" min="10" max="50" value="25">
                                     <div class="form-text">Percentage of position to sell at each level</div>
                                 </div>
-                                <div class="col-span-2">
+                                <div>
                                     <label for="moveStopLossOnPartialTP" class="form-label">Move Stop Loss to Breakeven</label>
                                     <label class="switch">
-                                        <input type="checkbox" id="moveStopLossOnPartialTP" checked>
+                                        <input type="checkbox" id="moveStopLossOnPartialTP" checked onchange="toggleBreakevenOptions()">
                                         <span class="slider"></span>
                                     </label>
-                                    <div class="form-text">Move stop loss to breakeven after first take profit level is hit</div>
+                                    <div class="form-text">Move stop loss to breakeven + percentage after TP1 is hit</div>
+                                </div>
+                                <div>
+                                    <label for="breakevenPercentage" class="form-label">Breakeven Buffer (%)</label>
+                                    <input type="number" class="form-input w-full" id="breakevenPercentage" step="0.1" min="0.1" max="1.0" value="0.2">
+                                    <div class="form-text">Entry price + this percentage becomes new stop loss (0.1-1.0%)</div>
                                 </div>
                             </div>
                         </div>
@@ -908,6 +913,7 @@
                 partialTakeProfitLevels: parseInt(document.getElementById('partialTakeProfitLevels').value),
                 partialTakeProfitPercentage: parseInt(document.getElementById('partialTakeProfitPercentage').value),
                 moveStopLossOnPartialTP: document.getElementById('moveStopLossOnPartialTP').checked,
+                breakevenPercentage: parseFloat(document.getElementById('breakevenPercentage').value),
                 tradingEnabled: document.getElementById('tradingEnabled').checked,
                 weekendTrading: document.getElementById('weekendTrading').checked,
                 
