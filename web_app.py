@@ -3199,6 +3199,29 @@ def get_coin_analysis():
             ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 80))
             ai_accuracy_threshold = float(os.getenv('AI_ACCURACY_THRESHOLD', 70))
         
+        # Load database settings first
+        try:
+            db = get_database()
+            db_settings = db.load_settings()
+            ai_confidence_threshold = float(db_settings.get('confidenceThreshold', ai_confidence_threshold))
+            ai_accuracy_threshold = float(db_settings.get('accuracyThreshold', ai_accuracy_threshold))
+            auto_execute = db_settings.get('autoExecute', False)
+            
+            # Load TP/SL settings from database
+            min_take_profit = float(db_settings.get('minTakeProfitPercent', 1))
+            max_take_profit = float(db_settings.get('maxTakeProfitPercent', 10))
+            base_take_profit = float(db_settings.get('takeProfitPercent', 3))
+            stop_loss_percent = float(db_settings.get('stopLossPercent', 2))
+        except Exception as settings_error:
+            app.logger.warning(f"Could not load settings from database: {settings_error}")
+            # Fallback to default values
+            min_take_profit = 1
+            max_take_profit = 10
+            base_take_profit = 3
+            stop_loss_percent = 2
+            auto_execute = False
+            db_settings = {}  # Empty dict for fallback
+        
         # Get training results from database
         coins_analysis = []
         
@@ -3317,31 +3340,6 @@ def get_trading_signals():
             ai_confidence_threshold = 75  # Default fallback
             ai_accuracy_threshold = 70  # Default fallback
         auto_execute = False  # Default
-        
-        try:
-            from database import TradingDatabase
-            db = get_database()
-            db_settings = db.load_settings()
-            ai_confidence_threshold = float(db_settings.get('confidenceThreshold', ai_confidence_threshold))
-            ai_accuracy_threshold = float(db_settings.get('accuracyThreshold', ai_accuracy_threshold))
-            auto_execute = db_settings.get('autoExecute', False)
-            
-            # Load TP/SL settings from database
-            min_take_profit = float(db_settings.get('minTakeProfitPercent', 1))
-            max_take_profit = float(db_settings.get('maxTakeProfitPercent', 10))
-            base_take_profit = float(db_settings.get('takeProfitPercent', 3))
-            stop_loss_percent = float(db_settings.get('stopLossPercent', 2))
-        except Exception as settings_error:
-            app.logger.warning(f"Could not load settings from database: {settings_error}")
-            # Fallback to default values
-            min_take_profit = 1
-            max_take_profit = 10
-            base_take_profit = 3
-            stop_loss_percent = 2
-            # Fallback to environment variables
-            ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 80))
-            auto_execute = os.getenv('AUTO_EXECUTE', 'true').lower() == 'true'
-            db_settings = {}  # Empty dict for fallback
         
         # Try to get AI worker
         ai_worker = None
