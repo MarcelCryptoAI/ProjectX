@@ -447,35 +447,12 @@
                         <h4 class="text-sm font-medium text-gray-400">WIN RATE</h4>
                         <i class="fas fa-trophy text-neon-yellow text-xl"></i>
                     </div>
-                    <div class="grid grid-cols-3 gap-4 text-center">
-                        <!-- 24H -->
-                        <div>
-                            <div class="text-xs text-gray-500 mb-1">24H</div>
-                            <div class="text-2xl font-bold text-white" id="winRate24h">0%</div>
-                            <div class="text-xs text-gray-500 mt-1" id="totalTrades24h">0 TRADES</div>
-                            <div class="text-xs mt-1">
-                                <span class="text-green-400" id="winCount24h">0W</span>/<span class="text-red-400" id="lossCount24h">0L</span>
-                            </div>
-                        </div>
-                        
-                        <!-- 30D -->
-                        <div class="border-l border-r border-gray-700">
-                            <div class="text-xs text-gray-500 mb-1">30D</div>
-                            <div class="text-2xl font-bold text-white" id="winRateMonth">0%</div>
-                            <div class="text-xs text-gray-500 mt-1" id="totalTradesMonth">0 TRADES</div>
-                            <div class="text-xs mt-1">
-                                <span class="text-green-400" id="winCountMonth">0W</span>/<span class="text-red-400" id="lossCountMonth">0L</span>
-                            </div>
-                        </div>
-                        
-                        <!-- All Time -->
-                        <div>
-                            <div class="text-xs text-gray-500 mb-1">ALL TIME</div>
-                            <div class="text-2xl font-bold text-white" id="winRate">0%</div>
-                            <div class="text-xs text-gray-500 mt-1" id="totalTrades">0 TRADES</div>
-                            <div class="text-xs mt-1">
-                                <span class="text-green-400" id="winCount">0W</span>/<span class="text-red-400" id="lossCount">0L</span>
-                            </div>
+                    <div class="text-3xl font-bold font-bold text-white" id="winRate">0%</div>
+                    <div class="text-sm mt-2 text-gray-500">
+                        <div id="totalTrades">0 TRADES</div>
+                        <div class="mt-1">
+                            <span class="text-green-400" id="winCount">0 WIN</span> / 
+                            <span class="text-red-400" id="lossCount">0 LOSS</span>
                         </div>
                     </div>
                 </div>
@@ -897,23 +874,11 @@
                         const winningTrades = data.winning_trades || 0;
                         const losingTrades = data.losing_trades || 0;
                         
-                        // All-time stats
+                        // Update winrate stats
                         document.getElementById('winRate').textContent = `${winRate.toFixed(1)}%`;
                         document.getElementById('totalTrades').textContent = `${totalTrades} TRADES`;
-                        document.getElementById('winCount').textContent = `${winningTrades}W`;
-                        document.getElementById('lossCount').textContent = `${losingTrades}L`;
-                        
-                        // 24h stats
-                        document.getElementById('winRate24h').textContent = `${(data.win_rate_24h || 0).toFixed(1)}%`;
-                        document.getElementById('totalTrades24h').textContent = `${data.trades_24h || 0} TRADES`;
-                        document.getElementById('winCount24h').textContent = `${data.wins_24h || 0}W`;
-                        document.getElementById('lossCount24h').textContent = `${data.losses_24h || 0}L`;
-                        
-                        // 30d stats
-                        document.getElementById('winRateMonth').textContent = `${(data.win_rate_month || 0).toFixed(1)}%`;
-                        document.getElementById('totalTradesMonth').textContent = `${data.trades_month || 0} TRADES`;
-                        document.getElementById('winCountMonth').textContent = `${data.wins_month || 0}W`;
-                        document.getElementById('lossCountMonth').textContent = `${data.losses_month || 0}L`;
+                        document.getElementById('winCount').textContent = `${winningTrades} WIN`;
+                        document.getElementById('lossCount').textContent = `${losingTrades} LOSS`;
                         
                         // Update positions table with real data
                         updatePositionsTable(data.positions || []);
