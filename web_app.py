@@ -266,7 +266,15 @@ else:
 
 # Configure CORS for production
 cors_origins = "*" if os.getenv('FLASK_ENV') == 'development' else None
-socketio = SocketIO(app, cors_allowed_origins=cors_origins)
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins=cors_origins,
+    async_mode='threading',
+    ping_timeout=60,
+    ping_interval=25,
+    logger=False,
+    engineio_logger=False
+)
 
 # Global variables
 settings = None
