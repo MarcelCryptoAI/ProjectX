@@ -4448,6 +4448,38 @@ def get_symbols_info():
             'details': error_details
         }), 500
 
+@app.route('/api/debug_settings')
+def debug_settings():
+    """Debug endpoint to check what settings are actually loaded"""
+    try:
+        # Use global database instance
+        db = db_instance
+        db_settings = db.load_settings()
+        
+        # Also load YAML for comparison
+        from utils.settings_loader import Settings
+        yaml_settings = Settings.load('config/settings.yaml')
+        
+        return jsonify({
+            'success': True,
+            'database_settings': dict(db_settings) if db_settings else None,
+            'yaml_settings': {
+                'ai_confidence_threshold': getattr(yaml_settings, 'ai_confidence_threshold', 'NOT_SET'),
+                'ai_accuracy_threshold': getattr(yaml_settings, 'ai_accuracy_threshold', 'NOT_SET'),
+                'take_profit_percent': getattr(yaml_settings, 'take_profit_percent', 'NOT_SET'),
+                'stop_loss_percent': getattr(yaml_settings, 'stop_loss_percent', 'NOT_SET'),
+                'min_take_profit_percent': getattr(yaml_settings, 'min_take_profit_percent', 'NOT_SET'),
+                'max_take_profit_percent': getattr(yaml_settings, 'max_take_profit_percent', 'NOT_SET')
+            },
+            'database_keys_count': len(db_settings) if db_settings else 0
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/training_symbols')
 def get_training_symbols():
     """Get symbols that will be used for training"""

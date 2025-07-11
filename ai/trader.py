@@ -34,31 +34,45 @@ class AITrader:
         # Use market conditions as provided
         adjusted_market_conditions = market_conditions or {}
         
-        # Get take profit settings from database with fallback to YAML
+        # STRICT database enforcement - NO YAML fallback for user settings
         try:
             from database import TradingDatabase
             db = TradingDatabase()
             db_settings = db.load_settings()
             
+            if not db_settings:
+                raise Exception("Database settings are empty - cannot proceed without user configuration")
+            
             # Check if dynamic TP is enabled
             enable_dynamic_tp = db_settings.get('enableDynamicTP', True)
             
             if enable_dynamic_tp:
-                # Use dynamic TP with min/max bounds
-                min_tp = float(db_settings.get('minTakeProfit', self.settings.min_take_profit_percent))
-                max_tp = float(db_settings.get('maxTakeProfit', self.settings.max_take_profit_percent))
+                # Use dynamic TP with min/max bounds - MUST come from database
+                if 'minTakeProfit' not in db_settings or 'maxTakeProfit' not in db_settings:
+                    raise Exception("Dynamic TP enabled but minTakeProfit/maxTakeProfit not found in database")
+                min_tp = float(db_settings['minTakeProfit'])
+                max_tp = float(db_settings['maxTakeProfit'])
                 default_tp = (min_tp + max_tp) / 2  # Use midpoint as default for dynamic
             else:
-                # Use static TP value
-                static_tp = float(db_settings.get('staticTakeProfit', self.settings.take_profit_percent))
+                # Use static TP value - MUST come from database
+                if 'staticTakeProfit' not in db_settings:
+                    raise Exception("Static TP selected but staticTakeProfit not found in database")
+                static_tp = float(db_settings['staticTakeProfit'])
                 min_tp = static_tp
                 max_tp = static_tp
                 default_tp = static_tp
-        except:
-            # Fallback to YAML settings
+        except Exception as e:
+            # Log the error and use YAML as emergency fallback ONLY
+            self.logger.error(f"CRITICAL: Database settings failed: {e}")
+            self.logger.error("Using YAML emergency fallback - user settings will be ignored!")
             min_tp = self.settings.min_take_profit_percent
             max_tp = self.settings.max_take_profit_percent
             default_tp = self.settings.take_profit_percent
+        
+        # Log which settings are being used for debugging
+        self.logger.info(f"TP Settings: min={min_tp}%, max={max_tp}%, default={default_tp}%")
+        if 'db_settings' in locals():
+            self.logger.info(f"Database settings loaded: enableDynamicTP={db_settings.get('enableDynamicTP', 'NOT_SET')}")
         
         # Generate AI-determined take profit based on market conditions
         ai_take_profit = self._calculate_dynamic_take_profit(
@@ -242,24 +256,38 @@ class AITrader:
     
     def _calculate_dynamic_stop_loss(self, market_conditions=None):
         """Calculate AI-advised stop loss based on market conditions"""
-        # Get stop loss settings from database with fallback to YAML
+        # STRICT database enforcement for stop loss
         try:
             from database import TradingDatabase
             db = TradingDatabase()
             db_settings = db.load_settings()
             
+            if not db_settings:
+                raise Exception("Database settings are empty - cannot proceed without stop loss configuration")
+            
             # Check if dynamic SL is enabled
             enable_dynamic_sl = db_settings.get('enableDynamicSL', True)
             
             if enable_dynamic_sl:
-                # Use dynamic SL calculation (will be adjusted by market conditions below)
-                base_sl = float(db_settings.get('defaultStopLoss', self.settings.stop_loss_percent))
+                # Use dynamic SL calculation - need default base from database
+                if 'defaultStopLoss' in db_settings:
+                    base_sl = float(db_settings['defaultStopLoss'])
+                else:
+                    # If no defaultStopLoss, calculate reasonable base from static if available
+                    if 'staticStopLoss' in db_settings:
+                        base_sl = float(db_settings['staticStopLoss'])
+                    else:
+                        raise Exception("Dynamic SL enabled but no stop loss value found in database")
             else:
-                # Use static SL value - no market adjustments
-                static_sl = float(db_settings.get('staticStopLoss', self.settings.stop_loss_percent))
+                # Use static SL value - MUST come from database
+                if 'staticStopLoss' not in db_settings:
+                    raise Exception("Static SL selected but staticStopLoss not found in database")
+                static_sl = float(db_settings['staticStopLoss'])
                 return static_sl
-        except:
-            # Fallback to YAML settings
+        except Exception as e:
+            # Log the error and use YAML as emergency fallback ONLY
+            self.logger.error(f"CRITICAL: Database stop loss settings failed: {e}")
+            self.logger.error("Using YAML emergency fallback for stop loss!")
             base_sl = self.settings.stop_loss_percent
         
         if market_conditions:

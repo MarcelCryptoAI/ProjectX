@@ -493,14 +493,14 @@ class AIWorker:
                     else:
                         raise Exception("No database settings found")
                 except Exception as db_error:
-                    # Fall back to YAML settings
+                    # Log database failure and use method that enforces database-first
+                    self.console_logger.log('ERROR', f'Database settings failed in reset signals: {db_error}')
+                    ai_threshold = self.get_ai_confidence_threshold()  # Uses database-first logic
+                    # Get accuracy threshold with database-first approach
                     try:
-                        from utils.settings_loader import Settings
-                        settings = Settings.load('config/settings.yaml')
-                        ai_threshold = settings.ai_confidence_threshold
-                        accuracy_threshold = settings.ai_accuracy_threshold
+                        db_settings = self.database.load_settings()
+                        accuracy_threshold = float(db_settings.get('accuracyThreshold', 70)) if db_settings else 70
                     except:
-                        ai_threshold = self.settings.bot.get('ai_confidence_threshold', 75)  # Final fallback
                         accuracy_threshold = self.settings.bot.get('ai_accuracy_threshold', 70)
                 
                 # If signal still meets requirements, reset to waiting
