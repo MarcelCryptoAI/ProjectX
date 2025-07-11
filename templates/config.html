@@ -342,25 +342,54 @@
                             <h3 class="text-xl font-bold text-neon-cyan mb-4">
                                 <i class="fas fa-target mr-2"></i>Take Profit & Stop Loss
                             </h3>
-                            <div class="grid grid-cols-2 gap-6">
-                                <div>
-                                    <label for="defaultTakeProfit" class="form-label">Default Take Profit (%)</label>
-                                    <input type="number" class="form-input w-full" id="defaultTakeProfit" step="0.1" min="0.1" max="50" value="3.0">
-                                </div>
-                                <div>
-                                    <label for="defaultStopLoss" class="form-label">Default Stop Loss (%)</label>
-                                    <input type="number" class="form-input w-full" id="defaultStopLoss" step="0.1" min="0.1" max="20" value="1.5">
-                                </div>
+                            
+                            <!-- Dynamic Take Profit Switch -->
+                            <div class="mb-6">
+                                <label for="enableDynamicTP" class="form-label">Enable Dynamic Take Profit (AI Calculation)</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="enableDynamicTP" onchange="toggleDynamicTP()" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <div class="form-text">When enabled, AI calculates take profit within min/max bounds</div>
+                            </div>
+                            
+                            <!-- Static Take Profit (hidden by default) -->
+                            <div id="staticTPSection" class="mb-6" style="display: none;">
+                                <label for="staticTakeProfit" class="form-label">Static Take Profit (%)</label>
+                                <input type="number" class="form-input w-full" id="staticTakeProfit" step="0.1" min="0.1" max="50" value="3.0">
+                                <div class="form-text">Fixed take profit percentage for all trades</div>
+                            </div>
+                            
+                            <!-- Min/Max TP bounds (shown when dynamic is enabled) -->
+                            <div id="dynamicTPSection" class="grid grid-cols-2 gap-6 mb-6">
                                 <div>
                                     <label for="minTakeProfit" class="form-label">Min Take Profit (%)</label>
-                                    <input type="number" class="form-input w-full" id="minTakeProfit" step="0.1" min="0.1" max="50" value="1.0">
+                                    <input type="number" class="form-input w-full" id="minTakeProfit" step="0.1" min="0.1" max="50" value="2.0">
                                     <div class="form-text">Minimum allowed AI take profit</div>
                                 </div>
                                 <div>
                                     <label for="maxTakeProfit" class="form-label">Max Take Profit (%)</label>
-                                    <input type="number" class="form-input w-full" id="maxTakeProfit" step="0.1" min="0.1" max="100" value="10.0">
+                                    <input type="number" class="form-input w-full" id="maxTakeProfit" step="0.1" min="0.1" max="100" value="5.0">
                                     <div class="form-text">Maximum allowed AI take profit</div>
                                 </div>
+                            </div>
+                            
+                            <!-- Dynamic Stop Loss Switch -->
+                            <div class="mb-6">
+                                <label for="enableDynamicSL" class="form-label">Enable Dynamic Stop Loss (AI Calculation)</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="enableDynamicSL" onchange="toggleDynamicSL()" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <div class="form-text">When enabled, AI calculates stop loss based on market conditions</div>
+                            </div>
+                            
+                            <!-- Static Stop Loss (hidden by default) -->
+                            <div id="staticSLSection" class="mb-6" style="display: none;">
+                                <label for="staticStopLoss" class="form-label">Static Stop Loss (%)</label>
+                                <input type="number" class="form-input w-full" id="staticStopLoss" step="0.1" min="0.1" max="20" value="2.0">
+                                <div class="form-text">Fixed stop loss percentage for all trades</div>
+                            </div>
                                 <div>
                                     <label for="trailingStopLoss" class="form-label">Enable Trailing Stop Loss</label>
                                     <label class="switch">
@@ -864,8 +893,12 @@
                 riskPerTrade: parseFloat(document.getElementById('riskPerTrade').value),
                 maxConcurrentTrades: parseInt(document.getElementById('maxConcurrentTrades').value),
                 minTradeAmount: parseFloat(document.getElementById('minTradeAmount').value),
-                defaultTakeProfit: parseFloat(document.getElementById('defaultTakeProfit').value),
-                defaultStopLoss: parseFloat(document.getElementById('defaultStopLoss').value),
+                
+                // New TP/SL settings
+                enableDynamicTP: document.getElementById('enableDynamicTP').checked,
+                staticTakeProfit: parseFloat(document.getElementById('staticTakeProfit').value),
+                enableDynamicSL: document.getElementById('enableDynamicSL').checked,
+                staticStopLoss: parseFloat(document.getElementById('staticStopLoss').value),
                 minTakeProfit: parseFloat(document.getElementById('minTakeProfit').value),
                 maxTakeProfit: parseFloat(document.getElementById('maxTakeProfit').value),
                 trailingStopLoss: document.getElementById('trailingStopLoss').checked,
@@ -1253,6 +1286,33 @@
                 });
         }
         
+        // Toggle Dynamic Take Profit
+        function toggleDynamicTP() {
+            const enableDynamicTP = document.getElementById('enableDynamicTP').checked;
+            const staticTPSection = document.getElementById('staticTPSection');
+            const dynamicTPSection = document.getElementById('dynamicTPSection');
+            
+            if (enableDynamicTP) {
+                staticTPSection.style.display = 'none';
+                dynamicTPSection.style.display = 'grid';
+            } else {
+                staticTPSection.style.display = 'block';
+                dynamicTPSection.style.display = 'none';
+            }
+        }
+        
+        // Toggle Dynamic Stop Loss
+        function toggleDynamicSL() {
+            const enableDynamicSL = document.getElementById('enableDynamicSL').checked;
+            const staticSLSection = document.getElementById('staticSLSection');
+            
+            if (enableDynamicSL) {
+                staticSLSection.style.display = 'none';
+            } else {
+                staticSLSection.style.display = 'block';
+            }
+        }
+        
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadCurrentBalance();
@@ -1263,6 +1323,8 @@
             // Initialize toggle options
             toggleTrailingStopOptions();
             togglePartialTakeProfitOptions();
+            toggleDynamicTP();
+            toggleDynamicSL();
             
             // Auto-refresh balance every 30 seconds
             setInterval(loadCurrentBalance, 30000);

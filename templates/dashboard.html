@@ -337,35 +337,35 @@
                         <div class="space-y-2 text-xs">
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Max Positions:</span>
-                                <span class="text-neon-yellow" id="maxPositions">20</span>
+                                <span class="text-neon-yellow" id="maxPositions">Loading...</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">AI Confidence:</span>
-                                <span class="text-neon-yellow" id="aiConfidence">95%</span>
+                                <span class="text-neon-yellow" id="aiConfidence">Loading...</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Min Accuracy:</span>
-                                <span class="text-neon-yellow" id="minAccuracy">88%</span>
+                                <span class="text-neon-yellow" id="minAccuracy">Loading...</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Amount per Trade:</span>
-                                <span class="text-neon-yellow" id="amountPerTrade">$100</span>
+                                <span class="text-neon-yellow" id="amountPerTrade">Loading...</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Leverage:</span>
-                                <span class="text-neon-yellow" id="leverage">10x</span>
+                                <span class="text-neon-yellow" id="leverage">Loading...</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Dynamic TP:</span>
-                                <span class="text-neon-yellow" id="dynamicTP">OFF</span>
+                                <span class="text-neon-yellow" id="dynamicTP">Loading...</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Trailing SL:</span>
-                                <span class="text-neon-yellow" id="trailingSL">OFF</span>
+                                <span class="text-neon-yellow" id="trailingSL">Loading...</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Trailing %:</span>
-                                <span class="text-neon-yellow" id="trailingPercent">2%</span>
+                                <span class="text-neon-yellow" id="trailingPercent">Loading...</span>
                             </div>
                         </div>
                     </div>
@@ -1351,24 +1351,27 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data && data.success) {
-                        // Update max concurrent trades from user settings
-                        const maxPositions = data.maxConcurrentTrades || data.max_positions || 20;
-                        document.getElementById('maxPositions').textContent = maxPositions;
+                        // Update max concurrent trades from user settings - use database value
+                        const maxPositions = data.maxConcurrentTrades || data.max_positions;
+                        document.getElementById('maxPositions').textContent = maxPositions || 'N/A';
                         
-                        // Update AI confidence threshold
-                        const aiConfidence = data.ai_confidence_threshold || 75;
-                        document.getElementById('aiConfidence').textContent = `${aiConfidence}%`;
+                        // Update AI confidence threshold from settings
+                        const aiConfidence = data.ai_confidence_threshold || data.settings?.confidenceThreshold;
+                        document.getElementById('aiConfidence').textContent = aiConfidence ? `${aiConfidence}%` : 'N/A';
                         
                         // Update risk per trade (amount calculation)
-                        const riskPerTrade = data.risk_per_trade || 2.0;
-                        document.getElementById('amountPerTrade').textContent = `${riskPerTrade}% of balance`;
+                        const riskPerTrade = data.risk_per_trade;
+                        document.getElementById('amountPerTrade').textContent = riskPerTrade ? `${riskPerTrade}% of balance` : 'N/A';
                         
                         // Update leverage range
-                        const minLeverage = data.min_leverage || 1;
-                        const maxLeverage = data.max_leverage || 10;
-                        const leverageStrategy = data.leverage_strategy || 'confidence_based';
-                        document.getElementById('leverage').textContent = `${minLeverage}x-${maxLeverage}x (${leverageStrategy})`;
-                        
+                        const minLeverage = data.min_leverage;
+                        const maxLeverage = data.max_leverage;
+                        const leverageStrategy = data.leverage_strategy;
+                        if (minLeverage && maxLeverage) {
+                            document.getElementById('leverage').textContent = `${minLeverage}x-${maxLeverage}x (${leverageStrategy || 'confidence_based'})`;
+                        } else {
+                            document.getElementById('leverage').textContent = 'N/A';
+                        }
                         
                         // Update dynamic TP (always ON for 4-level TP)
                         document.getElementById('dynamicTP').textContent = 'ON (4 levels)';
@@ -1378,28 +1381,32 @@
                         document.getElementById('trailingSL').textContent = 'ON (TP1 → BE+0.1%)';
                         document.getElementById('trailingSL').className = 'text-neon-green';
                         
-                        // Update trailing percentage
-                        document.getElementById('trailingPercent').textContent = '0.1%';
+                        // Update trailing percentage from settings
+                        const trailingPercent = data.trailing_stop_percent || data.settings?.trailingStopPercent;
+                        document.getElementById('trailingPercent').textContent = trailingPercent ? `${trailingPercent}%` : 'N/A';
                         
-                        // Update min accuracy (fixed at 60% for signals)
-                        document.getElementById('minAccuracy').textContent = '88%';
+                        // Update min accuracy from settings - use database value
+                        const accuracyThreshold = data.ai_accuracy_threshold || data.settings?.accuracyThreshold;
+                        document.getElementById('minAccuracy').textContent = accuracyThreshold ? `${accuracyThreshold}%` : 'N/A';
+                        
                         console.log('Trading parameters updated successfully');
                         
-                        // Update AI confidence from settings
-                        const confidenceThreshold = data.settings.confidenceThreshold || 95;
-                        document.getElementById('aiConfidence').textContent = `${confidenceThreshold}%`;
-                        
-                        // Update accuracy threshold from settings
-                        const accuracyThreshold = data.settings.accuracyThreshold || 88;
-                        document.getElementById('minAccuracy').textContent = `${accuracyThreshold}%`;
-                        
                         // Update auto execute from settings
-                        const autoExecute = data.settings.autoExecute || false;
-                        document.getElementById('autoExecute').checked = autoExecute;
+                        const autoExecute = data.settings?.autoExecute;
+                        if (document.getElementById('autoExecute')) {
+                            document.getElementById('autoExecute').checked = autoExecute || false;
+                        }
                     }
                 })
                 .catch(error => {
                     console.error('Failed to load extended settings:', error);
+                    // Set all values to Error state
+                    document.getElementById('maxPositions').textContent = 'Error';
+                    document.getElementById('aiConfidence').textContent = 'Error';
+                    document.getElementById('minAccuracy').textContent = 'Error';
+                    document.getElementById('amountPerTrade').textContent = 'Error';
+                    document.getElementById('leverage').textContent = 'Error';
+                    document.getElementById('trailingPercent').textContent = 'Error';
                 });
         }
         

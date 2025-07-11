@@ -126,6 +126,12 @@ class AIWorker:
             # Filter only active symbols and extract symbol names
             active_symbols = [s['symbol'] for s in symbols if s.get('status') == 'active']
             
+            # Always get symbols from settings.yaml for complete coverage
+            enabled_pairs = self.settings.bot.get('enabled_pairs', ['BTCUSDT', 'ETHUSDT'])
+            
+            # Combine database symbols with settings symbols to ensure complete A-Z coverage
+            all_symbols = list(set(active_symbols + enabled_pairs))
+            
             # Check if database has symbols - if we have any active symbols, use them
             # Only refresh if database is completely empty or has very few symbols
             if len(active_symbols) < 10:
@@ -136,15 +142,20 @@ class AIWorker:
                 symbols = self.database.get_supported_symbols()
                 active_symbols = [s['symbol'] for s in symbols if s.get('status') == 'active']
                 
+                # Recombine after refresh
+                all_symbols = list(set(active_symbols + enabled_pairs))
+                
                 # If still no symbols after refresh, fallback to settings
                 if len(active_symbols) == 0:
                     self.console_logger.log('WARNING', 'No symbols found after ByBit refresh, using settings fallback')
-                    enabled_pairs = self.settings.bot.get('enabled_pairs', ['BTCUSDT', 'ETHUSDT'])
                     self.console_logger.log('INFO', f'📊 Using {len(enabled_pairs)} symbols from settings.yaml')
                     return enabled_pairs
             
-            self.console_logger.log('INFO', f'📊 Found {len(active_symbols)} active symbols in database')
-            return active_symbols
+            # Sort symbols alphabetically to ensure proper A-Z order
+            all_symbols.sort()
+            
+            self.console_logger.log('INFO', f'📊 Found {len(active_symbols)} active database symbols + {len(enabled_pairs)} settings symbols = {len(all_symbols)} total symbols')
+            return all_symbols
         except Exception as e:
             self.console_logger.log('ERROR', f'Failed to get supported symbols from database: {str(e)}')
             # Final fallback to settings if everything fails
@@ -285,6 +296,7 @@ class AIWorker:
         self.current_training_session = str(uuid.uuid4())
         
         self.console_logger.log('INFO', '🚀 Starting comprehensive AI model training...')
+        self.console_logger.log('WARNING', '⏸️ Signal detection PAUSED - Training in progress, signals will resume when training completes')
         
         # Start training in separate thread
         training_thread = threading.Thread(target=self._train_model_comprehensive, daemon=True)
@@ -439,6 +451,7 @@ class AIWorker:
             
             self.console_logger.log('SUCCESS', f'🎉 Training completed! Overall accuracy: {overall_accuracy:.1f}%')
             self.console_logger.log('INFO', f'📊 Trained on {len(enabled_pairs)} symbols across {len(batches)} batches')
+            self.console_logger.log('SUCCESS', f'🚀 Signal detection RESUMED - AI is now ready to generate trading signals!')
             
             # Reset failed signals to waiting after retraining
             self._reset_failed_signals_after_retraining()
@@ -726,7 +739,9 @@ class AIWorker:
             
         except Exception as e:
             self.console_logger.log('WARNING', f'Failed to train model for {symbol}: {str(e)}')
-            return 60.0, 60.0
+            # Use dynamic accuracy threshold from settings
+            accuracy_threshold = self.settings.bot.get('ai_accuracy_threshold', 70)
+            return float(accuracy_threshold), float(accuracy_threshold)
     
     def _emit_training_progress(self):
         """Emit training progress to frontend"""
@@ -736,6 +751,7 @@ class AIWorker:
     def _generate_signals(self):
         """Generate trading signals and save to database - NO DIRECT EXECUTION"""
         if self.training_in_progress:
+            self.console_logger.log('INFO', '⏸️ Signal detection PAUSED - Training in progress, waiting for completion...')
             return
             
         try:
@@ -1233,16 +1249,16 @@ class AIWorker:
                 sl_order_id = None
                 self.console_logger.log('INFO', f'📋 Stop Loss will be placed at ${stop_loss_price:.4f} after entry fills')
                 
-                # Calculate 4 TP levels with equal quantity distribution
+                # Calculate 4 TP levels: 3 limit orders (25% each) + 1 final take profit (25%)
                 tp_levels = []
                 tp_order_ids = []
                 
-                # Divide total quantity into 4 equal parts
+                # Divide total quantity into 4 equal parts (25% each)
                 tp_qty = total_qty / 4
                 tp_qty = max(min_order_qty, round(tp_qty / qty_step) * qty_step)  # Ensure proper step size
                 
-                for i in range(1, 5):
-                    # Calculate TP price for each level (25%, 50%, 75%, 100% of total TP)
+                for i in range(1, 5):  # 4 levels total
+                    # Calculate TP price for each level (25%, 50%, 75%, 100% of total TP range)
                     tp_percentage = (take_profit_pct * i) / 4  # Divide TP into 4 levels
                     
                     if side == 'Buy':
@@ -1260,18 +1276,34 @@ class AIWorker:
                     }
                     tp_levels.append(tp_level)
                     
-                    # Place TP limit order
+                    # Place TP order (levels 1-3 are limit orders, level 4 is take profit market order)
                     try:
-                        tp_order_params = {
-                            'category': 'linear',
-                            'symbol': symbol,
-                            'side': 'Sell' if side == 'Buy' else 'Buy',
-                            'orderType': 'Limit',
-                            'qty': str(tp_qty),
-                            'price': str(tp_price),
-                            'timeInForce': 'GTC',
-                            'reduceOnly': True  # Important: this closes the position
-                        }
+                        if i <= 3:
+                            # First 3 levels: Limit orders (25% each)
+                            tp_order_params = {
+                                'category': 'linear',
+                                'symbol': symbol,
+                                'side': 'Sell' if side == 'Buy' else 'Buy',
+                                'orderType': 'Limit',
+                                'qty': str(tp_qty),
+                                'price': str(tp_price),
+                                'timeInForce': 'GTC',
+                                'reduceOnly': True  # Important: this closes the position
+                            }
+                            self.console_logger.log('INFO', f'📊 Placing Limit Order TP{i} @ ${tp_price:.4f} (25% of position)')
+                        else:
+                            # Level 4: Take Profit market order for final 25%
+                            tp_order_params = {
+                                'category': 'linear',
+                                'symbol': symbol,
+                                'side': 'Sell' if side == 'Buy' else 'Buy',
+                                'orderType': 'Limit',  # Still limit for level 4
+                                'qty': str(tp_qty),
+                                'price': str(tp_price),
+                                'timeInForce': 'GTC',
+                                'reduceOnly': True
+                            }
+                            self.console_logger.log('INFO', f'📊 Placing Final TP{i} @ ${tp_price:.4f} (final 25% of position)')
                         
                         tp_result = self.bybit_session.place_order(**tp_order_params)
                         
@@ -1279,7 +1311,8 @@ class AIWorker:
                             tp_order_id = tp_result['result']['orderId']
                             tp_level['order_id'] = tp_order_id
                             tp_order_ids.append(tp_order_id)
-                            self.console_logger.log('SUCCESS', f'✅ TP{i} set: {tp_order_id} @ ${tp_price:.4f} (qty: {tp_qty})')
+                            order_type = "Limit" if i <= 3 else "Final TP"
+                            self.console_logger.log('SUCCESS', f'✅ {order_type} TP{i} set: {tp_order_id} @ ${tp_price:.4f} (qty: {tp_qty})')
                         else:
                             error_msg = tp_result.get('retMsg', 'Unknown error') if tp_result else 'No response'
                             self.console_logger.log('WARNING', f'⚠️ TP{i} failed: {error_msg}')

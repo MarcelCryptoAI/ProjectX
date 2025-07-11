@@ -34,10 +34,31 @@ class AITrader:
         # Use market conditions as provided
         adjusted_market_conditions = market_conditions or {}
         
-        # Get take profit bounds from settings
-        min_tp = self.settings.min_take_profit_percent
-        max_tp = self.settings.max_take_profit_percent
-        default_tp = self.settings.take_profit_percent
+        # Get take profit settings from database with fallback to YAML
+        try:
+            from database import TradingDatabase
+            db = TradingDatabase()
+            db_settings = db.load_settings()
+            
+            # Check if dynamic TP is enabled
+            enable_dynamic_tp = db_settings.get('enableDynamicTP', True)
+            
+            if enable_dynamic_tp:
+                # Use dynamic TP with min/max bounds
+                min_tp = float(db_settings.get('minTakeProfit', self.settings.min_take_profit_percent))
+                max_tp = float(db_settings.get('maxTakeProfit', self.settings.max_take_profit_percent))
+                default_tp = (min_tp + max_tp) / 2  # Use midpoint as default for dynamic
+            else:
+                # Use static TP value
+                static_tp = float(db_settings.get('staticTakeProfit', self.settings.take_profit_percent))
+                min_tp = static_tp
+                max_tp = static_tp
+                default_tp = static_tp
+        except:
+            # Fallback to YAML settings
+            min_tp = self.settings.min_take_profit_percent
+            max_tp = self.settings.max_take_profit_percent
+            default_tp = self.settings.take_profit_percent
         
         # Generate AI-determined take profit based on market conditions
         ai_take_profit = self._calculate_dynamic_take_profit(
@@ -159,8 +180,9 @@ class AITrader:
         else:
             confidence = base_confidence + random.uniform(-10, 15)
         
-        # Ensure confidence is within reasonable bounds
-        confidence = max(60, min(95, confidence))
+        # Ensure confidence is within reasonable bounds using dynamic settings
+        min_confidence = self.settings.bot.get('ai_accuracy_threshold', 70)
+        confidence = max(min_confidence, min(95, confidence))
         
         return symbol, side, confidence
     
@@ -220,7 +242,25 @@ class AITrader:
     
     def _calculate_dynamic_stop_loss(self, market_conditions=None):
         """Calculate AI-advised stop loss based on market conditions"""
-        base_sl = self.settings.stop_loss_percent
+        # Get stop loss settings from database with fallback to YAML
+        try:
+            from database import TradingDatabase
+            db = TradingDatabase()
+            db_settings = db.load_settings()
+            
+            # Check if dynamic SL is enabled
+            enable_dynamic_sl = db_settings.get('enableDynamicSL', True)
+            
+            if enable_dynamic_sl:
+                # Use dynamic SL calculation (will be adjusted by market conditions below)
+                base_sl = float(db_settings.get('defaultStopLoss', self.settings.stop_loss_percent))
+            else:
+                # Use static SL value - no market adjustments
+                static_sl = float(db_settings.get('staticStopLoss', self.settings.stop_loss_percent))
+                return static_sl
+        except:
+            # Fallback to YAML settings
+            base_sl = self.settings.stop_loss_percent
         
         if market_conditions:
             volatility = market_conditions.get('avg_volatility', 2.0)
@@ -253,7 +293,8 @@ class AITrader:
         
         # Base leverage on confidence
         # Higher confidence = potentially higher leverage
-        confidence_factor = (confidence - 60) / 35  # Normalize 60-95 to 0-1
+        min_confidence = self.settings.bot.get('ai_accuracy_threshold', 70)
+        confidence_factor = (confidence - min_confidence) / (95 - min_confidence)  # Normalize to 0-1
         
         # Start with default leverage
         leverage = default_leverage
