@@ -2689,6 +2689,82 @@ def get_pnl_chart():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/debug_trades')
+def debug_trades():
+    """Debug endpoint to check trade counts"""
+    try:
+        # Initialize ByBit session
+        testnet = os.getenv('BYBIT_TESTNET', 'False').lower() == 'true'
+        bybit_session = HTTP(
+            testnet=testnet,
+            api_key=os.getenv('BYBIT_API_KEY'),
+            api_secret=os.getenv('BYBIT_API_SECRET'),
+        )
+        
+        # Get last 24h and 30d trades
+        now = datetime.utcnow()
+        yesterday = now - timedelta(days=1)
+        month_ago = now - timedelta(days=30)
+        
+        # Fetch all trades
+        all_trades = []
+        cursor = None
+        
+        while True:
+            params = {
+                "category": "linear",
+                "settleCoin": "USDT",
+                "limit": 200,
+                "startTime": int((now - timedelta(days=90)).timestamp() * 1000)
+            }
+            if cursor:
+                params["cursor"] = cursor
+            
+            response = bybit_session.get_closed_pnl(**params)
+            
+            if response and 'result' in response and response['result']['list']:
+                all_trades.extend(response['result']['list'])
+                
+                if 'nextPageCursor' in response['result'] and response['result']['nextPageCursor']:
+                    cursor = response['result']['nextPageCursor']
+                else:
+                    break
+            else:
+                break
+        
+        # Count trades by period
+        trades_24h = 0
+        trades_30d = 0
+        trades_all = len(all_trades)
+        
+        for trade in all_trades:
+            updated_time = trade.get('updatedTime')
+            if updated_time:
+                try:
+                    trade_time = datetime.fromtimestamp(int(updated_time) / 1000)
+                    if trade_time >= yesterday:
+                        trades_24h += 1
+                    if trade_time >= month_ago:
+                        trades_30d += 1
+                except:
+                    pass
+        
+        return jsonify({
+            'success': True,
+            'total_trades': trades_all,
+            'trades_24h': trades_24h,
+            'trades_30d': trades_30d,
+            'debug_info': {
+                'now': now.isoformat(),
+                'yesterday': yesterday.isoformat(),
+                'month_ago': month_ago.isoformat(),
+                'sample_trades': all_trades[:5] if all_trades else []
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/api/analytics_data')
 def get_analytics_data():
     try:
