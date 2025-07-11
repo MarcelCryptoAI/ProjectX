@@ -371,28 +371,7 @@
                     </div>
                 </div>
                 
-                <!-- Training Progress -->
-                <div class="glass-panel rounded-xl p-6" id="trainingProgressPanel" style="display: none;">
-                    <h4 class="text-lg font-bold text-neon-yellow mb-4 flex items-center">
-                        <i class="fas fa-brain mr-2 animate-pulse"></i> AI TRAINING
-                    </h4>
-                    <div class="space-y-3">
-                        <div>
-                            <div class="flex justify-between text-sm mb-1">
-                                <span>Progress</span>
-                                <span id="trainingPercent">0%</span>
-                            </div>
-                            <div class="w-full bg-dark-bg rounded-full h-3 overflow-hidden">
-                                <div class="h-full bg-gradient-to-r from-neon-yellow to-neon-orange transition-all duration-500" 
-                                     style="width: 0%" id="trainingProgressBar"></div>
-                            </div>
-                        </div>
-                        <div class="text-xs text-gray-400">
-                            <div>Symbol: <span id="currentSymbol" class="text-neon-cyan">-</span></div>
-                            <div>Batch: <span id="currentBatch" class="text-neon-yellow">0/0</span></div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Training Progress moved to main content area -->
                 
                 <!-- Activity Log -->
                 <div class="glass-panel rounded-xl p-6">
@@ -609,6 +588,45 @@
                     </div>
                     <div class="chart-container">
                         <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Training Progress -->
+            <div class="glass-panel rounded-xl p-6" id="trainingProgressPanel" style="display: none;">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold text-white flex items-center">
+                        <i class="fas fa-brain mr-3 text-neon-yellow animate-pulse"></i>
+                        AI MODEL TRAINING PROGRESS
+                    </h3>
+                    <div class="text-sm text-gray-400">
+                        <span>Status: </span><span id="trainingStatus" class="text-neon-yellow">Preparing...</span>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span>Overall Progress</span>
+                            <span id="trainingPercent" class="text-neon-yellow font-bold">0%</span>
+                        </div>
+                        <div class="w-full bg-dark-bg rounded-full h-4 overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-neon-yellow to-neon-orange transition-all duration-500" 
+                                 style="width: 0%" id="trainingProgressBar"></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4 text-sm">
+                        <div class="text-center p-3 bg-dark-bg/50 rounded-lg">
+                            <div class="text-gray-400">Current Symbol</div>
+                            <div id="currentSymbol" class="text-neon-cyan font-mono mt-1">-</div>
+                        </div>
+                        <div class="text-center p-3 bg-dark-bg/50 rounded-lg">
+                            <div class="text-gray-400">Batch Progress</div>
+                            <div id="currentBatch" class="text-neon-yellow font-mono mt-1">0/0</div>
+                        </div>
+                        <div class="text-center p-3 bg-dark-bg/50 rounded-lg">
+                            <div class="text-gray-400">Time Elapsed</div>
+                            <div id="trainingTime" class="text-neon-green font-mono mt-1">00:00</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1131,9 +1149,28 @@
         }
         
         // Training progress handler
+        let trainingStartTime = null;
+        let trainingTimerInterval = null;
+        
         function updateTrainingProgress(progress) {
             const panel = document.getElementById('trainingProgressPanel');
             panel.style.display = 'block';
+            
+            // Start timer if not started
+            if (!trainingStartTime && progress.overall_progress > 0) {
+                trainingStartTime = Date.now();
+                startTrainingTimer();
+            }
+            
+            // Update status
+            const statusEl = document.getElementById('trainingStatus');
+            if (progress.overall_progress >= 100) {
+                statusEl.textContent = 'Completed';
+                statusEl.className = 'text-neon-green';
+            } else {
+                statusEl.textContent = 'Training...';
+                statusEl.className = 'text-neon-yellow';
+            }
             
             document.getElementById('trainingPercent').textContent = `${progress.overall_progress.toFixed(1)}%`;
             document.getElementById('trainingProgressBar').style.width = `${progress.overall_progress}%`;
@@ -1141,9 +1178,32 @@
             document.getElementById('currentBatch').textContent = `${progress.current_batch}/${progress.total_batches}`;
             
             if (progress.overall_progress >= 100) {
+                stopTrainingTimer();
                 setTimeout(() => {
                     panel.style.display = 'none';
-                }, 5000);
+                    trainingStartTime = null;
+                }, 10000); // Show for 10 seconds after completion
+            }
+        }
+        
+        function startTrainingTimer() {
+            trainingTimerInterval = setInterval(updateTrainingTimer, 1000);
+        }
+        
+        function stopTrainingTimer() {
+            if (trainingTimerInterval) {
+                clearInterval(trainingTimerInterval);
+                trainingTimerInterval = null;
+            }
+        }
+        
+        function updateTrainingTimer() {
+            if (trainingStartTime) {
+                const elapsed = Math.floor((Date.now() - trainingStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                document.getElementById('trainingTime').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
         }
         
