@@ -3276,25 +3276,37 @@ def get_coin_analysis():
         ensure_components_initialized()
         ai_worker = get_ai_worker(socketio, bybit_session)
         
-        # Load database settings ONLY - NO FALLBACK
+        # Try to load database settings for thresholds
         try:
             db = get_database()
             db_settings = db.load_settings()
-            if not db_settings:
-                raise Exception("No database settings found")
-                
-            ai_confidence_threshold = float(db_settings['confidenceThreshold'])
-            ai_accuracy_threshold = float(db_settings['accuracyThreshold'])
-            auto_execute = db_settings.get('autoExecute', False)
-            
-            # Load TP/SL settings from database - NO FALLBACK
-            min_take_profit = float(db_settings['minTakeProfitPercent'])
-            max_take_profit = float(db_settings['maxTakeProfitPercent'])
-            base_take_profit = float(db_settings['takeProfitPercent'])
-            stop_loss_percent = float(db_settings['stopLossPercent'])
+            if db_settings:
+                ai_confidence_threshold = float(db_settings.get('confidenceThreshold', 75))
+                ai_accuracy_threshold = float(db_settings.get('accuracyThreshold', 70))
+                auto_execute = db_settings.get('autoExecute', False)
+                min_take_profit = float(db_settings.get('minTakeProfitPercent', 1))
+                max_take_profit = float(db_settings.get('maxTakeProfitPercent', 5))
+                base_take_profit = float(db_settings.get('takeProfitPercent', 3))
+                stop_loss_percent = float(db_settings.get('stopLossPercent', 2))
+            else:
+                # Use reasonable defaults for read-only display
+                ai_confidence_threshold = 75
+                ai_accuracy_threshold = 70
+                auto_execute = False
+                min_take_profit = 1
+                max_take_profit = 5
+                base_take_profit = 3
+                stop_loss_percent = 2
         except Exception as settings_error:
-            app.logger.error(f"Database settings required but not found: {settings_error}")
-            return jsonify({'error': 'Database settings required but not available'}), 500
+            app.logger.warning(f"Could not load database settings, using defaults: {settings_error}")
+            # Use reasonable defaults for read-only display
+            ai_confidence_threshold = 75
+            ai_accuracy_threshold = 70
+            auto_execute = False
+            min_take_profit = 1
+            max_take_profit = 5
+            base_take_profit = 3
+            stop_loss_percent = 2
         
         # Get training results from database
         coins_analysis = []
