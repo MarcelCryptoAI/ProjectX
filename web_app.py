@@ -2726,7 +2726,7 @@ def get_analytics_data():
         except:
             pass
         
-        # Count only completed signal trades from database
+        # Get P&L data from multiple sources
         try:
             from database import TradingDatabase
             db = get_database()
@@ -2734,6 +2734,16 @@ def get_analytics_data():
             
             # Filter for completed signal trades with P&L data
             completed_signals = [s for s in signal_trades if s.get('status') == 'completed' and s.get('realized_pnl') is not None]
+            
+            # Also get closed P&L from ByBit API
+            closed_pnl_response = bybit_session.get_closed_pnl(
+                category="linear",
+                settleCoin="USDT",
+                limit=200
+            )
+            
+            app.logger.info(f"Found {len(completed_signals)} completed AI signals from database")
+            
             trades_data['total_trades'] = len(completed_signals)
             
             # Calculate win/loss stats using stored P&L data
@@ -2808,6 +2818,42 @@ def get_analytics_data():
             # Add realized P&L data to trades_data
             trades_data['realized_pnl_24h'] = realized_pnl_24h
             trades_data['realized_pnl_all_time'] = realized_pnl_all_time
+            
+            # If no database signals, try to get P&L from ByBit closed P&L API
+            if len(completed_signals) == 0 and closed_pnl_response and 'result' in closed_pnl_response:
+                app.logger.info("No database signals found, using ByBit closed P&L data")
+                
+                for pnl_entry in closed_pnl_response['result']['list']:
+                    pnl = float(pnl_entry.get('closedPnl', 0))
+                    
+                    # Add to all-time P&L
+                    realized_pnl_all_time += pnl
+                    
+                    # Track wins and losses
+                    if pnl > 0:
+                        trades_data['winning_trades'] += 1
+                        trades_data['total_profit'] += pnl
+                        trades_data['largest_win'] = max(trades_data['largest_win'], pnl)
+                    elif pnl < 0:
+                        trades_data['losing_trades'] += 1
+                        trades_data['total_loss'] += abs(pnl)
+                        trades_data['largest_loss'] = min(trades_data['largest_loss'], pnl)
+                    
+                    trades_data['total_trades'] += 1
+                    
+                    # Check if trade was in last 24 hours
+                    updated_time = pnl_entry.get('updatedTime')
+                    if updated_time:
+                        try:
+                            trade_time = datetime.fromtimestamp(int(updated_time) / 1000)
+                            if trade_time >= yesterday:
+                                realized_pnl_24h += pnl
+                        except:
+                            pass
+                
+                # Update the data
+                trades_data['realized_pnl_24h'] = realized_pnl_24h
+                trades_data['realized_pnl_all_time'] = realized_pnl_all_time
                 
         except Exception as signal_error:
             # Fallback to empty data if signal database access fails
