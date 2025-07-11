@@ -52,7 +52,7 @@ class BreakevenMonitor:
                 if not self.initialize_bybit():
                     return []
                     
-            response = self.bybit_session.get_positions(category="linear", limit=200)
+            response = self.bybit_session.get_positions(category="linear", settleCoin="USDT", limit=200)
             if response.get('retCode') == 0:
                 positions = []
                 for position in response['result']['list']:

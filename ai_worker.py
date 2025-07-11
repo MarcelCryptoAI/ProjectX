@@ -94,6 +94,7 @@ class AIWorker:
         self.database = get_database()
         # Direct pybit integration - no separate executor needed
         # Max concurrent trades will be loaded from database when needed
+        self.max_concurrent_trades = 20  # Default, will be loaded from database
         self.last_heartbeat = datetime.now()
         self.active_trades = {}  # Track active trades for SL management
         if bybit_session:
@@ -355,16 +356,12 @@ class AIWorker:
     def _train_model_comprehensive(self):
         """Comprehensive AI model training with batch processing"""
         try:
-            # Get supported symbols from database first, fallback to settings
+            # Get supported symbols from database only
             enabled_pairs = self.get_supported_symbols()
             
             if not enabled_pairs:
-                self.console_logger.log('WARNING', 'No supported symbols found in database, using settings fallback')
-                # NO FALLBACK - only use database symbols
-            enabled_pairs = active_symbols
-            
-            if not enabled_pairs:
-                self.console_logger.log('ERROR', 'No trading pairs enabled for training')
+                self.console_logger.log('ERROR', 'No supported symbols found in database - cannot train')
+                self.training_in_progress = False
                 return
             
             # Initialize training session
@@ -1159,7 +1156,7 @@ class AIWorker:
             
             # Check for existing positions in the same direction
             try:
-                positions = self.bybit_session.get_positions(category="linear", symbol=symbol)
+                positions = self.bybit_session.get_positions(category="linear", symbol=symbol, settleCoin="USDT")
                 if positions and 'result' in positions:
                     for position in positions['result']['list']:
                         if position['symbol'] == symbol and float(position['size']) > 0:
@@ -1602,7 +1599,7 @@ class AIWorker:
             positions = None
             for attempt in range(max_retries):
                 try:
-                    positions = self.bybit_session.get_positions(category="linear")
+                    positions = self.bybit_session.get_positions(category="linear", settleCoin="USDT")
                     if positions and 'result' in positions:
                         break
                     time.sleep(retry_delay)
@@ -2013,7 +2010,7 @@ class AIWorker:
                 return
                 
             # Get all current positions
-            positions = self.bybit_session.get_positions(category="linear")
+            positions = self.bybit_session.get_positions(category="linear", settleCoin="USDT")
             if not positions or 'result' not in positions:
                 return
                 
@@ -2114,7 +2111,7 @@ class AIWorker:
                 return
                 
             # Get all current positions
-            positions = self.bybit_session.get_positions(category="linear")
+            positions = self.bybit_session.get_positions(category="linear", settleCoin="USDT")
             if not positions or 'result' not in positions:
                 return
                 

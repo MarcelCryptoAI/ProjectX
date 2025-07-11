@@ -3576,7 +3576,7 @@ def get_trading_signals():
                                 else:
                                     # Check if same direction position exists
                                     try:
-                                        positions = bybit_session.get_positions(category="linear", symbol=result['symbol'], limit=200)
+                                        positions = bybit_session.get_positions(category="linear", symbol=result['symbol'], settleCoin="USDT", limit=200)
                                         if positions and 'result' in positions:
                                             for position in positions['result']['list']:
                                                 if position['symbol'] == result['symbol'] and float(position['size']) > 0:
