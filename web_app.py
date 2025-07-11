@@ -2873,11 +2873,71 @@ def get_analytics_data():
                 'realized_pnl_all_time': 0
             }
         
-        # Calculate performance metrics - ONLY real data
+        # Calculate performance metrics with time-based winrates
         win_rate = 0
+        win_rate_24h = 0
+        win_rate_month = 0
+        wins_24h = 0
+        losses_24h = 0
+        trades_24h = 0
+        wins_month = 0
+        losses_month = 0
+        trades_month = 0
+        
+        # Calculate all-time winrate
         if trades_data['total_trades'] > 0:
             win_rate = (trades_data['winning_trades'] / trades_data['total_trades']) * 100
-        # No fallback estimates - only real data
+        
+        # Calculate time-based statistics
+        now = datetime.utcnow()
+        yesterday = now - timedelta(days=1)
+        month_ago = now - timedelta(days=30)
+        
+        # Process signals for time-based stats
+        for signal in completed_signals:
+            if signal.get('exit_time'):
+                try:
+                    exit_time = datetime.fromisoformat(str(signal.get('exit_time')).replace('Z', '+00:00'))
+                    if exit_time.tzinfo is not None:
+                        exit_time = exit_time.utctimetuple()
+                        exit_time = datetime(*exit_time[:6])
+                    
+                    pnl = float(signal.get('realized_pnl', 0))
+                    
+                    # 24h stats
+                    if exit_time >= yesterday:
+                        trades_24h += 1
+                        if pnl > 0:
+                            wins_24h += 1
+                        elif pnl < 0:
+                            losses_24h += 1
+                    
+                    # 30 day stats  
+                    if exit_time >= month_ago:
+                        trades_month += 1
+                        if pnl > 0:
+                            wins_month += 1
+                        elif pnl < 0:
+                            losses_month += 1
+                except:
+                    pass
+        
+        # Calculate winrates for different periods
+        if trades_24h > 0:
+            win_rate_24h = (wins_24h / trades_24h) * 100
+        if trades_month > 0:
+            win_rate_month = (wins_month / trades_month) * 100
+        
+        # Add detailed stats to trades_data
+        trades_data['win_rate'] = win_rate
+        trades_data['win_rate_24h'] = win_rate_24h
+        trades_data['win_rate_month'] = win_rate_month
+        trades_data['wins_24h'] = wins_24h
+        trades_data['losses_24h'] = losses_24h
+        trades_data['trades_24h'] = trades_24h
+        trades_data['wins_month'] = wins_month
+        trades_data['losses_month'] = losses_month
+        trades_data['trades_month'] = trades_month
         
         # Format positions for frontend with TP level information
         formatted_positions = []
@@ -3032,6 +3092,14 @@ def get_analytics_data():
             'winning_trades': trades_data['winning_trades'],
             'losing_trades': trades_data['losing_trades'],
             'win_rate': win_rate,
+            'win_rate_24h': trades_data['win_rate_24h'],
+            'win_rate_month': trades_data['win_rate_month'],
+            'wins_24h': trades_data['wins_24h'],
+            'losses_24h': trades_data['losses_24h'],
+            'trades_24h': trades_data['trades_24h'],
+            'wins_month': trades_data['wins_month'],
+            'losses_month': trades_data['losses_month'],
+            'trades_month': trades_data['trades_month'],
             'total_volume': trades_data['total_volume'],
             'total_fees': trades_data['total_fees'],
             'largest_win': trades_data['largest_win'],
