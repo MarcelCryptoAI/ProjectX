@@ -904,8 +904,8 @@
                 staticTakeProfit: parseFloat(document.getElementById('staticTakeProfit').value),
                 enableDynamicSL: document.getElementById('enableDynamicSL').checked,
                 staticStopLoss: parseFloat(document.getElementById('staticStopLoss').value),
-                minTakeProfit: parseFloat(document.getElementById('minTakeProfit').value),
-                maxTakeProfit: parseFloat(document.getElementById('maxTakeProfit').value),
+                minTakeProfitPercent: parseFloat(document.getElementById('minTakeProfit').value),
+                maxTakeProfitPercent: parseFloat(document.getElementById('maxTakeProfit').value),
                 trailingStopLoss: document.getElementById('trailingStopLoss').checked,
                 trailingStopValue: parseFloat(document.getElementById('trailingStopValue').value),
                 dynamicTakeProfit: document.getElementById('dynamicTakeProfit').checked,
@@ -1007,7 +1007,12 @@
                         
                         // Populate form fields with loaded settings
                         Object.keys(settings).forEach(key => {
-                            const element = document.getElementById(key);
+                            let elementId = key;
+                            // Map database field names to HTML element IDs
+                            if (key === 'minTakeProfitPercent') elementId = 'minTakeProfit';
+                            if (key === 'maxTakeProfitPercent') elementId = 'maxTakeProfit';
+                            
+                            const element = document.getElementById(elementId);
                             if (element) {
                                 if (element.type === 'checkbox') {
                                     element.checked = settings[key];

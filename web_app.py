@@ -4117,20 +4117,21 @@ def save_settings():
     try:
         settings_data = request.get_json()
         
-        # Load existing settings first
-        existing_settings = {}
+        # Load existing settings first - NO FALLBACK
         try:
             # Use global database instance
             db = get_db_instance()
             existing_settings = db.load_settings()
+            if not existing_settings:
+                return jsonify({
+                    'success': False,
+                    'error': 'Database settings not available - cannot save settings'
+                })
         except Exception as db_error:
-            print(f"Database settings load failed, using file fallback: {db_error}")
-            # Fallback to file if database fails
-            try:
-                with open(settings_file, 'r') as f:
-                    existing_settings = json.load(f)
-            except:
-                existing_settings = {}
+            return jsonify({
+                'success': False,
+                'error': f'Database error: {db_error} - cannot save settings'
+            })
         
         # Merge new settings with existing ones
         merged_settings = existing_settings.copy()
@@ -4140,10 +4141,11 @@ def save_settings():
         if len(settings_data) > 1:  # More than just autoExecute
             required_settings = [
                 'riskPerTrade', 'maxConcurrentTrades', 'minTradeAmount',
-                'minTakeProfit', 'maxTakeProfit', 'confidenceThreshold'
+                'confidenceThreshold', 'accuracyThreshold',
+                'minTakeProfitPercent', 'maxTakeProfitPercent'
             ]
             
-            # Remove defaultTakeProfit and defaultStopLoss from required since we now use dynamic switches
+            # Validate all required settings are present
             for setting in required_settings:
                 if setting not in merged_settings:
                     return jsonify({
@@ -4151,16 +4153,16 @@ def save_settings():
                         'error': f'Missing required setting: {setting}'
                     })
         
-        # Save to database
+        # Save to database - NO FALLBACK
         try:
             # Use global database instance
             db = get_db_instance()
             db.save_settings(merged_settings)
         except Exception as db_error:
-            print(f"Database settings save failed, using file fallback: {db_error}")
-            # Fallback to file if database fails
-            with open(settings_file, 'w') as f:
-                json.dump(merged_settings, f, indent=2)
+            return jsonify({
+                'success': False,
+                'error': f'Database save failed: {db_error}'
+            })
         
         # Update environment variables for immediate effect
         os.environ['AI_CONFIDENCE_THRESHOLD'] = str(merged_settings.get('confidenceThreshold', 80))
