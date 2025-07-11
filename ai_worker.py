@@ -576,67 +576,163 @@ class AIWorker:
             return None
     
     def _calculate_technical_indicators(self, symbol, market_data):
-        """Calculate technical indicators for the symbol"""
-        if not market_data or len(market_data) < 20:
-            return {}
-        
-        try:
-            # Convert to numpy arrays for calculations with None checks
-            try:
-                closes = np.array([float(kline[4]) for kline in market_data if kline[4] is not None])
-                volumes = np.array([float(kline[5]) for kline in market_data if kline[5] is not None])
-                
-                if len(closes) == 0 or len(volumes) == 0:
-                    self.console_logger.log('WARNING', f'Invalid kline data for {symbol} - all values are None')
-                    return {}
-            except (ValueError, TypeError) as e:
-                self.console_logger.log('ERROR', f'❌ Error converting kline data for {symbol}: {e}')
-                return {}
-            
-            # Simple moving averages
-            sma_20 = np.mean(closes[-20:]) if len(closes) >= 20 else closes[-1]
-            
-            # RSI calculation (simplified)
-            deltas = np.diff(closes)
-            gains = np.where(deltas > 0, deltas, 0)
-            losses = np.where(deltas < 0, -deltas, 0)
-            
-            if len(gains) >= 14:
-                avg_gain = np.mean(gains[-14:])
-                avg_loss = np.mean(losses[-14:])
-                rs = avg_gain / (avg_loss + 1e-10)
-                rsi = 100 - (100 / (1 + rs))
-            else:
-                rsi = 50
-            
-            # MACD (simplified)
-            ema_12 = closes[-1]  # Simplified
-            ema_26 = np.mean(closes[-26:]) if len(closes) >= 26 else closes[-1]
-            macd_line = ema_12 - ema_26
-            
-            # Bollinger Bands
-            bb_middle = sma_20
-            std_dev = np.std(closes[-20:]) if len(closes) >= 20 else 0
-            bb_upper = bb_middle + (2 * std_dev)
-            bb_lower = bb_middle - (2 * std_dev)
-            
-            return {
-                'rsi_14': rsi,
-                'macd_line': macd_line,
-                'macd_signal': macd_line * 0.9,  # Simplified
-                'bb_upper': bb_upper,
-                'bb_lower': bb_lower,
-                'bb_middle': bb_middle,
-                'volume_sma_20': np.mean(volumes[-20:]) if len(volumes) >= 20 else volumes[-1],
-                'price_sma_20': sma_20,
-                'price_ema_12': ema_12,
-                'price_ema_26': ema_26
-            }
-            
-        except Exception as e:
-            self.console_logger.log('WARNING', f'Failed to calculate indicators for {symbol}: {str(e)}')
+        """Calculate ~22 indicators for richer AI confidence."""
+        if not market_data or len(market_data) < 30:
             return {}
     
+        try:
+            highs = np.array([float(k[2]) for k in market_data])
+            lows = np.array([float(k[3]) for k in market_data])
+            closes = np.array([float(k[4]) for k in market_data])
+            volumes = np.array([float(k[5]) for k in market_data])
+    
+            # Helpers
+            def ema(arr, span):
+                alpha = 2/(span+1)
+                ema_arr = [arr[0]]
+                for val in arr[1:]:
+                    ema_arr.append(alpha*val + (1-alpha)*ema_arr[-1])
+                return np.array(ema_arr)
+    
+            # RSI 14
+            deltas = np.diff(closes)
+            gains = np.where(deltas>0, deltas, 0)
+            losses = np.where(deltas<0, -deltas, 0)
+            avg_gain = np.mean(gains[-14:]) if len(gains)>=14 else 0
+            avg_loss = np.mean(losses[-14:]) if len(losses)>=14 else 0
+            rs = avg_gain / (avg_loss + 1e-10)
+            rsi = 100 - 100/(1+rs)
+    
+            # Stochastic %K 14
+            lowest14 = np.min(lows[-14:])
+            highest14 = np.max(highs[-14:])
+            stoch_k = (closes[-1]-lowest14)/(highest14-lowest14+1e-10)*100
+    
+            # StochRSI
+            rsi_series = []
+            for i in range(len(closes)):
+                if i<14: rsi_series.append(50)
+                else:
+                    delt = closes[i]-closes[i-1]
+                    g = max(delt,0)
+                    l = -min(delt,0)
+                    avg_g = (avg_gain*13 + g)/14
+                    avg_l = (avg_loss*13 + l)/14
+                    avg_gain,avg_loss=avg_g,avg_l
+                    rs = avg_g/(avg_l+1e-10)
+                    rsi_series.append(100-100/(1+rs))
+            rsi_array = np.array(rsi_series)
+            stoch_rsi = (rsi_array[-1]-np.min(rsi_array[-14:]))/(np.max(rsi_array[-14:])-np.min(rsi_array[-14:])+1e-10)*100
+    
+            # Williams %R
+            will_r = -100*(highest14-closes[-1])/(highest14-lowest14+1e-10)
+    
+            # CCI 20
+            tp = (highs+lows+closes)/3
+            sma_tp20 = np.mean(tp[-20:])
+            mean_dev = np.mean(np.abs(tp[-20:]-sma_tp20))
+            cci = (tp[-1]-sma_tp20)/(0.015*mean_dev+1e-10)
+    
+            # MACD
+            ema12 = ema(closes,12)
+            ema26 = ema(closes,26)
+            macd_line = ema12[-1]-ema26[-1]
+            macd_signal = ema(macd_line*np.ones_like(closes),9)[-1]
+    
+            # Bollinger
+            sma20 = np.mean(closes[-20:])
+            std20 = np.std(closes[-20:])
+            bb_upper = sma20+2*std20
+            bb_lower = sma20-2*std20
+    
+            # ATR14
+            tr = np.maximum.reduce([highs[1:]-lows[1:], np.abs(highs[1:]-closes[:-1]), np.abs(lows[1:]-closes[:-1])])
+            atr14 = np.mean(tr[-14:]) if len(tr)>=14 else np.mean(tr)
+    
+            # OBV
+            obv = 0
+            for i in range(1,len(closes)):
+                if closes[i]>closes[i-1]: obv+=volumes[i]
+                elif closes[i]<closes[i-1]: obv-=volumes[i]
+            # CMF (Chaikin Money Flow) 20
+            mf_multiplier = (closes - lows - (highs - closes)) / (highs - lows + 1e-10)
+            mf_volume = mf_multiplier * volumes
+            cmf = np.sum(mf_volume[-20:]) / (np.sum(volumes[-20:])+1e-10)
+    
+            # MFI 14
+            tp_vals = tp
+            raw_money = tp_vals[1:]*volumes[1:]
+            pos_rm = np.where(tp_vals[1:]>tp_vals[:-1], raw_money, 0)
+            neg_rm = np.where(tp_vals[1:]<tp_vals[:-1], raw_money, 0)
+            mfi = 100 - 100/(1+ (np.sum(pos_rm[-14:])/(np.sum(neg_rm[-14:])+1e-10)))
+    
+            # Donchian width 20
+            donch_high = np.max(highs[-20:])
+            donch_low = np.min(lows[-20:])
+            donch_width = (donch_high-donch_low)/(donch_low+1e-10)*100
+    
+            # ADX 14
+            up_move = highs[1:] - highs[:-1]
+            down_move = lows[:-1] - lows[1:]
+            plus_dm = np.where((up_move>down_move) & (up_move>0), up_move, 0)
+            minus_dm = np.where((down_move>up_move) & (down_move>0), down_move, 0)
+            tr14 = pd.Series(tr).rolling(14).sum().iloc[-1]
+            plus_di = 100 * (np.sum(plus_dm[-14:]) / (tr14+1e-10))
+            minus_di = 100 * (np.sum(minus_dm[-14:]) / (tr14+1e-10))
+            dx = 100 * abs(plus_di-minus_di)/(plus_di+minus_di+1e-10)
+            adx = dx  # crude snapshot
+    
+            # Aroon 25
+            period=25
+            idx_high = np.argmax(highs[-period:])
+            idx_low = np.argmin(lows[-period:])
+            aroon_up = ((period-idx_high)/period)*100
+            aroon_down = ((period-idx_low)/period)*100
+    
+            # Keltner Channel width (EMA20 ± ATR*1.5)
+            ema20 = ema(closes,20)[-1]
+            kc_upper = ema20 + 1.5*atr14
+            kc_lower = ema20 - 1.5*atr14
+            keltner_width = (kc_upper-kc_lower)/(ema20+1e-10)*100
+    
+            # SuperTrend direction 10/3 (simplified)
+            mult=3
+            atr10 = np.mean(tr[-10:])
+            basic_upper = (highs[-1]+lows[-1])/2 + mult*atr10
+            basic_lower = (highs[-1]+lows[-1])/2 - mult*atr10
+            supertrend_dir = 1 if closes[-1]>basic_upper else -1 if closes[-1]<basic_lower else 0
+    
+            return {
+                'rsi_14': rsi,
+                'stoch_k': stoch_k,
+                'stoch_rsi': stoch_rsi,
+                'williams_r': will_r,
+                'cci': cci,
+                'macd_line': macd_line,
+                'macd_signal': macd_signal,
+                'bb_upper': bb_upper,
+                'bb_lower': bb_lower,
+                'bb_middle': sma20,
+                'sma_20': sma20,
+                'ema_12': ema12[-1],
+                'ema_26': ema26[-1],
+                'ema_20': ema20,
+                'atr': atr14,
+                'obv': obv,
+                'cmf': cmf,
+                'mfi': mfi,
+                'donch_width': donch_width,
+                'adx': adx,
+                'aroon_up': aroon_up,
+                'aroon_down': aroon_down,
+                'keltner_width': keltner_width,
+                'supertrend_dir': supertrend_dir,
+                'volume_sma_20': np.mean(volumes[-20:])
+            }
+    
+        except Exception as e:
+            self.console_logger.log('WARNING', f'Indicator calc failed for {symbol}: {e}')
+            return {}
     def _analyze_sentiment(self, symbol):
         """Analyze sentiment for the symbol"""
         try:
@@ -794,39 +890,49 @@ class AIWorker:
                     'market_trend': 'neutral',
                     'volume_strength': 0
                 }
-    
-    def _train_symbol_model(self, symbol, indicators, sentiment):
-        """Train AI model for specific symbol"""
-        try:
-            # Simulate model training with realistic results
-            base_accuracy = 65 + np.random.uniform(-10, 20)  # 55-85% range
-            base_confidence = 70 + np.random.uniform(-15, 25)  # 55-95% range
-            
-            # Adjust based on data quality
-            data_quality_bonus = 0
-            if indicators and len(indicators) > 5:
-                data_quality_bonus += 5
-            if sentiment and sentiment.get('news_count', 0) > 20:
-                data_quality_bonus += 3
-                
-            accuracy = min(95, max(50, base_accuracy + data_quality_bonus))
-            confidence = min(95, max(50, base_confidence + data_quality_bonus))
-            
-            return accuracy, confidence
-            
-        except Exception as e:
-            self.console_logger.log('WARNING', f'Failed to train model for {symbol}: {str(e)}')
-            # Use dynamic accuracy threshold from database only
-            try:
-                db_settings = self.database.load_settings()
-                if not db_settings or 'accuracyThreshold' not in db_settings:
-                    raise Exception("No database settings found")
-                accuracy_threshold = float(db_settings['accuracyThreshold'])
-                return float(accuracy_threshold), float(accuracy_threshold)
-            except Exception as db_error:
-                self.console_logger.log('ERROR', f'Failed to get database accuracy threshold: {db_error}')
-                return 70.0, 70.0  # Minimal fallback
-    
+
+def _train_symbol_model(self, symbol, indicators, sentiment=None):
+    """Confidence from 24 indicators, deterministic."""
+    try:
+        weights = {
+            'rsi_14':1,'stoch_k':0.9,'stoch_rsi':0.9,'williams_r':0.7,'cci':0.8,
+            'macd_line':1,'macd_signal':0.8,'bb_middle':0.4,'ema_20':1,'ema_12':0.7,'ema_26':0.7,
+            'atr':0.5,'donch_width':0.3,'adx':1.1,'aroon_up':0.6,'aroon_down':0.6,
+            'cmf':0.6,'mfi':0.5,'keltner_width':0.3,'supertrend_dir':1,
+            'obv':0.4
+        }
+        score=0; tot=0
+        for name,w in weights.items():
+            val=indicators.get(name)
+            if val is None: continue
+            if name in ('rsi_14','stoch_k','stoch_rsi'):
+                bull = 1 if val>50 else 0
+            elif name=='williams_r':
+                bull = 1 if val>-50 else 0
+            elif name in ('supertrend_dir',):
+                bull = 1 if val>0 else 0
+            elif name in ('aroon_up','adx'):
+                bull = 1 if val>50 else 0
+            elif name=='aroon_down':
+                bull = 0 if val>50 else 1
+            elif name in ('cmf','mfi','macd_line','macd_signal','cci','obv'):
+                bull = 1 if val>0 else 0
+            else:
+                bull = 0.5
+            score+=bull*w
+            tot+=w
+        if tot==0: return 65,65
+        confidence=(score/tot)*100
+        # penalty for high ATR relative to ema20
+        atr = indicators.get('atr'); ema20=indicators.get('ema_20',1)
+        if atr: confidence*=max(0.6,1-min(1,atr/ema20))
+        confidence=max(50,min(95,confidence))
+        accuracy = confidence-5 if confidence>60 else confidence
+        return round(accuracy,1), round(confidence,1)
+    except Exception as e:
+        self.console_logger.log('WARNING',f'Confidence fail {symbol}: {e}')
+        threshold=70
+        return threshold,threshold
     def _emit_training_progress(self):
         """Emit training progress to frontend"""
         if self.socketio:
