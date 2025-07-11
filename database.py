@@ -29,7 +29,16 @@ class TradingDatabase:
         else:
             self.db_path = db_path
             
-        self.init_database()
+        self._initialized = False
+        # Connection pool to limit concurrent connections
+        self._connection_pool = None
+        self._max_connections = 3  # Limit to 3 concurrent connections
+    
+    def _ensure_initialized(self):
+        """Ensure database is initialized (lazy initialization)"""
+        if not self._initialized:
+            self.init_database()
+            self._initialized = True
     
     def get_connection(self):
         """Get database connection based on environment"""
@@ -338,6 +347,7 @@ class TradingDatabase:
     
     def save_settings(self, settings_dict):
         """Save settings to database"""
+        self._ensure_initialized()
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -986,6 +996,7 @@ class TradingDatabase:
     
     def get_trading_signals(self):
         """Get all trading signals"""
+        self._ensure_initialized()
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -1176,6 +1187,7 @@ class TradingDatabase:
     
     def get_supported_symbols(self):
         """Get supported symbols list"""
+        self._ensure_initialized()
         conn = self.get_connection()
         cursor = conn.cursor()
         
