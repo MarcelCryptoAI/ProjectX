@@ -1351,61 +1351,78 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data && data.success) {
-                        // Update max concurrent trades from user settings - use database value
+                        // Update max concurrent trades from database settings
                         const maxPositions = data.maxConcurrentTrades || data.max_positions;
                         document.getElementById('maxPositions').textContent = maxPositions || 'N/A';
                         
-                        // Update AI confidence threshold from settings
-                        const aiConfidence = data.ai_confidence_threshold || data.settings?.confidenceThreshold;
+                        // Update AI confidence threshold from database settings
+                        const aiConfidence = data.ai_confidence_threshold;
                         document.getElementById('aiConfidence').textContent = aiConfidence ? `${aiConfidence}%` : 'N/A';
+                        
+                        // Update min accuracy from database settings
+                        const accuracyThreshold = data.ai_accuracy_threshold;
+                        document.getElementById('minAccuracy').textContent = accuracyThreshold ? `${accuracyThreshold}%` : 'N/A';
                         
                         // Update risk per trade (amount calculation)
                         const riskPerTrade = data.risk_per_trade;
                         document.getElementById('amountPerTrade').textContent = riskPerTrade ? `${riskPerTrade}% of balance` : 'N/A';
                         
-                        // Update leverage range
+                        // Update leverage range with strategy
                         const minLeverage = data.min_leverage;
                         const maxLeverage = data.max_leverage;
                         const leverageStrategy = data.leverage_strategy;
                         if (minLeverage && maxLeverage) {
-                            document.getElementById('leverage').textContent = `${minLeverage}x-${maxLeverage}x (${leverageStrategy || 'confidence_based'})`;
+                            const strategyText = leverageStrategy === 'confidence_based' ? 'confidence' : leverageStrategy;
+                            document.getElementById('leverage').textContent = `${minLeverage}x-${maxLeverage}x (${strategyText})`;
                         } else {
                             document.getElementById('leverage').textContent = 'N/A';
                         }
                         
-                        // Update dynamic TP (always ON for 4-level TP)
-                        document.getElementById('dynamicTP').textContent = 'ON (4 levels)';
-                        document.getElementById('dynamicTP').className = 'text-neon-green';
+                        // Update dynamic TP based on database setting
+                        const enableDynamicTP = data.enable_dynamic_tp;
+                        if (enableDynamicTP) {
+                            document.getElementById('dynamicTP').textContent = 'ON (4 levels)';
+                            document.getElementById('dynamicTP').className = 'text-neon-green';
+                        } else {
+                            const staticTP = data.static_take_profit;
+                            document.getElementById('dynamicTP').textContent = `Static: ${staticTP}%`;
+                            document.getElementById('dynamicTP').className = 'text-neon-yellow';
+                        }
                         
-                        // Update trailing stop loss (always ON for TP1 breakeven)
-                        document.getElementById('trailingSL').textContent = 'ON (TP1 → BE+0.1%)';
-                        document.getElementById('trailingSL').className = 'text-neon-green';
+                        // Update trailing stop loss based on database setting
+                        const enableDynamicSL = data.enable_dynamic_sl;
+                        if (enableDynamicSL) {
+                            document.getElementById('trailingSL').textContent = 'ON (TP1 → BE+0.1%)';
+                            document.getElementById('trailingSL').className = 'text-neon-green';
+                        } else {
+                            const staticSL = data.static_stop_loss;
+                            document.getElementById('trailingSL').textContent = `Static: ${staticSL}%`;
+                            document.getElementById('trailingSL').className = 'text-neon-yellow';
+                        }
                         
-                        // Update trailing percentage from settings
-                        const trailingPercent = data.trailing_stop_percent || data.settings?.trailingStopPercent;
+                        // Update trailing percentage from database settings
+                        const trailingPercent = data.trailing_stop_percent;
                         document.getElementById('trailingPercent').textContent = trailingPercent ? `${trailingPercent}%` : 'N/A';
                         
-                        // Update min accuracy from settings - use database value
-                        const accuracyThreshold = data.ai_accuracy_threshold || data.settings?.accuracyThreshold;
-                        document.getElementById('minAccuracy').textContent = accuracyThreshold ? `${accuracyThreshold}%` : 'N/A';
-                        
-                        console.log('Trading parameters updated successfully');
+                        console.log('Trading parameters updated successfully with database settings');
                         
                         // Update auto execute from settings
-                        const autoExecute = data.settings?.autoExecute;
+                        const autoExecute = data.auto_execute;
                         if (document.getElementById('autoExecute')) {
                             document.getElementById('autoExecute').checked = autoExecute || false;
                         }
                     }
                 })
                 .catch(error => {
-                    console.error('Failed to load extended settings:', error);
+                    console.error('Failed to load trading parameters from /api/config:', error);
                     // Set all values to Error state
                     document.getElementById('maxPositions').textContent = 'Error';
                     document.getElementById('aiConfidence').textContent = 'Error';
                     document.getElementById('minAccuracy').textContent = 'Error';
                     document.getElementById('amountPerTrade').textContent = 'Error';
                     document.getElementById('leverage').textContent = 'Error';
+                    document.getElementById('dynamicTP').textContent = 'Error';
+                    document.getElementById('trailingSL').textContent = 'Error';
                     document.getElementById('trailingPercent').textContent = 'Error';
                 });
         }
@@ -1494,6 +1511,7 @@
             // Set up refresh intervals
             setInterval(updateDashboard, 10000);  // Every 10 seconds
             setInterval(updateTradingStatus, 15000);  // Every 15 seconds
+            setInterval(updateTradingParameters, 30000);  // Every 30 seconds for parameters
             
             // Add initial console message
             addConsoleMessage('SUCCESS', 'A.R.I.E Control Center initialized');

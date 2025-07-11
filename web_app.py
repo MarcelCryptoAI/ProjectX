@@ -3620,7 +3620,9 @@ def get_config():
             db = get_database()
             db_settings = db.load_settings()
             
+            # Core trading settings
             ai_confidence_threshold = float(db_settings.get('confidenceThreshold', 80))
+            ai_accuracy_threshold = float(db_settings.get('accuracyThreshold', 70))
             auto_execute = db_settings.get('autoExecute', False)
             max_positions = int(db_settings.get('maxConcurrentTrades', 20))
             risk_per_trade = float(db_settings.get('riskPerTrade', 2.0))
@@ -3629,9 +3631,21 @@ def get_config():
             leverage_strategy = db_settings.get('leverageStrategy', 'confidence_based')
             min_trade_amount = float(db_settings.get('minTradeAmount', 5.0))
             
+            # TP/SL settings
+            enable_dynamic_tp = db_settings.get('enableDynamicTP', True)
+            enable_dynamic_sl = db_settings.get('enableDynamicSL', True)
+            static_take_profit = float(db_settings.get('staticTakeProfit', 3.0))
+            static_stop_loss = float(db_settings.get('staticStopLoss', 2.0))
+            min_take_profit = float(db_settings.get('minTakeProfit', 1.0))
+            max_take_profit = float(db_settings.get('maxTakeProfit', 10.0))
+            
+            # Trailing settings
+            trailing_stop_percent = float(db_settings.get('trailingStopPercent', 1.0))
+            
         except Exception as db_error:
             # Fallback to environment variables if database fails
             ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 80))
+            ai_accuracy_threshold = float(os.getenv('AI_ACCURACY_THRESHOLD', 70))
             auto_execute = os.getenv('AUTO_EXECUTE', 'true').lower() == 'true'
             max_positions = int(os.getenv('MAX_CONCURRENT_TRADES', 20))
             risk_per_trade = float(os.getenv('RISK_PER_TRADE', 2.0))
@@ -3639,10 +3653,21 @@ def get_config():
             max_leverage = 10
             leverage_strategy = 'confidence_based'
             min_trade_amount = 5.0
+            
+            # TP/SL fallback settings
+            enable_dynamic_tp = True
+            enable_dynamic_sl = True
+            static_take_profit = 3.0
+            static_stop_loss = 2.0
+            min_take_profit = 1.0
+            max_take_profit = 10.0
+            trailing_stop_percent = 1.0
         
         return jsonify({
             'success': True,
+            # Core trading settings
             'ai_confidence_threshold': ai_confidence_threshold,
+            'ai_accuracy_threshold': ai_accuracy_threshold,
             'max_positions': max_positions,
             'maxConcurrentTrades': max_positions,  # Add this for consistency
             'risk_per_trade': risk_per_trade,
@@ -3651,6 +3676,19 @@ def get_config():
             'max_leverage': max_leverage,
             'leverage_strategy': leverage_strategy,
             'min_trade_amount': min_trade_amount,
+            
+            # TP/SL settings
+            'enable_dynamic_tp': enable_dynamic_tp,
+            'enable_dynamic_sl': enable_dynamic_sl,
+            'static_take_profit': static_take_profit,
+            'static_stop_loss': static_stop_loss,
+            'min_take_profit': min_take_profit,
+            'max_take_profit': max_take_profit,
+            
+            # Trailing settings
+            'trailing_stop_percent': trailing_stop_percent,
+            
+            # API configuration
             'api_key': 'configured' if os.getenv('BYBIT_API_KEY') else 'not_configured',
             'api_secret': 'configured' if os.getenv('BYBIT_API_SECRET') else 'not_configured'
         })
