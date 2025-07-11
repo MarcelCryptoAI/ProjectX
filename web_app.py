@@ -3329,17 +3329,27 @@ def get_coin_analysis():
 def get_trading_signals():
     """Get trading signals ONLY above AI confidence threshold"""
     try:
-        # Get AI confidence threshold and auto_execute from database first
-        # Get AI confidence threshold from settings
+        # Load database settings first
         try:
-            from utils.settings_loader import Settings
-            settings = Settings.load('config/settings.yaml')
-            ai_confidence_threshold = settings.ai_confidence_threshold
-            ai_accuracy_threshold = settings.ai_accuracy_threshold
-        except:
-            ai_confidence_threshold = 75  # Default fallback
-            ai_accuracy_threshold = 70  # Default fallback
-        auto_execute = False  # Default
+            db = get_database()
+            db_settings = db.load_settings()
+            ai_confidence_threshold = float(db_settings.get('confidenceThreshold', 75))
+            ai_accuracy_threshold = float(db_settings.get('accuracyThreshold', 70))
+            auto_execute = db_settings.get('autoExecute', False)
+        except Exception as db_error:
+            # Fallback to YAML settings
+            try:
+                from utils.settings_loader import Settings
+                settings = Settings.load('config/settings.yaml')
+                ai_confidence_threshold = settings.ai_confidence_threshold
+                ai_accuracy_threshold = settings.ai_accuracy_threshold
+                auto_execute = False
+                db_settings = {}  # Empty dict for fallback
+            except:
+                ai_confidence_threshold = 75  # Default fallback
+                ai_accuracy_threshold = 70  # Default fallback
+                auto_execute = False
+                db_settings = {}  # Empty dict for fallback
         
         # Try to get AI worker
         ai_worker = None
@@ -4454,7 +4464,7 @@ def get_symbols_info():
     """Get symbols info and last updated date"""
     try:
         # Use global database instance
-        db = db_instance
+        db = get_db_instance()
         
         app.logger.info("Loading symbols from database...")
         symbols = db.get_supported_symbols()
@@ -4496,7 +4506,7 @@ def debug_settings():
     """Debug endpoint to check what settings are actually loaded"""
     try:
         # Use global database instance
-        db = db_instance
+        db = get_db_instance()
         db_settings = db.load_settings()
         
         # Also load YAML for comparison
@@ -4625,7 +4635,7 @@ def get_leverage_symbols_count():
     """Get count of symbols with leverage multipliers"""
     try:
         # Use global database instance
-        db = db_instance
+        db = get_db_instance()
         
         symbols = db.get_supported_symbols()
         
