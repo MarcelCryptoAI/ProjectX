@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime
 import os
 from urllib.parse import urlparse
+from contextlib import contextmanager
 
 class TradingDatabase:
     def __init__(self, db_path='trading_data.db'):
@@ -33,9 +34,31 @@ class TradingDatabase:
     def get_connection(self):
         """Get database connection based on environment"""
         if self.use_postgres:
-            return self.psycopg2.connect(**self.db_config)
+            # Add connection pooling for PostgreSQL
+            try:
+                conn = self.psycopg2.connect(**self.db_config)
+                # Set connection to autocommit mode to prevent long transactions
+                conn.autocommit = False
+                return conn
+            except Exception as e:
+                print(f"Database connection error: {e}")
+                raise
         else:
             return sqlite3.connect(self.db_path)
+    
+    @contextmanager
+    def get_db_connection(self):
+        """Context manager for database connections to ensure they're always closed"""
+        conn = None
+        try:
+            conn = self.get_connection()
+            yield conn
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
     
     def init_database(self):
         """Initialize the database with required tables"""

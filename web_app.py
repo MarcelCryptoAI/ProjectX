@@ -27,6 +27,10 @@ import urllib3
 # Load environment variables
 load_dotenv()
 
+# Initialize database instance once
+from database import TradingDatabase
+db_instance = TradingDatabase()
+
 # Comprehensive DNS and SSL bypass for Heroku ByBit connection issues
 try:
     import socket
@@ -4052,8 +4056,8 @@ def save_settings():
         # Load existing settings first
         existing_settings = {}
         try:
-            from database import TradingDatabase
-            db = TradingDatabase()
+            # Use global database instance
+            db = db_instance
             existing_settings = db.load_settings()
         except Exception as db_error:
             print(f"Database settings load failed, using file fallback: {db_error}")
@@ -4072,10 +4076,10 @@ def save_settings():
         if len(settings_data) > 1:  # More than just autoExecute
             required_settings = [
                 'riskPerTrade', 'maxConcurrentTrades', 'minTradeAmount',
-                'defaultTakeProfit', 'defaultStopLoss', 'minTakeProfit', 
-                'maxTakeProfit', 'confidenceThreshold'
+                'minTakeProfit', 'maxTakeProfit', 'confidenceThreshold'
             ]
             
+            # Remove defaultTakeProfit and defaultStopLoss from required since we now use dynamic switches
             for setting in required_settings:
                 if setting not in merged_settings:
                     return jsonify({
@@ -4085,8 +4089,8 @@ def save_settings():
         
         # Save to database
         try:
-            from database import TradingDatabase
-            db = TradingDatabase()
+            # Use global database instance
+            db = db_instance
             db.save_settings(merged_settings)
         except Exception as db_error:
             print(f"Database settings save failed, using file fallback: {db_error}")
@@ -4406,8 +4410,8 @@ def refresh_symbols():
 def get_symbols_info():
     """Get symbols info and last updated date"""
     try:
-        from database import TradingDatabase
-        db = TradingDatabase()
+        # Use global database instance
+        db = db_instance
         
         app.logger.info("Loading symbols from database...")
         symbols = db.get_supported_symbols()
@@ -4545,8 +4549,8 @@ def save_leverage_multipliers():
 def get_leverage_symbols_count():
     """Get count of symbols with leverage multipliers"""
     try:
-        from database import TradingDatabase
-        db = TradingDatabase()
+        # Use global database instance
+        db = db_instance
         
         symbols = db.get_supported_symbols()
         
