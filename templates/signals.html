@@ -229,7 +229,10 @@
     <script>
         let allSignals = [];
         let currentFilter = 'all';
-        const socket = io();
+        const socket = io({
+            transports: ['polling'],
+            upgrade: false
+        });
         
         // Socket event handlers
         socket.on('trading_signal', function(signal) {
@@ -247,7 +250,13 @@
         });
         
         function loadSignals() {
-            fetch('/api/trading_signals')
+            fetch('/api/trading_signals?_=' + Date.now(), {
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            })
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
