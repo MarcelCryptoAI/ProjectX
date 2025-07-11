@@ -1299,8 +1299,6 @@ class AIWorker:
             
             self.console_logger.log('INFO', f'📊 Using TP: {take_profit_pct:.2f}% (bounds: {min_take_profit:.2f}-{max_take_profit:.2f}%)')
             
-            self.console_logger.log('INFO', f'📊 Using AI-determined TP: {take_profit_pct:.2f}% (bounds: {min_tp}-{max_tp}%)')
-            
             # Calculate stop loss and take profit based on AI ENTRY PRICE (not current market price)
             if side == 'Buy':
                 stop_loss_price = ai_entry_price * (1 - stop_loss_pct / 100)
