@@ -756,13 +756,11 @@ class AIWorker:
                 confidence = prediction['confidence']
                 symbol = prediction['symbol']
                 side = prediction['side']
-                strategy_mode = prediction.get('strategy_mode', 'unknown')
                 take_profit = prediction.get('take_profit', 0)
                 stop_loss = prediction.get('stop_loss', 0)
                 
-                # Log strategy mode and its impact on trading parameters
-                self.console_logger.log('INFO', f'🎯 Strategy Mode: {strategy_mode.upper()} applied to signal generation')
-                self.console_logger.log('INFO', f'📊 Strategy Impact: TP={take_profit:.2f}%, SL={stop_loss:.2f}%')
+                # Log AI prediction impact on trading parameters
+                self.console_logger.log('INFO', f'🎯 AI Prediction: TP={take_profit:.2f}%, SL={stop_loss:.2f}%')
                 
                 # Ensure confidence is in percentage format (0-100)
                 if confidence < 1.0:  # If it's a fraction (0.0-1.0), convert to percentage

@@ -610,17 +610,7 @@
                     <h3 class="text-xl font-bold text-neon-cyan mb-4">
                         <i class="fas fa-cogs mr-2"></i>Trading Strategy
                     </h3>
-                    <div class="grid grid-cols-2 gap-6">
-                        <div>
-                            <label for="strategyMode" class="form-label">Strategy Mode</label>
-                            <select class="form-input w-full" id="strategyMode">
-                                <option value="conservative">Conservative</option>
-                                <option value="balanced" selected>Balanced</option>
-                                <option value="aggressive">Aggressive</option>
-                                <option value="scalping">Scalping</option>
-                                <option value="swing">Swing Trading</option>
-                            </select>
-                        </div>
+                    <div class="grid grid-cols-1 gap-6">
                         <div>
                             <label for="marketCondition" class="form-label">Market Condition</label>
                             <select class="form-input w-full" id="marketCondition">
@@ -909,7 +899,6 @@
                 accuracyThreshold: parseInt(document.getElementById('accuracyThreshold').value),
                 modelUpdateFreq: document.getElementById('modelUpdateFreq').value,
                 technicalIndicators: parseInt(document.getElementById('technicalIndicators').value),
-                strategyMode: document.getElementById('strategyMode').value,
                 marketCondition: document.getElementById('marketCondition').value,
                 
                 // Telegram settings

@@ -3618,7 +3618,6 @@ def get_config():
             min_leverage = int(db_settings.get('minLeverage', 1))
             max_leverage = int(db_settings.get('maxLeverage', 10))
             leverage_strategy = db_settings.get('leverageStrategy', 'confidence_based')
-            strategy_mode = db_settings.get('strategyMode', 'balanced')
             min_trade_amount = float(db_settings.get('minTradeAmount', 5.0))
             
         except Exception as db_error:
@@ -3630,7 +3629,6 @@ def get_config():
             min_leverage = 1
             max_leverage = 10
             leverage_strategy = 'confidence_based'
-            strategy_mode = 'balanced'
             min_trade_amount = 5.0
         
         return jsonify({
@@ -3643,7 +3641,6 @@ def get_config():
             'min_leverage': min_leverage,
             'max_leverage': max_leverage,
             'leverage_strategy': leverage_strategy,
-            'strategy_mode': strategy_mode,
             'min_trade_amount': min_trade_amount,
             'api_key': 'configured' if os.getenv('BYBIT_API_KEY') else 'not_configured',
             'api_secret': 'configured' if os.getenv('BYBIT_API_SECRET') else 'not_configured'
@@ -4211,7 +4208,6 @@ def load_settings():
             'accuracyThreshold': 70,
             'modelUpdateFreq': '4h',
             'technicalIndicators': 15,
-            'strategyMode': 'balanced',
             'marketCondition': 'auto',
             'telegramBotToken': '',
             'telegramChatId': '',
