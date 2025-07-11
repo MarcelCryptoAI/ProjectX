@@ -38,6 +38,10 @@
                 <i class="fas fa-cog"></i>
                 <span>Settings</span>
             </a>
+            <a href="/healthcheck" class="nav-link" id="nav-healthcheck">
+                <i class="fas fa-heartbeat"></i>
+                <span>Health Check</span>
+            </a>
         </div>
         
         <!-- Right Side Info -->
@@ -102,6 +106,9 @@
         </a>
         <a href="/config" class="mobile-nav-link">
             <i class="fas fa-cog"></i>Settings
+        </a>
+        <a href="/healthcheck" class="mobile-nav-link">
+            <i class="fas fa-heartbeat"></i>Health Check
         </a>
     </div>
 </nav>
@@ -433,6 +440,9 @@
                 break;
             case '/analytics':
                 document.getElementById('nav-analytics')?.classList.add('active');
+                break;
+            case '/healthcheck':
+                document.getElementById('nav-healthcheck')?.classList.add('active');
                 break;
         }
         

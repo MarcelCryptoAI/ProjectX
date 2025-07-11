@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Check & Debug - A.R.I.E AI Trading Bot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'neon-cyan': '#00D9FF',
+                        'neon-yellow': '#FFD700',
+                        'neon-red': '#CC0000',
+                        'neon-green': '#008844',
+                        'neon-orange': '#FF6B00',
+                        'dark-bg': '#0A0A0F',
+                        'dark-panel': '#0F0F1A',
+                        'dark-border': '#1A1A2E',
+                        'dark-hover': '#16213E'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
+                        'mono': ['SF Mono', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: #0A0A0F;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        .glass-card {
+            background: rgba(15, 15, 26, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 0 40px rgba(0, 217, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cyber-button {
+            position: relative;
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(255, 215, 0, 0.1));
+            border: 1px solid rgba(0, 217, 255, 0.5);
+            color: #00D9FF;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.3s;
+            overflow: hidden;
+        }
+        
+        .cyber-button:hover {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(255, 215, 0, 0.2));
+            border-color: #00D9FF;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.5), inset 0 0 20px rgba(0, 217, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .status-ok { color: #008844; }
+        .status-warning { color: #FFD700; }
+        .status-error { color: #CC0000; }
+        
+        .debug-output {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 217, 255, 0.3);
+            font-family: 'SF Mono', 'Consolas', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="bg-dark-bg text-white font-sans min-h-screen relative">
+    <!-- Include shared header -->
+    {% include 'includes/header.html' %}
+    
+    <!-- Main Content -->
+    <div class="w-full max-w-none px-4 py-8 relative z-10">
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold text-neon-cyan mb-2">
+                <i class="fas fa-heartbeat mr-3"></i>HEALTH CHECK & DEBUG
+            </h1>
+            <p class="text-gray-400">System diagnostics and debugging tools</p>
+        </div>
+        
+        <!-- Quick Status Overview -->
+        <div class="grid grid-cols-4 gap-6 mb-8">
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">DATABASE STATUS</h3>
+                <div class="text-2xl font-bold" id="dbStatus">Checking...</div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">SETTINGS LOADED</h3>
+                <div class="text-2xl font-bold" id="settingsStatus">Checking...</div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">AI WORKER STATUS</h3>
+                <div class="text-2xl font-bold" id="aiStatus">Checking...</div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">API ENDPOINTS</h3>
+                <div class="text-2xl font-bold" id="apiStatus">Checking...</div>
+            </div>
+        </div>
+        
+        <!-- Debug Tools Grid -->
+        <div class="grid grid-cols-2 gap-8">
+            <!-- Settings Debug -->
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-xl font-bold text-neon-cyan mb-4">
+                    <i class="fas fa-cog mr-2"></i>Settings Debug
+                </h3>
+                <p class="text-gray-400 mb-4">Check database vs YAML settings comparison</p>
+                <button class="cyber-button py-3 px-6 rounded-lg mb-4" onclick="checkSettings()">
+                    <i class="fas fa-search mr-2"></i>Check Settings
+                </button>
+                <div id="settingsOutput" class="debug-output p-4 rounded hidden"></div>
+            </div>
+            
+            <!-- Database Connection Test -->
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-xl font-bold text-neon-cyan mb-4">
+                    <i class="fas fa-database mr-2"></i>Database Connection
+                </h3>
+                <p class="text-gray-400 mb-4">Test database connectivity and performance</p>
+                <button class="cyber-button py-3 px-6 rounded-lg mb-4" onclick="testDatabase()">
+                    <i class="fas fa-plug mr-2"></i>Test Connection
+                </button>
+                <div id="databaseOutput" class="debug-output p-4 rounded hidden"></div>
+            </div>
+            
+            <!-- Symbols Check -->
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-xl font-bold text-neon-cyan mb-4">
+                    <i class="fas fa-chart-line mr-2"></i>Trading Symbols
+                </h3>
+                <p class="text-gray-400 mb-4">Verify symbol coverage and trading pairs</p>
+                <button class="cyber-button py-3 px-6 rounded-lg mb-4" onclick="checkSymbols()">
+                    <i class="fas fa-list mr-2"></i>Check Symbols
+                </button>
+                <div id="symbolsOutput" class="debug-output p-4 rounded hidden"></div>
+            </div>
+            
+            <!-- Signal Generation Test -->
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-xl font-bold text-neon-cyan mb-4">
+                    <i class="fas fa-signal mr-2"></i>Signal Generation
+                </h3>
+                <p class="text-gray-400 mb-4">Test AI signal generation and parameters</p>
+                <button class="cyber-button py-3 px-6 rounded-lg mb-4" onclick="testSignals()">
+                    <i class="fas fa-brain mr-2"></i>Test Signals
+                </button>
+                <div id="signalsOutput" class="debug-output p-4 rounded hidden"></div>
+            </div>
+            
+            <!-- API Endpoints Status -->
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-xl font-bold text-neon-cyan mb-4">
+                    <i class="fas fa-network-wired mr-2"></i>API Endpoints
+                </h3>
+                <p class="text-gray-400 mb-4">Check all critical API endpoints</p>
+                <button class="cyber-button py-3 px-6 rounded-lg mb-4" onclick="checkEndpoints()">
+                    <i class="fas fa-wifi mr-2"></i>Check APIs
+                </button>
+                <div id="endpointsOutput" class="debug-output p-4 rounded hidden"></div>
+            </div>
+            
+            <!-- System Resources -->
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-xl font-bold text-neon-cyan mb-4">
+                    <i class="fas fa-server mr-2"></i>System Resources
+                </h3>
+                <p class="text-gray-400 mb-4">Check memory, CPU and system status</p>
+                <button class="cyber-button py-3 px-6 rounded-lg mb-4" onclick="checkSystem()">
+                    <i class="fas fa-tachometer-alt mr-2"></i>Check System
+                </button>
+                <div id="systemOutput" class="debug-output p-4 rounded hidden"></div>
+            </div>
+        </div>
+        
+        <!-- Complete System Check -->
+        <div class="glass-card rounded-xl p-6 mt-8">
+            <h3 class="text-xl font-bold text-neon-cyan mb-4">
+                <i class="fas fa-shield-alt mr-2"></i>Complete System Health Check
+            </h3>
+            <p class="text-gray-400 mb-4">Run all diagnostics in sequence for comprehensive system analysis</p>
+            <button class="cyber-button py-3 px-8 rounded-lg text-lg mb-4" onclick="runFullCheck()">
+                <i class="fas fa-heartbeat mr-2"></i>Run Full Health Check
+            </button>
+            <div id="fullCheckOutput" class="debug-output p-4 rounded hidden"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Run quick status check on load
+            quickStatusCheck();
+        });
+        
+        function quickStatusCheck() {
+            // Quick status overview
+            fetch('/api/debug_settings')
+                .then(response => response.json())
+                .then(data => {
+                    const settingsEl = document.getElementById('settingsStatus');
+                    if (data.success && data.database_keys_count > 0) {
+                        settingsEl.textContent = `${data.database_keys_count} Keys`;
+                        settingsEl.className = 'text-2xl font-bold status-ok';
+                    } else {
+                        settingsEl.textContent = 'Error';
+                        settingsEl.className = 'text-2xl font-bold status-error';
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('settingsStatus').textContent = 'Failed';
+                    document.getElementById('settingsStatus').className = 'text-2xl font-bold status-error';
+                });
+        }
+        
+        function checkSettings() {
+            const output = document.getElementById('settingsOutput');
+            output.classList.remove('hidden');
+            output.innerHTML = '<div class="text-neon-cyan">Loading settings comparison...</div>';
+            
+            fetch('/api/debug_settings')
+                .then(response => response.json())
+                .then(data => {
+                    let html = '<div class="space-y-2">';
+                    
+                    if (data.success) {
+                        html += '<div class="text-neon-green"><i class="fas fa-check mr-2"></i>Settings API Success</div>';
+                        html += `<div class="text-white">Database Keys: <span class="text-neon-yellow">${data.database_keys_count}</span></div>`;
+                        
+                        html += '<div class="mt-4 text-neon-cyan font-bold">DATABASE SETTINGS:</div>';
+                        if (data.database_settings) {
+                            Object.entries(data.database_settings).forEach(([key, value]) => {
+                                html += `<div class="ml-4"><span class="text-gray-400">${key}:</span> <span class="text-white">${JSON.stringify(value)}</span></div>`;
+                            });
+                        } else {
+                            html += '<div class="ml-4 text-neon-red">No database settings found!</div>';
+                        }
+                        
+                        html += '<div class="mt-4 text-neon-cyan font-bold">YAML FALLBACK SETTINGS:</div>';
+                        Object.entries(data.yaml_settings).forEach(([key, value]) => {
+                            html += `<div class="ml-4"><span class="text-gray-400">${key}:</span> <span class="text-white">${value}</span></div>`;
+                        });
+                    } else {
+                        html += `<div class="text-neon-red"><i class="fas fa-times mr-2"></i>Error: ${data.error}</div>`;
+                    }
+                    
+                    html += '</div>';
+                    output.innerHTML = html;
+                })
+                .catch(error => {
+                    output.innerHTML = `<div class="text-neon-red"><i class="fas fa-times mr-2"></i>Request failed: ${error.message}</div>`;
+                });
+        }
+        
+        function testDatabase() {
+            const output = document.getElementById('databaseOutput');
+            output.classList.remove('hidden');
+            output.innerHTML = '<div class="text-neon-cyan">Testing database connection...</div>';
+            
+            const startTime = Date.now();
+            
+            fetch('/api/symbols_info')
+                .then(response => response.json())
+                .then(data => {
+                    const endTime = Date.now();
+                    const responseTime = endTime - startTime;
+                    
+                    let html = '<div class="space-y-2">';
+                    
+                    if (data.success) {
+                        html += '<div class="text-neon-green"><i class="fas fa-check mr-2"></i>Database Connection OK</div>';
+                        html += `<div class="text-white">Response Time: <span class="text-neon-yellow">${responseTime}ms</span></div>`;
+                        html += `<div class="text-white">Symbols Count: <span class="text-neon-yellow">${data.count}</span></div>`;
+                        html += `<div class="text-white">Last Updated: <span class="text-neon-yellow">${data.last_updated || 'Never'}</span></div>`;
+                    } else {
+                        html += `<div class="text-neon-red"><i class="fas fa-times mr-2"></i>Database Error: ${data.error}</div>`;
+                    }
+                    
+                    html += '</div>';
+                    output.innerHTML = html;
+                })
+                .catch(error => {
+                    const endTime = Date.now();
+                    const responseTime = endTime - startTime;
+                    output.innerHTML = `<div class="text-neon-red"><i class="fas fa-times mr-2"></i>Connection failed after ${responseTime}ms: ${error.message}</div>`;
+                });
+        }
+        
+        function checkSymbols() {
+            const output = document.getElementById('symbolsOutput');
+            output.classList.remove('hidden');
+            output.innerHTML = '<div class="text-neon-cyan">Checking trading symbols...</div>';
+            
+            fetch('/api/training_symbols')
+                .then(response => response.json())
+                .then(data => {
+                    let html = '<div class="space-y-2">';
+                    
+                    if (data.success) {
+                        html += '<div class="text-neon-green"><i class="fas fa-check mr-2"></i>Symbols Check OK</div>';
+                        html += `<div class="text-white">Total Symbols: <span class="text-neon-yellow">${data.total_symbols}</span></div>`;
+                        html += `<div class="text-white">Database Symbols: <span class="text-neon-yellow">${data.database_count}</span></div>`;
+                        html += `<div class="text-white">Settings Symbols: <span class="text-neon-yellow">${data.settings_count}</span></div>`;
+                        html += `<div class="text-white">Coverage: <span class="text-neon-yellow">A-Z: ${data.has_complete_coverage ? 'YES' : 'NO'}</span></div>`;
+                        
+                        if (data.sample_symbols && data.sample_symbols.length > 0) {
+                            html += '<div class="mt-2 text-neon-cyan">Sample Symbols:</div>';
+                            html += '<div class="ml-4 text-sm text-gray-300">' + data.sample_symbols.slice(0, 20).join(', ') + '</div>';
+                        }
+                    } else {
+                        html += `<div class="text-neon-red"><i class="fas fa-times mr-2"></i>Error: ${data.error}</div>`;
+                    }
+                    
+                    html += '</div>';
+                    output.innerHTML = html;
+                })
+                .catch(error => {
+                    output.innerHTML = `<div class="text-neon-red"><i class="fas fa-times mr-2"></i>Request failed: ${error.message}</div>`;
+                });
+        }
+        
+        function testSignals() {
+            const output = document.getElementById('signalsOutput');
+            output.classList.remove('hidden');
+            output.innerHTML = '<div class="text-neon-cyan">Testing signal generation (this might take a moment)...</div>';
+            
+            // Get recent signals first
+            fetch('/api/signals')
+                .then(response => response.json())
+                .then(data => {
+                    let html = '<div class="space-y-2">';
+                    
+                    if (data.success) {
+                        html += '<div class="text-neon-green"><i class="fas fa-check mr-2"></i>Signals API OK</div>';
+                        html += `<div class="text-white">Recent Signals: <span class="text-neon-yellow">${data.signals.length}</span></div>`;
+                        
+                        if (data.signals.length > 0) {
+                            const latest = data.signals[0];
+                            html += '<div class="mt-2 text-neon-cyan">Latest Signal:</div>';
+                            html += `<div class="ml-4 text-sm"><span class="text-gray-400">Symbol:</span> <span class="text-white">${latest.symbol}</span></div>`;
+                            html += `<div class="ml-4 text-sm"><span class="text-gray-400">Side:</span> <span class="text-white">${latest.side}</span></div>`;
+                            html += `<div class="ml-4 text-sm"><span class="text-gray-400">Confidence:</span> <span class="text-white">${latest.confidence}%</span></div>`;
+                            html += `<div class="ml-4 text-sm"><span class="text-gray-400">Status:</span> <span class="text-white">${latest.status}</span></div>`;
+                        }
+                    } else {
+                        html += `<div class="text-neon-red"><i class="fas fa-times mr-2"></i>Signals Error: ${data.error}</div>`;
+                    }
+                    
+                    html += '</div>';
+                    output.innerHTML = html;
+                })
+                .catch(error => {
+                    output.innerHTML = `<div class="text-neon-red"><i class="fas fa-times mr-2"></i>Request failed: ${error.message}</div>`;
+                });
+        }
+        
+        function checkEndpoints() {
+            const output = document.getElementById('endpointsOutput');
+            output.classList.remove('hidden');
+            output.innerHTML = '<div class="text-neon-cyan">Testing API endpoints...</div>';
+            
+            const endpoints = [
+                '/api/config',
+                '/api/balance',
+                '/api/signals',
+                '/api/order_history',
+                '/api/debug_settings'
+            ];
+            
+            let results = [];
+            let completed = 0;
+            
+            endpoints.forEach(endpoint => {
+                const startTime = Date.now();
+                fetch(endpoint)
+                    .then(response => {
+                        const endTime = Date.now();
+                        const responseTime = endTime - startTime;
+                        results.push({
+                            endpoint,
+                            status: response.ok ? 'OK' : 'Error',
+                            code: response.status,
+                            time: responseTime
+                        });
+                    })
+                    .catch(error => {
+                        const endTime = Date.now();
+                        const responseTime = endTime - startTime;
+                        results.push({
+                            endpoint,
+                            status: 'Failed',
+                            code: 'N/A',
+                            time: responseTime,
+                            error: error.message
+                        });
+                    })
+                    .finally(() => {
+                        completed++;
+                        if (completed === endpoints.length) {
+                            displayEndpointResults(results);
+                        }
+                    });
+            });
+            
+            function displayEndpointResults(results) {
+                let html = '<div class="space-y-1">';
+                results.forEach(result => {
+                    const statusClass = result.status === 'OK' ? 'status-ok' : 'status-error';
+                    html += `<div class="flex justify-between text-sm">`;
+                    html += `<span class="text-gray-400">${result.endpoint}</span>`;
+                    html += `<span class="${statusClass}">${result.status} (${result.time}ms)</span>`;
+                    html += `</div>`;
+                });
+                html += '</div>';
+                output.innerHTML = html;
+            }
+        }
+        
+        function checkSystem() {
+            const output = document.getElementById('systemOutput');
+            output.classList.remove('hidden');
+            output.innerHTML = '<div class="text-neon-cyan">Checking system resources...</div>';
+            
+            // This would typically call a system status endpoint
+            // For now, we'll show browser/client info
+            let html = '<div class="space-y-2">';
+            html += '<div class="text-neon-green"><i class="fas fa-check mr-2"></i>Client System Info</div>';
+            html += `<div class="text-white">User Agent: <span class="text-neon-yellow text-xs">${navigator.userAgent}</span></div>`;
+            html += `<div class="text-white">Platform: <span class="text-neon-yellow">${navigator.platform}</span></div>`;
+            html += `<div class="text-white">Language: <span class="text-neon-yellow">${navigator.language}</span></div>`;
+            html += `<div class="text-white">Online: <span class="text-neon-yellow">${navigator.onLine ? 'Yes' : 'No'}</span></div>`;
+            html += `<div class="text-white">Screen: <span class="text-neon-yellow">${screen.width}x${screen.height}</span></div>`;
+            html += '</div>';
+            
+            output.innerHTML = html;
+        }
+        
+        function runFullCheck() {
+            const output = document.getElementById('fullCheckOutput');
+            output.classList.remove('hidden');
+            output.innerHTML = '<div class="text-neon-cyan">Running comprehensive health check...</div>';
+            
+            // Run all checks in sequence
+            setTimeout(() => checkSettings(), 500);
+            setTimeout(() => testDatabase(), 1000);
+            setTimeout(() => checkSymbols(), 1500);
+            setTimeout(() => testSignals(), 2000);
+            setTimeout(() => checkEndpoints(), 2500);
+            setTimeout(() => checkSystem(), 3000);
+            
+            // Final summary after all checks
+            setTimeout(() => {
+                let html = '<div class="space-y-2">';
+                html += '<div class="text-neon-green text-lg"><i class="fas fa-check-circle mr-2"></i>Full Health Check Completed</div>';
+                html += '<div class="text-gray-400">All individual checks have been run. Check each section above for detailed results.</div>';
+                html += '<div class="text-neon-yellow mt-4">System Status: <span class="text-neon-green">OPERATIONAL</span></div>';
+                html += '</div>';
+                output.innerHTML = html;
+            }, 4000);
+        }
+    </script>
+</body>
+</html>

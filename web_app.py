@@ -557,6 +557,10 @@ def order_history():
 def performance():
     return render_template('performance.html')
 
+@app.route('/healthcheck')
+def healthcheck():
+    return render_template('healthcheck.html')
+
 @app.route('/api/order_history')
 def get_order_history():
     """Get order history for this app's trades with pagination - now includes AI signals data"""
