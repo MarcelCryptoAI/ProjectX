@@ -3412,14 +3412,8 @@ def get_trading_signals():
             auto_execute = db_settings.get('autoExecute', False)
         except Exception as db_error:
             # Fallback to YAML settings
-            try:
-                from utils.settings_loader import Settings
-                settings = Settings.load('config/settings.yaml')
-                ai_confidence_threshold = settings.ai_confidence_threshold
-                ai_accuracy_threshold = settings.ai_accuracy_threshold
-                auto_execute = False
-                db_settings = {}  # Empty dict for fallback
-            # This except block should not exist - database is required
+            # This try block should not exist - database is required
+            # REMOVED: Fallback to YAML settings
         
         # Try to get AI worker
         ai_worker = None
