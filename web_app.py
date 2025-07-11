@@ -265,15 +265,17 @@ else:
     logging.basicConfig(level=logging.DEBUG)
 
 # Configure CORS for production
-cors_origins = "*" if os.getenv('FLASK_ENV') == 'development' else None
+cors_origins = "*"  # Allow all origins to fix connection issues
 socketio = SocketIO(
     app, 
     cors_allowed_origins=cors_origins,
     async_mode='threading',
-    ping_timeout=60,
-    ping_interval=25,
-    logger=False,
-    engineio_logger=False
+    ping_timeout=120,
+    ping_interval=60,
+    logger=True,
+    engineio_logger=True,
+    allow_upgrades=False,
+    transports=['polling']
 )
 
 # Global variables
