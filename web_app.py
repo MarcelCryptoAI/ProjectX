@@ -27,9 +27,16 @@ import urllib3
 # Load environment variables
 load_dotenv()
 
-# Initialize database instance once
+# Lazy-load database instance to prevent connection pool exhaustion on startup
 from database import TradingDatabase
-db_instance = TradingDatabase()
+db_instance = None
+
+def get_db_instance():
+    """Get database instance with lazy initialization"""
+    global db_instance
+    if db_instance is None:
+        db_instance = TradingDatabase()
+    return db_instance
 
 # Comprehensive DNS and SSL bypass for Heroku ByBit connection issues
 try:
@@ -4061,7 +4068,7 @@ def save_settings():
         existing_settings = {}
         try:
             # Use global database instance
-            db = db_instance
+            db = get_db_instance()
             existing_settings = db.load_settings()
         except Exception as db_error:
             print(f"Database settings load failed, using file fallback: {db_error}")
@@ -4094,7 +4101,7 @@ def save_settings():
         # Save to database
         try:
             # Use global database instance
-            db = db_instance
+            db = get_db_instance()
             db.save_settings(merged_settings)
         except Exception as db_error:
             print(f"Database settings save failed, using file fallback: {db_error}")
