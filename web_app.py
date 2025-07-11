@@ -3411,9 +3411,8 @@ def get_trading_signals():
             ai_accuracy_threshold = float(db_settings.get('accuracyThreshold', 70))
             auto_execute = db_settings.get('autoExecute', False)
         except Exception as db_error:
-            # Fallback to YAML settings
-            # This try block should not exist - database is required
-            # REMOVED: Fallback to YAML settings
+            app.logger.error(f"Database settings required but not found: {db_error}")
+            return jsonify({'error': 'Database settings required but not available'}), 500
         
         # Try to get AI worker
         ai_worker = None
