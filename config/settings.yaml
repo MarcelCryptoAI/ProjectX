@@ -9,8 +9,8 @@ api_keys:
   bybit_api_secret: ePL14K15F1GWRv3Fc5EzKC8AoHKuzr8vyKiI
   cryptopanic_api_key: defb6fad0b3f58d8369f3cbcafea0c0e8727025f
 bot:
-  ai_confidence_threshold: 80
-  ai_accuracy_threshold: 70
+  ai_confidence_threshold: 95
+  ai_accuracy_threshold: 88
   auto_tpsl: true
   cooldown_period: 1
   default_leverage: 5
@@ -217,7 +217,7 @@ bot:
   stop_loss_percent: 2
   take_profit_percent: 3
   min_take_profit_percent: 1
-  max_take_profit_percent: 10
+  max_take_profit_percent: 5
   trailing_stop_percent: 1
 dashboard:
   password: changeme123

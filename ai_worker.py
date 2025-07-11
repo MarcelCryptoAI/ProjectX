@@ -481,16 +481,29 @@ class AIWorker:
                 confidence = signal.get('confidence', 0)
                 accuracy = signal.get('accuracy', 0)
                 
-                # Get current threshold
+                # Get current threshold from database first, then settings
                 try:
-                    from utils.settings_loader import Settings
-                    settings = Settings.load('config/settings.yaml')
-                    ai_threshold = settings.ai_confidence_threshold
-                except:
-                    ai_threshold = self.settings.bot.get('ai_confidence_threshold', 75)  # Use settings with fallback
+                    # Try database first
+                    from database import TradingDatabase
+                    db = TradingDatabase()
+                    db_settings = db.load_settings()
+                    if db_settings and 'confidenceThreshold' in db_settings:
+                        ai_threshold = float(db_settings['confidenceThreshold'])
+                        accuracy_threshold = float(db_settings.get('accuracyThreshold', 70))
+                    else:
+                        raise Exception("No database settings found")
+                except Exception as db_error:
+                    # Fall back to YAML settings
+                    try:
+                        from utils.settings_loader import Settings
+                        settings = Settings.load('config/settings.yaml')
+                        ai_threshold = settings.ai_confidence_threshold
+                        accuracy_threshold = settings.ai_accuracy_threshold
+                    except:
+                        ai_threshold = self.settings.bot.get('ai_confidence_threshold', 75)  # Final fallback
+                        accuracy_threshold = self.settings.bot.get('ai_accuracy_threshold', 70)
                 
                 # If signal still meets requirements, reset to waiting
-                accuracy_threshold = self.settings.bot.get('ai_accuracy_threshold', 70)
                 if confidence >= ai_threshold and accuracy > accuracy_threshold:  # Basic quality check
                     db.update_signal_status(signal['signal_id'], 'waiting')
                     reset_count += 1
@@ -739,8 +752,18 @@ class AIWorker:
             
         except Exception as e:
             self.console_logger.log('WARNING', f'Failed to train model for {symbol}: {str(e)}')
-            # Use dynamic accuracy threshold from settings
-            accuracy_threshold = self.settings.bot.get('ai_accuracy_threshold', 70)
+            # Use dynamic accuracy threshold from database first, then settings
+            try:
+                from database import TradingDatabase
+                db = TradingDatabase()
+                db_settings = db.load_settings()
+                if db_settings and 'accuracyThreshold' in db_settings:
+                    accuracy_threshold = float(db_settings['accuracyThreshold'])
+                else:
+                    raise Exception("No database settings found")
+            except Exception as db_error:
+                # Fall back to YAML settings
+                accuracy_threshold = self.settings.bot.get('ai_accuracy_threshold', 70)
             return float(accuracy_threshold), float(accuracy_threshold)
     
     def _emit_training_progress(self):
@@ -783,7 +806,22 @@ class AIWorker:
                     confidence = confidence * 100
                 
                 # Check if prediction meets minimum confidence threshold FIRST
-                ai_threshold = self.get_ai_confidence_threshold()
+                # Get thresholds from database first, then settings
+                try:
+                    # Try database first
+                    from database import TradingDatabase
+                    db = TradingDatabase()
+                    db_settings = db.load_settings()
+                    if db_settings and 'confidenceThreshold' in db_settings:
+                        ai_threshold = float(db_settings['confidenceThreshold'])
+                        accuracy_threshold = float(db_settings.get('accuracyThreshold', 70))
+                    else:
+                        raise Exception("No database settings found")
+                except Exception as db_error:
+                    # Fall back to get_ai_confidence_threshold method
+                    ai_threshold = self.get_ai_confidence_threshold()
+                    accuracy_threshold = self.settings.bot.get('ai_accuracy_threshold', 70)
+                
                 if confidence < ai_threshold:
                     self.console_logger.log('INFO', f'⏭️ Signal {symbol} below threshold ({confidence:.1f}% < {ai_threshold}%) - not saving')
                     return  # Don't save or process low confidence signals
@@ -805,11 +843,11 @@ class AIWorker:
                         'symbol': symbol,
                         'side': side,
                         'confidence': confidence,
-                        'accuracy': prediction.get('accuracy', self.settings.bot.get('ai_accuracy_threshold', 70)),
+                        'accuracy': prediction.get('accuracy', accuracy_threshold),
                         'amount': prediction.get('amount', 100),
                         'leverage': prediction.get('leverage', 1),
-                        'stop_loss': prediction.get('stop_loss', 2.0),
-                        'take_profit': prediction.get('take_profit', 3.0),
+                        'stop_loss': prediction.get('stop_loss', db_settings.get('stopLossPercent', 2.0) if db_settings else 2.0),
+                        'take_profit': prediction.get('take_profit', db_settings.get('takeProfitPercent', 3.0) if db_settings else 3.0),
                         'entry_price': prediction.get('entry_price', 0.0),  # AI-advised entry price
                         'status': 'waiting'
                     }
@@ -857,13 +895,24 @@ class AIWorker:
             # Sort by confidence (highest first), then accuracy (highest first)
             waiting_signals.sort(key=lambda x: (x.get('confidence', 0), x.get('accuracy', 0)), reverse=True)
             
-            # Get confidence threshold
+            # Get confidence threshold from database first, then settings
             try:
-                from utils.settings_loader import Settings
-                settings = Settings.load('config/settings.yaml')
-                ai_threshold = settings.ai_confidence_threshold
-            except:
-                ai_threshold = self.settings.bot.get('ai_confidence_threshold', 75)  # Use settings with fallback
+                # Try database first
+                from database import TradingDatabase
+                db = TradingDatabase()
+                db_settings = db.load_settings()
+                if db_settings and 'confidenceThreshold' in db_settings:
+                    ai_threshold = float(db_settings['confidenceThreshold'])
+                else:
+                    raise Exception("No database settings found")
+            except Exception as db_error:
+                # Fall back to YAML settings
+                try:
+                    from utils.settings_loader import Settings
+                    settings = Settings.load('config/settings.yaml')
+                    ai_threshold = settings.ai_confidence_threshold
+                except:
+                    ai_threshold = self.settings.bot.get('ai_confidence_threshold', 75)  # Final fallback
             
             signals_processed = 0
             trades_executed = 0
@@ -973,13 +1022,24 @@ class AIWorker:
         }
     
     def get_ai_confidence_threshold(self):
-        """Get AI confidence threshold from settings"""
+        """Get AI confidence threshold from database first, then settings"""
+        try:
+            # Try database first
+            from database import TradingDatabase
+            db = TradingDatabase()
+            db_settings = db.load_settings()
+            if db_settings and 'confidenceThreshold' in db_settings:
+                return float(db_settings['confidenceThreshold'])
+        except Exception as db_error:
+            pass  # Fall back to YAML
+        
+        # Fall back to YAML settings
         try:
             from utils.settings_loader import Settings
             settings = Settings.load('config/settings.yaml')
             return settings.ai_confidence_threshold
         except:
-            return self.settings.bot.get('ai_confidence_threshold', 75.0)  # Use settings with fallback
+            return self.settings.bot.get('ai_confidence_threshold', 75.0)
     
     def get_active_positions_count(self):
         """Get count of active positions AND pending orders"""
@@ -1196,9 +1256,21 @@ class AIWorker:
             stop_loss_pct = float(signal.get('stop_loss', 2.0))  # AI determines SL
             take_profit_pct = float(signal.get('take_profit', 3.0))  # AI determines TP
             
-            # Ensure take profit is within configured bounds
-            min_tp = self.settings.min_take_profit_percent
-            max_tp = self.settings.max_take_profit_percent
+            # Ensure take profit is within configured bounds - load from database first
+            try:
+                from database import TradingDatabase
+                db = TradingDatabase()
+                db_settings = db.load_settings()
+                if db_settings:
+                    min_tp = float(db_settings.get('minTakeProfitPercent', 1))
+                    max_tp = float(db_settings.get('maxTakeProfitPercent', 10))
+                else:
+                    raise Exception("No database settings found")
+            except Exception as db_error:
+                # Fall back to YAML settings
+                min_tp = self.settings.min_take_profit_percent
+                max_tp = self.settings.max_take_profit_percent
+                
             take_profit_pct = max(min_tp, min(max_tp, take_profit_pct))
             
             self.console_logger.log('INFO', f'📊 Using AI-determined TP: {take_profit_pct:.2f}% (bounds: {min_tp}-{max_tp}%)')
