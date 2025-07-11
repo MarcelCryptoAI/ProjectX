@@ -2857,6 +2857,7 @@ def get_analytics_data():
             trades_data['realized_pnl_all_time'] = realized_pnl_all_time
             
             # Always process ByBit closed P&L data to get ALL trades (not just AI signals)
+            app.logger.info(f"closed_pnl_response available: {bool(closed_pnl_response and 'result' in closed_pnl_response)}")
             if closed_pnl_response and 'result' in closed_pnl_response:
                 app.logger.info(f"Processing {len(closed_pnl_response['result']['list'])} trades from ByBit closed P&L")
                 
@@ -2895,8 +2896,10 @@ def get_analytics_data():
                             # Check if trade was in last 24 hours
                             if trade_time >= yesterday:
                                 realized_pnl_24h += pnl
-                        except:
-                            pass
+                        except Exception as e:
+                            app.logger.error(f"Error parsing trade time: {e}, updatedTime: {updated_time}")
+                    else:
+                        app.logger.warning(f"No updatedTime for trade: {pnl_entry}")
                 
                 # Update the data
                 trades_data['realized_pnl_24h'] = realized_pnl_24h
@@ -2945,6 +2948,9 @@ def get_analytics_data():
         
         # Process ALL trades from ByBit API for time-based stats
         if 'all_trades_data' in trades_data:
+            app.logger.info(f"Processing {len(trades_data['all_trades_data'])} trades for time-based stats")
+            app.logger.info(f"Time boundaries - Yesterday: {yesterday}, Month ago: {month_ago}")
+            
             for trade in trades_data['all_trades_data']:
                 trade_time = trade['time']
                 pnl = trade['pnl']
@@ -2964,6 +2970,8 @@ def get_analytics_data():
                         wins_month += 1
                     elif pnl < 0:
                         losses_month += 1
+            
+            app.logger.info(f"Time-based stats - 24h trades: {trades_24h}, 30d trades: {trades_month}")
             
             # Remove the temporary data
             del trades_data['all_trades_data']
