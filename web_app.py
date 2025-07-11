@@ -3542,18 +3542,10 @@ def get_trading_signals():
                         leverage = max(min_leverage, min(max_leverage, leverage))
                         
                         # Calculate partial take profit levels - get from database settings
-                        try:
-                            from database import TradingDatabase
-                            db = get_database()
-                            db_settings = db.load_settings()
-                            partial_tp_enabled = db_settings.get('partialTakeProfit', False)
-                            partial_tp_levels = db_settings.get('partialTakeProfitLevels', 4)
-                            partial_tp_percentage = db_settings.get('partialTakeProfitPercentage', 25)
-                        except:
-                            # Fallback to environment variables
-                            partial_tp_enabled = os.getenv('PARTIAL_TAKE_PROFIT', 'false').lower() == 'true'
-                            partial_tp_levels = int(os.getenv('PARTIAL_TAKE_PROFIT_LEVELS', 4))
-                            partial_tp_percentage = int(os.getenv('PARTIAL_TAKE_PROFIT_PERCENTAGE', 25))
+                        # Use already loaded db_settings - NO ADDITIONAL DATABASE CALL
+                        partial_tp_enabled = db_settings.get('partialTakeProfit', False)
+                        partial_tp_levels = db_settings.get('partialTakeProfitLevels', 4)
+                        partial_tp_percentage = db_settings.get('partialTakeProfitPercentage', 25)
                         
                         take_profit_levels = []
                         if partial_tp_enabled:

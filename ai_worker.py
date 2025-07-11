@@ -246,11 +246,23 @@ class AIWorker:
                 self.console_logger.log('INFO', '⚡ Direct pybit trading ready for live execution')
             
     def stop(self):
-        """Stop the AI worker"""
+        """Stop the AI worker and abort any training"""
         self.is_running = False
         
         # Stop breakeven monitor
         self.stop_breakeven_monitor()
+        
+        # Abort training if in progress
+        if self.training_in_progress:
+            self.training_in_progress = False
+            self.console_logger.log('WARNING', '⏹️ TRAINING ABORTED - Manual stop requested')
+            
+            # Emit training aborted event
+            if self.socketio:
+                self.socketio.emit('training_aborted', {
+                    'message': 'Training was manually stopped',
+                    'timestamp': datetime.now().isoformat()
+                })
         
         self.console_logger.log('WARNING', '⏹️ AI WORKER STOPPED - All operations halted')
         self.console_logger.log('INFO', '🔴 Training, signals, and trading have been disabled')
@@ -267,11 +279,15 @@ class AIWorker:
                 # Check if model needs retraining
                 self._check_model_training()
                 
-                # Generate trading signals
-                self._generate_signals()
-                
-                # Execute trades from ranked signal list
-                self._execute_top_signals()
+                # Only generate and execute signals if NOT training
+                if not self.training_in_progress:
+                    # Generate trading signals
+                    self._generate_signals()
+                    
+                    # Execute trades from ranked signal list
+                    self._execute_top_signals()
+                else:
+                    self.console_logger.log('INFO', '🔄 Training in progress - skipping signal generation and execution')
                 
                 # Monitor trades and move stop loss if needed
                 self.monitor_trades_and_move_sl()
@@ -1262,8 +1278,13 @@ class AIWorker:
             # Fix: User expects 5% to mean 0.5% (divide by 10)
             calculated_trade_amount = total_balance * (risk_per_trade / 1000)
             
-            # Ensure minimum trade amount (user's setting or $5 minimum)
-            trade_amount_usd = max(min_trade_amount, calculated_trade_amount)
+            # If calculated amount is less than minimum, use EXACT minimum
+            if calculated_trade_amount < min_trade_amount:
+                trade_amount_usd = min_trade_amount
+                self.console_logger.log('INFO', f'💰 Using minimum trade amount: ${min_trade_amount:.2f} (calculated: ${calculated_trade_amount:.2f})')
+            else:
+                trade_amount_usd = calculated_trade_amount
+                self.console_logger.log('INFO', f'💰 Using calculated trade amount: ${calculated_trade_amount:.2f}')
             
             # Calculate total quantity for this trade amount (WITH leverage to get position value)
             # Trade amount × leverage = position value, so qty = (trade_amount × leverage) / price
