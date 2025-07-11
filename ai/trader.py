@@ -12,8 +12,8 @@ class AITrader:
     def _get_user_accuracy_setting(self):
         """Get exact user accuracy setting from database"""
         try:
-            from database import TradingDatabase
-            db = TradingDatabase()
+            from db_singleton import get_database
+            db = get_database()
             db_settings = db.load_settings()
             user_accuracy = float(db_settings.get('accuracyThreshold', 88))  # Default to 88
             self.logger.info(f"Using user accuracy setting: {user_accuracy}%")
@@ -36,8 +36,8 @@ class AITrader:
         
         # STRICT database enforcement - NO YAML fallback for user settings
         try:
-            from database import TradingDatabase
-            db = TradingDatabase()
+            from db_singleton import get_database
+            db = get_database()
             db_settings = db.load_settings()
             
             if not db_settings:
@@ -258,8 +258,8 @@ class AITrader:
         """Calculate AI-advised stop loss based on market conditions"""
         # STRICT database enforcement for stop loss
         try:
-            from database import TradingDatabase
-            db = TradingDatabase()
+            from db_singleton import get_database
+            db = get_database()
             db_settings = db.load_settings()
             
             if not db_settings:

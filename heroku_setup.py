@@ -45,7 +45,7 @@ def verify_no_redis_dependencies():
 def initialize_database():
     """Initialize database (PostgreSQL on Heroku, SQLite locally)"""
     try:
-        from database import TradingDatabase
+        from db_singleton import get_database
         
         # Check if we're on Heroku
         if os.getenv('DATABASE_URL'):
@@ -53,11 +53,11 @@ def initialize_database():
             print("📊 Database will be automatically initialized on first access")
             # PostgreSQL database is created automatically by Heroku
             # Tables will be created by TradingDatabase on first instantiation
-            db = TradingDatabase()
+            db = get_database()
             print("✅ PostgreSQL database connection verified")
         else:
             print("🗄️  Using SQLite database for local development")
-            db = TradingDatabase()
+            db = get_database()
             print("✅ SQLite database initialized successfully")
         
         return True

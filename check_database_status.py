@@ -8,13 +8,13 @@ import os
 # Add the project root to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from database import TradingDatabase
+from db_singleton import get_database
 from utils.settings_loader import Settings
 
 def check_database_status():
     """Check the status of symbols in the database"""
     try:
-        db = TradingDatabase()
+        db = get_database()
         
         # Get all symbols from database
         symbols = db.get_supported_symbols()

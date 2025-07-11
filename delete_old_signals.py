@@ -5,12 +5,12 @@ Script to delete old trading signals from the database
 
 import os
 import sys
-from database import TradingDatabase
+from db_singleton import get_database
 
 def main():
     """Delete the oldest 11 trading signals"""
     try:
-        db = TradingDatabase()
+        db = get_database()
         
         # Get current count
         current_signals = db.get_trading_signals()

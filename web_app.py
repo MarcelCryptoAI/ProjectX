@@ -27,16 +27,12 @@ import urllib3
 # Load environment variables
 load_dotenv()
 
-# Lazy-load database instance to prevent connection pool exhaustion on startup
-from database import TradingDatabase
-db_instance = None
+# Use singleton database instance to prevent connection pool exhaustion
+from db_singleton import get_database
 
 def get_db_instance():
-    """Get database instance with lazy initialization"""
-    global db_instance
-    if db_instance is None:
-        db_instance = TradingDatabase()
-    return db_instance
+    """Get the global database singleton instance"""
+    return get_database()
 
 # Comprehensive DNS and SSL bypass for Heroku ByBit connection issues
 try:
@@ -581,7 +577,7 @@ def get_order_history():
         
         # First, get completed trades from our trading_signals database
         from database import TradingDatabase
-        db = TradingDatabase()
+        db = get_database()
         ai_signals = db.get_trading_signals()
         
         # Filter completed signals with P&L data
@@ -689,7 +685,7 @@ def get_order_history():
                 leverage_multiplier = 1.0
                 try:
                     from database import TradingDatabase
-                    db = TradingDatabase()
+                    db = get_database()
                     leverage_multiplier = db.get_leverage_multiplier(symbol)
                 except:
                     pass
@@ -755,7 +751,7 @@ def get_order_history():
                 leverage_multiplier = 1.0
                 try:
                     from database import TradingDatabase
-                    db = TradingDatabase()
+                    db = get_database()
                     leverage_multiplier = db.get_leverage_multiplier(symbol)
                 except:
                     pass
@@ -813,7 +809,7 @@ def get_order_history():
                 leverage_multiplier = 1.0
                 try:
                     from database import TradingDatabase
-                    db = TradingDatabase()
+                    db = get_database()
                     leverage_multiplier = db.get_leverage_multiplier(execution.get('symbol', ''))
                 except:
                     pass
@@ -930,7 +926,7 @@ def get_ai_signals_analytics():
     """Get detailed analytics for AI trading signals"""
     try:
         from database import TradingDatabase
-        db = TradingDatabase()
+        db = get_database()
         
         # Get all signals
         all_signals = db.get_trading_signals()
@@ -1286,7 +1282,7 @@ def get_balance_header():
             # Calculate 24h P&L from database
             try:
                 from database import TradingDatabase
-                db = TradingDatabase()
+                db = get_database()
                 signal_trades = db.get_trading_signals()
                 
                 # Calculate 24h realized P&L
@@ -1331,7 +1327,7 @@ def get_balance_header():
             pnl_24h_percent = 0.0
             try:
                 from database import TradingDatabase
-                db = TradingDatabase()
+                db = get_database()
                 signal_trades = db.get_trading_signals()
                 
                 now = datetime.now()
@@ -1461,7 +1457,7 @@ def get_system_status():
     # Test Database
     try:
         from database import TradingDatabase
-        db = TradingDatabase()
+        db = get_database()
         # Simple test query
         test_query = db.get_connection()
         test_query.close()
@@ -2083,7 +2079,7 @@ def delete_old_signals():
         count = data.get('count', 10)
         
         from database import TradingDatabase
-        db = TradingDatabase()
+        db = get_database()
         
         # Delete the oldest signals
         deleted_count = db.delete_oldest_trading_signals(count)
@@ -2436,7 +2432,7 @@ def stop_all():
 def get_database_stats():
     try:
         from database import TradingDatabase
-        db = TradingDatabase()
+        db = get_database()
         
         # Get training sessions count
         sessions = db.get_training_history(limit=100)
@@ -2646,7 +2642,7 @@ def get_analytics_data():
         # Count only completed signal trades from database
         try:
             from database import TradingDatabase
-            db = TradingDatabase()
+            db = get_database()
             signal_trades = db.get_trading_signals()
             
             # Filter for completed signal trades with P&L data
@@ -2954,7 +2950,7 @@ def get_performance_analytics():
         # Get trading signals from database for the specified period
         try:
             from database import TradingDatabase
-            db = TradingDatabase()
+            db = get_database()
             signal_trades = db.get_trading_signals()
             
             # Filter signals by time period
@@ -3070,7 +3066,7 @@ def get_cumulative_roi():
         # Get trading signals from database
         try:
             from database import TradingDatabase
-            db = TradingDatabase()
+            db = get_database()
             signal_trades = db.get_trading_signals()
             
             # Filter for completed signals with realized P&L
@@ -3324,7 +3320,7 @@ def get_trading_signals():
         
         try:
             from database import TradingDatabase
-            db = TradingDatabase()
+            db = get_database()
             db_settings = db.load_settings()
             ai_confidence_threshold = float(db_settings.get('confidenceThreshold', ai_confidence_threshold))
             ai_accuracy_threshold = float(db_settings.get('accuracyThreshold', ai_accuracy_threshold))
@@ -3383,7 +3379,7 @@ def get_trading_signals():
                 # Try direct database access as fallback
                 try:
                     from database import TradingDatabase
-                    db = TradingDatabase()
+                    db = get_database()
                     latest_session = db.get_latest_training_session()
                     if latest_session:
                         training_results = db.get_training_results(latest_session['session_id'])
@@ -3448,7 +3444,7 @@ def get_trading_signals():
                         # Calculate partial take profit levels - get from database settings
                         try:
                             from database import TradingDatabase
-                            db = TradingDatabase()
+                            db = get_database()
                             db_settings = db.load_settings()
                             partial_tp_enabled = db_settings.get('partialTakeProfit', False)
                             partial_tp_levels = db_settings.get('partialTakeProfitLevels', 4)
@@ -3623,7 +3619,7 @@ def get_config():
         # Load from database settings first
         try:
             from database import TradingDatabase
-            db = TradingDatabase()
+            db = get_database()
             db_settings = db.load_settings()
             
             ai_confidence_threshold = float(db_settings.get('confidenceThreshold', 80))
@@ -4138,7 +4134,7 @@ def fix_pnl():
     """Fix realized P&L calculations in the database"""
     try:
         from database import TradingDatabase
-        db = TradingDatabase()
+        db = get_database()
         
         # Get all completed signals with P&L data
         signals = db.get_trading_signals()
@@ -4236,7 +4232,7 @@ def load_settings():
         # Try to load from database
         try:
             from database import TradingDatabase
-            db = TradingDatabase()
+            db = get_database()
             db_settings = db.load_settings()
             default_settings.update(db_settings)
         except Exception as db_error:
@@ -4308,7 +4304,7 @@ def refresh_symbols():
     """Refresh supported symbols from ByBit"""
     try:
         from database import TradingDatabase
-        db = TradingDatabase()
+        db = get_database()
         
         # Force migration to fix symbol column size
         db.migrate_supported_symbols_table()
@@ -4496,7 +4492,7 @@ def get_training_symbols():
     """Get symbols that will be used for training"""
     try:
         from database import TradingDatabase
-        db = TradingDatabase()
+        db = get_database()
         
         # Get active symbols from database
         symbols = db.get_supported_symbols()
@@ -4539,7 +4535,7 @@ def get_leverage_multipliers():
     """Get leverage multipliers for all supported symbols"""
     try:
         from database import TradingDatabase
-        db = TradingDatabase()
+        db = get_database()
         
         symbols = db.get_supported_symbols()
         
@@ -4569,7 +4565,7 @@ def save_leverage_multipliers():
             }), 400
         
         from database import TradingDatabase
-        db = TradingDatabase()
+        db = get_database()
         
         updated_count = 0
         for symbol, multiplier in multipliers.items():

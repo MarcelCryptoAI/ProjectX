@@ -10,7 +10,7 @@ from queue import Queue
 from utils.settings_loader import Settings
 from ai.trader import AITrader
 from utils.trade_logger import TradeLogger
-from database import TradingDatabase
+from db_singleton import get_database
 # Trading.executor removed - using direct pybit calls
 import logging
 
@@ -94,7 +94,7 @@ class AIWorker:
         self.ai_trader = AITrader(self.settings)
         self.trade_logger = TradeLogger()
         self.console_logger = ConsoleLogger()
-        self.database = TradingDatabase()
+        self.database = get_database()
         # Direct pybit integration - no separate executor needed
         self.max_concurrent_trades = int(os.getenv('MAX_CONCURRENT_TRADES', 20))
         self.active_trades = {}  # Track active trades for SL management
@@ -211,8 +211,8 @@ class AIWorker:
             
             # Resume on-hold signals back to waiting status
             try:
-                from database import TradingDatabase
-                db = TradingDatabase()
+                from db_singleton import get_database
+                db = get_database()
                 on_hold_signals = db.get_trading_signals()
                 resumed_count = 0
                 
@@ -469,8 +469,8 @@ class AIWorker:
     def _reset_failed_signals_after_retraining(self):
         """Reset failed signals to waiting status after retraining to give them another chance"""
         try:
-            from database import TradingDatabase
-            db = TradingDatabase()
+            from db_singleton import get_database
+            db = get_database()
             
             # Get all failed signals
             failed_signals = [s for s in db.get_trading_signals() if s.get('status') == 'failed']
@@ -484,8 +484,8 @@ class AIWorker:
                 # Get current threshold from database first, then settings
                 try:
                     # Try database first
-                    from database import TradingDatabase
-                    db = TradingDatabase()
+                    from db_singleton import get_database
+                    db = get_database()
                     db_settings = db.load_settings()
                     if db_settings and 'confidenceThreshold' in db_settings:
                         ai_threshold = float(db_settings['confidenceThreshold'])
@@ -624,8 +624,8 @@ class AIWorker:
             # First check if user has manually set market condition (not auto)
             user_market_condition = None
             try:
-                from database import TradingDatabase
-                db = TradingDatabase()
+                from db_singleton import get_database
+                db = get_database()
                 settings = db.load_settings()
                 user_market_condition = settings.get('marketCondition', 'auto')
             except Exception as settings_error:
@@ -754,8 +754,8 @@ class AIWorker:
             self.console_logger.log('WARNING', f'Failed to train model for {symbol}: {str(e)}')
             # Use dynamic accuracy threshold from database first, then settings
             try:
-                from database import TradingDatabase
-                db = TradingDatabase()
+                from db_singleton import get_database
+                db = get_database()
                 db_settings = db.load_settings()
                 if db_settings and 'accuracyThreshold' in db_settings:
                     accuracy_threshold = float(db_settings['accuracyThreshold'])
@@ -809,8 +809,8 @@ class AIWorker:
                 # Get thresholds from database first, then settings
                 try:
                     # Try database first
-                    from database import TradingDatabase
-                    db = TradingDatabase()
+                    from db_singleton import get_database
+                    db = get_database()
                     db_settings = db.load_settings()
                     if db_settings and 'confidenceThreshold' in db_settings:
                         ai_threshold = float(db_settings['confidenceThreshold'])
@@ -833,8 +833,8 @@ class AIWorker:
                 # SAVE TO DATABASE ONLY - NO DIRECT EXECUTION
                 # Let the ranked system handle execution
                 try:
-                    from database import TradingDatabase
-                    db = TradingDatabase()
+                    from db_singleton import get_database
+                    db = get_database()
                     
                     # Save signal to database with waiting status
                     signal_id = f'signal_{self.signal_count}_{symbol}'
@@ -883,8 +883,8 @@ class AIWorker:
                 return
                 
             # Get waiting signals from database
-            from database import TradingDatabase
-            db = TradingDatabase()
+            from db_singleton import get_database
+            db = get_database()
             
             # Get all waiting signals (including previously failed ones after retraining)
             waiting_signals = [s for s in db.get_trading_signals() if s.get('status') in ['waiting', 'failed']]
@@ -898,8 +898,8 @@ class AIWorker:
             # Get confidence threshold from database first, then settings
             try:
                 # Try database first
-                from database import TradingDatabase
-                db = TradingDatabase()
+                from db_singleton import get_database
+                db = get_database()
                 db_settings = db.load_settings()
                 if db_settings and 'confidenceThreshold' in db_settings:
                     ai_threshold = float(db_settings['confidenceThreshold'])
@@ -1025,8 +1025,8 @@ class AIWorker:
         """Get AI confidence threshold from database first, then settings"""
         try:
             # Try database first
-            from database import TradingDatabase
-            db = TradingDatabase()
+            from db_singleton import get_database
+            db = get_database()
             db_settings = db.load_settings()
             if db_settings and 'confidenceThreshold' in db_settings:
                 return float(db_settings['confidenceThreshold'])
@@ -1106,8 +1106,8 @@ class AIWorker:
                                 self.console_logger.log('WARNING', f'⚠️ Already have {existing_side} position for {symbol}, blocking same direction trade')
                                 # Update signal status to waiting
                                 if 'signal_id' in signal:
-                                    from database import TradingDatabase
-                                    db = TradingDatabase()
+                                    from db_singleton import get_database
+                                    db = get_database()
                                     db.update_signal_status(signal['signal_id'], 'waiting')
                                 return False
                             
@@ -1157,8 +1157,8 @@ class AIWorker:
             
             # Get user settings for leverage and trade amount
             try:
-                from database import TradingDatabase
-                db = TradingDatabase()
+                from db_singleton import get_database
+                db = get_database()
                 db_settings = db.load_settings()
                 
                 # User leverage settings
@@ -1258,8 +1258,8 @@ class AIWorker:
             
             # Ensure take profit is within configured bounds - load from database first
             try:
-                from database import TradingDatabase
-                db = TradingDatabase()
+                from db_singleton import get_database
+                db = get_database()
                 db_settings = db.load_settings()
                 if db_settings:
                     min_tp = float(db_settings.get('minTakeProfitPercent', 1))
@@ -1424,8 +1424,8 @@ class AIWorker:
                 # Update signal status and store order IDs in database
                 if 'signal_id' in signal:
                     try:
-                        from database import TradingDatabase
-                        db = TradingDatabase()
+                        from db_singleton import get_database
+                        db = get_database()
                         # Update signal with order IDs
                         signal_update = {
                             'entry_order_id': entry_order_id,
@@ -1451,8 +1451,8 @@ class AIWorker:
                 # Update signal status to 'failed' in database
                 if 'signal_id' in signal:
                     try:
-                        from database import TradingDatabase
-                        db = TradingDatabase()
+                        from db_singleton import get_database
+                        db = get_database()
                         db.update_signal_status(signal['signal_id'], 'failed')
                     except Exception as db_error:
                         self.console_logger.log('WARNING', f'⚠️ Could not update signal status: {db_error}')
@@ -1465,8 +1465,8 @@ class AIWorker:
             # Update signal status to 'failed' in database
             if 'signal_id' in signal:
                 try:
-                    from database import TradingDatabase
-                    db = TradingDatabase()
+                    from db_singleton import get_database
+                    db = get_database()
                     db.update_signal_status(signal['signal_id'], 'failed')
                 except Exception as db_error:
                     self.console_logger.log('WARNING', f'⚠️ Could not update signal status: {db_error}')
@@ -1566,8 +1566,8 @@ class AIWorker:
                                 signal_id = trade_data.get('signal_id')
                                 if signal_id:
                                     # Update signal status to 'pending' (position now open, waiting for exit)
-                                    from database import TradingDatabase
-                                    db = TradingDatabase()
+                                    from db_singleton import get_database
+                                    db = get_database()
                                     
                                     # Update both status and entry price
                                     conn = db.get_connection()
@@ -1863,8 +1863,8 @@ class AIWorker:
                                 self.console_logger.log('WARNING', f'⚠️ Position closed for {symbol} but no exit trades found')
                                 
                                 # Still update signal to completed status without P&L
-                                from database import TradingDatabase
-                                db = TradingDatabase()
+                                from db_singleton import get_database
+                                db = get_database()
                                 conn = db.get_connection()
                                 cursor = conn.cursor()
                                 placeholder = '%s' if db.use_postgres else '?'
@@ -1931,8 +1931,8 @@ class AIWorker:
                         
                         try:
                             # Try to find a matching signal in the database
-                            from database import TradingDatabase
-                            db = TradingDatabase()
+                            from db_singleton import get_database
+                            db = get_database()
                             
                             # Look for recent signals with this symbol that are in 'pending' or 'executing' status
                             signals = db.get_trading_signals()
@@ -2156,8 +2156,8 @@ class AIWorker:
                                         self.console_logger.log('INFO', f'📊 Manual close recorded with estimated P&L: {symbol} ${estimated_pnl:.2f} (estimated)')
                                     else:
                                         # Still update signal to completed status without P&L
-                                        from database import TradingDatabase
-                                        db = TradingDatabase()
+                                        from db_singleton import get_database
+                                        db = get_database()
                                         conn = db.get_connection()
                                         cursor = conn.cursor()
                                         placeholder = '%s' if db.use_postgres else '?'

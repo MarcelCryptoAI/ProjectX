@@ -191,8 +191,8 @@ class TradeExecutor:
     def _get_leverage_multiplier(self, symbol):
         """Get leverage multiplier for a specific symbol from database"""
         try:
-            from database import TradingDatabase
-            db = TradingDatabase()
+            from db_singleton import get_database
+            db = get_database()
             return db.get_leverage_multiplier(symbol)
         except Exception as e:
             self.log('WARNING', f'Failed to get leverage multiplier for {symbol}: {str(e)}')
