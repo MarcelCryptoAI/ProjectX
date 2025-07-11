@@ -245,7 +245,8 @@ else:
     print("💻 Running locally - Development mode")
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here-change-in-production')
+# Get SECRET_KEY from environment - NO FALLBACK
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY') or 'dev-key-change-in-production'
 
 # Configure logging for production
 if os.getenv('FLASK_ENV') == 'production':
@@ -297,9 +298,12 @@ def init_components():
         # Fallback to environment variables if config file doesn't exist
         settings = type('Settings', (), {})()
     
-    # Override with environment variables - use setattr to avoid setter issues
-    api_key = os.getenv('BYBIT_API_KEY', getattr(settings, 'bybit_api_key', ''))
-    api_secret = os.getenv('BYBIT_API_SECRET', getattr(settings, 'bybit_api_secret', ''))
+    # Get API credentials from environment - NO FALLBACK
+    api_key = os.getenv('BYBIT_API_KEY')
+    api_secret = os.getenv('BYBIT_API_SECRET')
+    
+    if not api_key or not api_secret:
+        raise ValueError("BYBIT_API_KEY and BYBIT_API_SECRET must be set in environment")
     
     # Set attributes safely
     if hasattr(settings, '__dict__'):
@@ -572,9 +576,9 @@ def get_order_history():
     try:
         ensure_components_initialized()
         
-        # Get query params
-        period = request.args.get('period', '7d')
-        page = int(request.args.get('page', 1))
+        # Get query params - NO FALLBACK
+        period = request.args.get('period') or '7d'
+        page = int(request.args.get('page') or 1)
         per_page = 50
         
         # First, get completed trades from our trading_signals database
@@ -673,8 +677,10 @@ def get_order_history():
         # First, process our AI signals data (most accurate)
         for signal in completed_signals:
             try:
-                symbol = signal.get('symbol', '')
-                side = signal.get('side', '')
+                if 'symbol' not in signal or 'side' not in signal:
+                    continue  # Skip incomplete signals
+                symbol = signal['symbol']
+                side = signal['side']
                 entry_price = float(signal.get('entry_price', 0))
                 exit_price = float(signal.get('exit_price', 0))
                 realized_pnl = float(signal.get('realized_pnl', 0))
@@ -3270,38 +3276,25 @@ def get_coin_analysis():
         ensure_components_initialized()
         ai_worker = get_ai_worker(socketio, bybit_session)
         
-        # Get AI confidence threshold from settings
-        try:
-            from utils.settings_loader import Settings
-            settings = Settings.load('config/settings.yaml')
-            ai_confidence_threshold = settings.ai_confidence_threshold
-            ai_accuracy_threshold = settings.ai_accuracy_threshold
-        except:
-            ai_confidence_threshold = float(os.getenv('AI_CONFIDENCE_THRESHOLD', 80))
-            ai_accuracy_threshold = float(os.getenv('AI_ACCURACY_THRESHOLD', 70))
-        
-        # Load database settings first
+        # Load database settings ONLY - NO FALLBACK
         try:
             db = get_database()
             db_settings = db.load_settings()
-            ai_confidence_threshold = float(db_settings.get('confidenceThreshold', ai_confidence_threshold))
-            ai_accuracy_threshold = float(db_settings.get('accuracyThreshold', ai_accuracy_threshold))
+            if not db_settings:
+                raise Exception("No database settings found")
+                
+            ai_confidence_threshold = float(db_settings['confidenceThreshold'])
+            ai_accuracy_threshold = float(db_settings['accuracyThreshold'])
             auto_execute = db_settings.get('autoExecute', False)
             
-            # Load TP/SL settings from database
-            min_take_profit = float(db_settings.get('minTakeProfitPercent', 1))
-            max_take_profit = float(db_settings.get('maxTakeProfitPercent', 10))
-            base_take_profit = float(db_settings.get('takeProfitPercent', 3))
-            stop_loss_percent = float(db_settings.get('stopLossPercent', 2))
+            # Load TP/SL settings from database - NO FALLBACK
+            min_take_profit = float(db_settings['minTakeProfitPercent'])
+            max_take_profit = float(db_settings['maxTakeProfitPercent'])
+            base_take_profit = float(db_settings['takeProfitPercent'])
+            stop_loss_percent = float(db_settings['stopLossPercent'])
         except Exception as settings_error:
-            app.logger.warning(f"Could not load settings from database: {settings_error}")
-            # Fallback to default values
-            min_take_profit = 1
-            max_take_profit = 10
-            base_take_profit = 3
-            stop_loss_percent = 2
-            auto_execute = False
-            db_settings = {}  # Empty dict for fallback
+            app.logger.error(f"Database settings required but not found: {settings_error}")
+            return jsonify({'error': 'Database settings required but not available'}), 500
         
         # Get training results from database
         coins_analysis = []
@@ -3426,11 +3419,7 @@ def get_trading_signals():
                 ai_accuracy_threshold = settings.ai_accuracy_threshold
                 auto_execute = False
                 db_settings = {}  # Empty dict for fallback
-            except:
-                ai_confidence_threshold = 75  # Default fallback
-                ai_accuracy_threshold = 70  # Default fallback
-                auto_execute = False
-                db_settings = {}  # Empty dict for fallback
+            # This except block should not exist - database is required
         
         # Try to get AI worker
         ai_worker = None

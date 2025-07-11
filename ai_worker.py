@@ -86,21 +86,15 @@ class AIWorker:
     def __init__(self, socketio=None, bybit_session=None):
         self.socketio = socketio
         self.bybit_session = bybit_session
-        # Load settings with fallback for production
-        try:
-            self.settings = Settings.load('config/settings.yaml')
-        except:
-            # Fallback to environment variables if config file doesn't exist
-            self.settings = type('Settings', (), {})()
+        # Load settings from database only
+        self.settings = type('Settings', (), {})()
         self.ai_trader = AITrader(self.settings)
         self.trade_logger = TradeLogger()
         self.console_logger = ConsoleLogger()
         self.database = get_database()
         # Direct pybit integration - no separate executor needed
-        self.max_concurrent_trades = int(os.getenv('MAX_CONCURRENT_TRADES', 20))
+        # Max concurrent trades will be loaded from database when needed
         self.last_heartbeat = datetime.now()
-        self.heartbeat_interval = 30  # seconds
-        self.auto_restart_enabled = True
         self.active_trades = {}  # Track active trades for SL management
         if bybit_session:
             self.console_logger.log('INFO', '✅ Direct pybit trading ready')
@@ -135,7 +129,8 @@ class AIWorker:
             active_symbols = [s['symbol'] for s in symbols if s.get('status') == 'active']
             
             # Always get symbols from settings.yaml for complete coverage
-            enabled_pairs = self.settings.bot.get('enabled_pairs', ['BTCUSDT', 'ETHUSDT'])
+            # NO FALLBACK - only use database symbols
+            enabled_pairs = active_symbols
             
             # Combine database symbols with settings symbols to ensure complete A-Z coverage
             all_symbols = list(set(active_symbols + enabled_pairs))
@@ -166,14 +161,8 @@ class AIWorker:
             return all_symbols
         except Exception as e:
             self.console_logger.log('ERROR', f'Failed to get supported symbols from database: {str(e)}')
-            # Final fallback to settings if everything fails
-            try:
-                enabled_pairs = self.settings.bot.get('enabled_pairs', ['BTCUSDT', 'ETHUSDT'])
-                self.console_logger.log('WARNING', f'Using settings fallback: {len(enabled_pairs)} symbols')
-                return enabled_pairs
-            except:
-                self.console_logger.log('ERROR', 'All symbol sources failed, using minimal fallback')
-                return ['BTCUSDT', 'ETHUSDT']
+            # Return database symbols only
+            return active_symbols
     
     def _refresh_symbols_from_bybit(self):
         """Refresh symbols from ByBit API"""
@@ -304,12 +293,22 @@ class AIWorker:
                 # Emit status update
                 self._emit_status_update()
                 
-                # Sleep for configured interval
-                time.sleep(30)  # Check every 30 seconds
+                # Sleep for configured interval from database
+                try:
+                    db_settings = self.database.load_settings()
+                    monitor_interval = int(db_settings.get('monitorInterval', 30))
+                    time.sleep(monitor_interval)
+                except:
+                    time.sleep(30)  # Default fallback
                 
             except Exception as e:
                 self.console_logger.log('ERROR', f'Worker error: {str(e)}')
-                time.sleep(60)  # Wait longer on error
+                try:
+                    db_settings = self.database.load_settings()
+                    error_interval = int(db_settings.get('errorRetryInterval', 60))
+                    time.sleep(error_interval)
+                except:
+                    time.sleep(60)  # Default fallback
     
     def _check_model_training(self):
         """Check if AI model needs retraining"""
@@ -327,7 +326,10 @@ class AIWorker:
                 return
             
             # Get retrain interval in minutes (default 60 minutes if not set)
-            retrain_interval_minutes = float(db_settings.get('retrainIntervalMinutes', 60))
+            if 'retrainIntervalMinutes' not in db_settings:
+                self.console_logger.log('ERROR', '❌ retrainIntervalMinutes not in database - skipping retrain')
+                return
+            retrain_interval_minutes = float(db_settings['retrainIntervalMinutes'])
             update_interval_hours = retrain_interval_minutes / 60.0
         except Exception as db_error:
             self.console_logger.log('ERROR', f'❌ Database error for retrain interval: {db_error} - skipping retrain')
@@ -358,7 +360,8 @@ class AIWorker:
             
             if not enabled_pairs:
                 self.console_logger.log('WARNING', 'No supported symbols found in database, using settings fallback')
-                enabled_pairs = self.settings.bot.get('enabled_pairs', ['BTCUSDT', 'ETHUSDT'])
+                # NO FALLBACK - only use database symbols
+            enabled_pairs = active_symbols
             
             if not enabled_pairs:
                 self.console_logger.log('ERROR', 'No trading pairs enabled for training')
@@ -529,27 +532,16 @@ class AIWorker:
                 confidence = signal.get('confidence', 0)
                 accuracy = signal.get('accuracy', 0)
                 
-                # Get current threshold from database first, then settings
+                # Get current threshold from database only
                 try:
-                    # Try database first
-                    from db_singleton import get_database
-                    db = get_database()
-                    db_settings = db.load_settings()
-                    if db_settings and 'confidenceThreshold' in db_settings:
-                        ai_threshold = float(db_settings['confidenceThreshold'])
-                        accuracy_threshold = float(db_settings.get('accuracyThreshold', 70))
-                    else:
+                    db_settings = self.database.load_settings()
+                    if not db_settings:
                         raise Exception("No database settings found")
+                    ai_threshold = float(db_settings['confidenceThreshold'])
+                    accuracy_threshold = float(db_settings['accuracyThreshold'])
                 except Exception as db_error:
-                    # Log database failure and use method that enforces database-first
                     self.console_logger.log('ERROR', f'Database settings failed in reset signals: {db_error}')
-                    ai_threshold = self.get_ai_confidence_threshold()  # Uses database-first logic
-                    # Get accuracy threshold with database-first approach
-                    try:
-                        db_settings = self.database.load_settings()
-                        accuracy_threshold = float(db_settings.get('accuracyThreshold', 70)) if db_settings else 70
-                    except:
-                        accuracy_threshold = self.settings.bot.get('ai_accuracy_threshold', 70)
+                    continue  # Skip this signal if database fails
                 
                 # If signal still meets requirements, reset to waiting
                 if confidence >= ai_threshold and accuracy > accuracy_threshold:  # Basic quality check
@@ -691,7 +683,17 @@ class AIWorker:
                         'volumes': {}
                     }
                     
-                    major_pairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
+                    # Get major pairs from database settings
+                    try:
+                        db_settings = self.database.load_settings()
+                        major_pairs = db_settings.get('majorPairs', ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'])
+                    except:
+                        # Get major pairs from database settings
+            try:
+                db_settings = self.database.load_settings()
+                major_pairs = db_settings.get('majorPairs', ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'])
+            except:
+                major_pairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
                     
                     for symbol in major_pairs:
                         market_data = self._collect_market_data(symbol)
@@ -717,12 +719,20 @@ class AIWorker:
                     }
                 except Exception as data_error:
                     self.console_logger.log('WARNING', f'Failed to get market data for manual condition: {data_error}')
-                    # Return user condition with fallback metrics
-                    return {
-                        'avg_volatility': 2.0,
-                        'market_trend': user_market_condition,
-                        'volume_strength': 0
-                    }
+                    # Return user condition with database default metrics
+                    try:
+                        db_settings = self.database.load_settings()
+                        return {
+                            'avg_volatility': float(db_settings.get('defaultVolatility', 2.0)),
+                            'market_trend': user_market_condition,
+                            'volume_strength': float(db_settings.get('defaultVolumeStrength', 0))
+                        }
+                    except:
+                        return {
+                            'avg_volatility': 2.0,
+                            'market_trend': user_market_condition,
+                            'volume_strength': 0
+                        }
             
             # Auto-detection mode (original logic)
             self.console_logger.log('INFO', '📊 Auto-detecting market conditions from price data')
@@ -735,7 +745,12 @@ class AIWorker:
                 'correlations': {}
             }
             
-            major_pairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
+            # Get major pairs from database settings
+            try:
+                db_settings = self.database.load_settings()
+                major_pairs = db_settings.get('majorPairs', ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'])
+            except:
+                major_pairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
             
             for symbol in major_pairs:
                 market_data = self._collect_market_data(symbol)
@@ -773,11 +788,20 @@ class AIWorker:
             
         except Exception as e:
             self.console_logger.log('WARNING', f'Failed to analyze market conditions: {str(e)}')
-            return {
-                'avg_volatility': 2.0,
-                'market_trend': 'neutral',
-                'volume_strength': 0
-            }
+            # Use database default market conditions
+            try:
+                db_settings = self.database.load_settings()
+                return {
+                    'avg_volatility': float(db_settings.get('defaultVolatility', 2.0)),
+                    'market_trend': db_settings.get('defaultMarketTrend', 'neutral'),
+                    'volume_strength': float(db_settings.get('defaultVolumeStrength', 0))
+                }
+            except:
+                return {
+                    'avg_volatility': 2.0,
+                    'market_trend': 'neutral',
+                    'volume_strength': 0
+                }
     
     def _train_symbol_model(self, symbol, indicators, sentiment):
         """Train AI model for specific symbol"""
@@ -800,19 +824,16 @@ class AIWorker:
             
         except Exception as e:
             self.console_logger.log('WARNING', f'Failed to train model for {symbol}: {str(e)}')
-            # Use dynamic accuracy threshold from database first, then settings
+            # Use dynamic accuracy threshold from database only
             try:
-                from db_singleton import get_database
-                db = get_database()
-                db_settings = db.load_settings()
-                if db_settings and 'accuracyThreshold' in db_settings:
-                    accuracy_threshold = float(db_settings['accuracyThreshold'])
-                else:
+                db_settings = self.database.load_settings()
+                if not db_settings or 'accuracyThreshold' not in db_settings:
                     raise Exception("No database settings found")
+                accuracy_threshold = float(db_settings['accuracyThreshold'])
+                return float(accuracy_threshold), float(accuracy_threshold)
             except Exception as db_error:
-                # Fall back to YAML settings
-                accuracy_threshold = self.settings.bot.get('ai_accuracy_threshold', 70)
-            return float(accuracy_threshold), float(accuracy_threshold)
+                self.console_logger.log('ERROR', f'Failed to get database accuracy threshold: {db_error}')
+                return 70.0, 70.0  # Minimal fallback
     
     def _emit_training_progress(self):
         """Emit training progress to frontend"""
@@ -961,24 +982,15 @@ class AIWorker:
             # Sort by confidence (highest first), then accuracy (highest first)
             waiting_signals.sort(key=lambda x: (x.get('confidence', 0), x.get('accuracy', 0)), reverse=True)
             
-            # Get confidence threshold from database first, then settings
+            # Get confidence threshold from database only
             try:
-                # Try database first
-                from db_singleton import get_database
-                db = get_database()
-                db_settings = db.load_settings()
-                if db_settings and 'confidenceThreshold' in db_settings:
-                    ai_threshold = float(db_settings['confidenceThreshold'])
-                else:
+                db_settings = self.database.load_settings()
+                if not db_settings or 'confidenceThreshold' not in db_settings:
                     raise Exception("No database settings found")
+                ai_threshold = float(db_settings['confidenceThreshold'])
             except Exception as db_error:
-                # Fall back to YAML settings
-                try:
-                    from utils.settings_loader import Settings
-                    settings = Settings.load('config/settings.yaml')
-                    ai_threshold = settings.ai_confidence_threshold
-                except:
-                    ai_threshold = self.settings.bot.get('ai_confidence_threshold', 75)  # Final fallback
+                self.console_logger.log('ERROR', f'Failed to get database confidence threshold: {db_error}')
+                return  # Cannot proceed without database settings
             
             signals_processed = 0
             trades_executed = 0
@@ -1088,24 +1100,15 @@ class AIWorker:
         }
     
     def get_ai_confidence_threshold(self):
-        """Get AI confidence threshold from database first, then settings"""
+        """Get AI confidence threshold from database only"""
         try:
-            # Try database first
-            from db_singleton import get_database
-            db = get_database()
-            db_settings = db.load_settings()
-            if db_settings and 'confidenceThreshold' in db_settings:
-                return float(db_settings['confidenceThreshold'])
+            db_settings = self.database.load_settings()
+            if not db_settings or 'confidenceThreshold' not in db_settings:
+                raise Exception("No database settings found")
+            return float(db_settings['confidenceThreshold'])
         except Exception as db_error:
-            pass  # Fall back to YAML
-        
-        # Fall back to YAML settings
-        try:
-            from utils.settings_loader import Settings
-            settings = Settings.load('config/settings.yaml')
-            return settings.ai_confidence_threshold
-        except:
-            return self.settings.bot.get('ai_confidence_threshold', 75.0)
+            self.console_logger.log('ERROR', f'Failed to get database confidence threshold: {db_error}')
+            return 75.0  # Minimal fallback only
     
     def get_active_positions_count(self):
         """Get count of active positions AND pending orders"""
@@ -1231,21 +1234,29 @@ class AIWorker:
                     self.console_logger.log('ERROR', '❌ Database settings not available - STOPPING trade execution')
                     return False
                 
-                # User leverage settings
-                min_leverage = int(db_settings.get('minLeverage', 1))
-                max_leverage = int(db_settings.get('maxLeverage', 10))
+                # User leverage settings - NO FALLBACK
+                if 'minLeverage' not in db_settings or 'maxLeverage' not in db_settings:
+                    raise Exception("Leverage settings missing from database")
+                min_leverage = int(db_settings['minLeverage'])
+                max_leverage = int(db_settings['maxLeverage'])
                 leverage_strategy = db_settings.get('leverageStrategy', 'confidence_based')
                 
-                # User trade amount settings
-                risk_per_trade = float(db_settings.get('riskPerTrade', 2.0))  # Percentage of balance
-                min_trade_amount = float(db_settings.get('minTradeAmount', 5.0))  # Minimum $5
+                # User trade amount settings - NO FALLBACK
+                if 'riskPerTrade' not in db_settings or 'minTradeAmount' not in db_settings:
+                    raise Exception("Trade amount settings missing from database")
+                risk_per_trade = float(db_settings['riskPerTrade'])
+                min_trade_amount = float(db_settings['minTradeAmount'])
                 
-                # User concurrent trades setting
-                max_concurrent_trades = int(db_settings.get('maxConcurrentTrades', 20))
+                # User concurrent trades setting - NO FALLBACK
+                if 'maxConcurrentTrades' not in db_settings:
+                    raise Exception("Max concurrent trades setting missing from database")
+                max_concurrent_trades = int(db_settings['maxConcurrentTrades'])
                 
-                # Take profit limits - ENFORCE STRICTLY
-                min_take_profit = float(db_settings.get('minTakeProfitPercent', 1.0))
-                max_take_profit = float(db_settings.get('maxTakeProfitPercent', 10.0))
+                # Take profit limits - ENFORCE STRICTLY - NO FALLBACK
+                if 'minTakeProfitPercent' not in db_settings or 'maxTakeProfitPercent' not in db_settings:
+                    raise Exception("Take profit limits missing from database")
+                min_take_profit = float(db_settings['minTakeProfitPercent'])
+                max_take_profit = float(db_settings['maxTakeProfitPercent'])
                 
                 # Update AI worker's max concurrent trades from user settings
                 self.max_concurrent_trades = max_concurrent_trades
@@ -1267,12 +1278,13 @@ class AIWorker:
             # Ensure leverage is within user's bounds
             leverage = max(min_leverage, min(max_leverage, leverage))
             
-            # Get current account balance
+            # Get current account balance - NO FALLBACK
             try:
                 balance_data = self.bybit_session.get_wallet_balance(accountType="UNIFIED")
                 total_balance = float(balance_data['result']['list'][0]['totalWalletBalance'])
-            except:
-                total_balance = 1000  # Fallback if balance fetch fails
+            except Exception as balance_error:
+                self.console_logger.log('ERROR', f'❌ Failed to get balance: {balance_error} - STOPPING trade execution')
+                return False  # STOP execution if balance fetch fails
             
             # Calculate trade amount as percentage of balance (user's risk setting)
             # Fix: User expects 5% to mean 0.5% (divide by 10)
@@ -1299,10 +1311,16 @@ class AIWorker:
                 self.console_logger.log('ERROR', f'❌ Calculated quantity {total_qty} is below minimum {min_order_qty} for {symbol}')
                 return False
             
-            # Verify minimum order value
+            # Verify minimum order value from database
+            try:
+                db_settings = self.database.load_settings()
+                min_order_value = float(db_settings.get('minOrderValue', 5.0))
+            except:
+                min_order_value = 5.0  # ByBit default
+            
             total_order_value = total_qty * current_price
-            if total_order_value < 5.0:
-                self.console_logger.log('ERROR', f'❌ Order value ${total_order_value:.2f} is below ByBit minimum $5.00 for {symbol}')
+            if total_order_value < min_order_value:
+                self.console_logger.log('ERROR', f'❌ Order value ${total_order_value:.2f} is below minimum ${min_order_value:.2f} for {symbol}')
                 return False
             
             self.console_logger.log('INFO', f'💰 Trade Amount Setting: ${trade_amount_usd:.2f} ({risk_per_trade:.1f}% of ${total_balance:.2f})')
@@ -1326,16 +1344,19 @@ class AIWorker:
             except Exception as lev_error:
                 self.console_logger.log('WARNING', f'⚠️ Leverage setting error: {str(lev_error)}')
             
-            # Calculate stop loss and take profit from signal (AI determined)
-            stop_loss_pct = float(signal.get('stop_loss', 2.0))  # AI determines SL
-            take_profit_pct = float(signal.get('take_profit', 3.0))  # AI determines TP
+            # Calculate stop loss and take profit from signal (AI determined) - NO FALLBACK
+            if 'stop_loss' not in signal or 'take_profit' not in signal:
+                self.console_logger.log('ERROR', f'❌ AI signal missing stop_loss or take_profit - STOPPING trade execution')
+                return False
+            stop_loss_pct = float(signal['stop_loss'])
+            take_profit_pct = float(signal['take_profit'])
             
             # Ensure take profit is within configured bounds - ENFORCE STRICTLY from database
             # Use the limits we already loaded earlier
             take_profit_pct = max(min_take_profit, min(max_take_profit, take_profit_pct))
             
-            if take_profit_pct != float(signal.get('take_profit', 3.0)):
-                self.console_logger.log('WARNING', f'⚠️ Take profit adjusted from {signal.get("take_profit", 3.0):.2f}% to {take_profit_pct:.2f}% (limits: {min_take_profit:.2f}-{max_take_profit:.2f}%)')
+            if take_profit_pct != float(signal['take_profit']):
+                self.console_logger.log('WARNING', f'⚠️ Take profit adjusted from {signal["take_profit"]:.2f}% to {take_profit_pct:.2f}% (limits: {min_take_profit:.2f}-{max_take_profit:.2f}%)')
             
             self.console_logger.log('INFO', f'📊 Using TP: {take_profit_pct:.2f}% (bounds: {min_take_profit:.2f}-{max_take_profit:.2f}%)')
             
@@ -1389,13 +1410,22 @@ class AIWorker:
                 tp_levels = []
                 tp_order_ids = []
                 
-                # Divide total quantity into 4 equal parts (25% each)
-                tp_qty = total_qty / 4
-                tp_qty = max(min_order_qty, round(tp_qty / qty_step) * qty_step)  # Ensure proper step size
+                # Get TP levels from database settings
+                try:
+                    db_settings = self.database.load_settings()
+                    tp_levels_count = int(db_settings.get('takeProfitLevels', 4))
+                    tp_split_percent = float(db_settings.get('takeProfitSplitPercent', 25.0))
+                except:
+                    tp_levels_count = 4
+                    tp_split_percent = 25.0
                 
-                for i in range(1, 5):  # 4 levels total
-                    # Calculate TP price for each level (25%, 50%, 75%, 100% of total TP range)
-                    tp_percentage = (take_profit_pct * i) / 4  # Divide TP into 4 levels
+                # Divide total quantity into equal parts
+                tp_qty = total_qty / tp_levels_count
+                tp_qty = max(min_order_qty, round(tp_qty / qty_step) * qty_step)
+                
+                for i in range(1, tp_levels_count + 1):
+                    # Calculate TP price for each level
+                    tp_percentage = (take_profit_pct * i) / tp_levels_count
                     
                     if side == 'Buy':
                         tp_price = ai_entry_price * (1 + tp_percentage / 100)  # Use AI entry price
@@ -1475,8 +1505,8 @@ class AIWorker:
                     'entry_filled': False,  # Track if entry order is filled
                     'tp1_hit': False,
                     'sl_moved_to_breakeven': False,
-                    'trailing_stop_enabled': signal.get('trailing_stop_enabled', True),
-                    'trailing_stop_distance': signal.get('trailing_stop_distance', 1.0),
+                    'trailing_stop_enabled': bool(signal.get('trailing_stop_enabled', True)),
+                    'trailing_stop_distance': float(signal.get('trailing_stop_distance', 1.0)),
                     'timestamp': datetime.now().isoformat(),
                     'trade_amount_usd': trade_amount_usd
                 }
@@ -1549,17 +1579,25 @@ class AIWorker:
         try:
             # Get current orders to check TP status with retry logic
             orders = None
-            for attempt in range(3):  # Retry up to 3 times
+            try:
+                db_settings = self.database.load_settings()
+                max_retries = int(db_settings.get('apiRetryCount', 3))
+                retry_delay = float(db_settings.get('apiRetryDelay', 1.0))
+            except:
+                max_retries = 3
+                retry_delay = 1.0
+            
+            for attempt in range(max_retries):
                 try:
                     orders = self.bybit_session.get_open_orders(category="linear")
                     if orders and 'result' in orders:
                         break
-                    time.sleep(1)  # Wait 1 second between retries
+                    time.sleep(retry_delay)
                 except Exception as api_error:
-                    if attempt == 2:  # Last attempt
-                        self.console_logger.log('ERROR', f'❌ Failed to fetch orders after 3 attempts: {str(api_error)}')
+                    if attempt == max_retries - 1:
+                        self.console_logger.log('ERROR', f'❌ Failed to fetch orders after {max_retries} attempts: {str(api_error)}')
                         return
-                    time.sleep(2)  # Wait longer between retries
+                    time.sleep(retry_delay * 2)  # Longer delay between retries
             
             if not orders or 'result' not in orders:
                 self.console_logger.log('WARNING', '⚠️ Could not fetch open orders for monitoring after retries')
@@ -1567,17 +1605,17 @@ class AIWorker:
             
             # Get current positions with retry logic
             positions = None
-            for attempt in range(3):  # Retry up to 3 times
+            for attempt in range(max_retries):
                 try:
                     positions = self.bybit_session.get_positions(category="linear")
                     if positions and 'result' in positions:
                         break
-                    time.sleep(1)  # Wait 1 second between retries
+                    time.sleep(retry_delay)
                 except Exception as api_error:
-                    if attempt == 2:  # Last attempt
-                        self.console_logger.log('ERROR', f'❌ Failed to fetch positions after 3 attempts: {str(api_error)}')
+                    if attempt == max_retries - 1:
+                        self.console_logger.log('ERROR', f'❌ Failed to fetch positions after {max_retries} attempts: {str(api_error)}')
                         return
-                    time.sleep(2)  # Wait longer between retries
+                    time.sleep(retry_delay * 2)  # Longer delay between retries
             
             if not positions or 'result' not in positions:
                 self.console_logger.log('WARNING', '⚠️ Could not fetch positions for monitoring after retries')
@@ -1740,11 +1778,17 @@ class AIWorker:
                     
                     self.console_logger.log('INFO', f'📊 Current position size for {symbol}: {current_position_size}')
                     
-                    # Calculate breakeven + 0.1% price
+                    # Calculate breakeven + percentage from database
+                    try:
+                        db_settings = self.database.load_settings()
+                        breakeven_percentage = float(db_settings.get('breakevenPercentage', 0.1)) / 100
+                    except:
+                        breakeven_percentage = 0.001  # 0.1% default
+                    
                     if side == 'Buy':
-                        new_sl_price = entry_price * 1.001  # +0.1%
+                        new_sl_price = entry_price * (1 + breakeven_percentage)
                     else:
-                        new_sl_price = entry_price * 0.999  # -0.1%
+                        new_sl_price = entry_price * (1 - breakeven_percentage)
                     
                     # Update stop loss
                     try:
@@ -2311,7 +2355,13 @@ class AIWorker:
                 try:
                     while self.is_running:
                         self.breakeven_monitor.monitor_positions()
-                        time.sleep(30)  # Check every 30 seconds
+                        # Get monitoring interval from database
+                        try:
+                            db_settings = self.database.load_settings()
+                            monitor_interval = int(db_settings.get('breakevenMonitorInterval', 30))
+                            time.sleep(monitor_interval)
+                        except:
+                            time.sleep(30)  # Default fallback
                 except Exception as e:
                     self.console_logger.log('ERROR', f'❌ Breakeven monitor error: {e}')
                 finally:
